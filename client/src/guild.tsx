@@ -6,6 +6,7 @@ import {
 import { JOB_DEFS } from '../../shared/src/jobs';
 import type { Game, Hud } from './game/Game';
 import { t, tm, tv, useT } from './i18n';
+import { Icon } from './ui/icons';
 
 const GLYPH: Record<string, string> = { shield: '⛨', star: '★', flame: '♨', drop: '◆', bolt: 'ϟ', wing: '❦', crown: '♛', tree: '♣' };
 const rankName = (r: number) => tv(GUILD_RANKS[r]);
@@ -36,7 +37,7 @@ export function GuildPanel({ hud, game, onClose }: { hud: Hud; game: Game; onClo
     <div className="hud qlog panel" role="dialog" aria-label={t('guild.title')}>
       <div className="sheethead">
         <h2>{g ? <><EmblemBadge e={g.emblem} /> {g.name} <small className="sub">[{g.tag}]</small></> : t('guild.title')}</h2>
-        <button className="link" onClick={onClose} aria-label={t('guild.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('guild.close')}>{t('common.close')}</button>
       </div>
       {g ? <GuildView hud={hud} game={game} /> : <Found hud={hud} game={game} />}
     </div>
@@ -107,7 +108,7 @@ function GuildView({ hud, game }: { hud: Hud; game: Game }) {
             const info = GUILD_BUILDING_INFO[k], lv = g.buildings[k], full = lv >= GUILD_BUILDING_MAX;
             return (
               <div key={k} className="shoprow">
-                <span className="bicon" aria-hidden="true">{{ barracks: '⚔', treasury: '🪙', weaponry: '🗡', kitchen: '🍲', fortress: '🛡' }[k]}</span>
+                <span className="bicon" aria-hidden="true"><Icon name={({ barracks: 'auto', treasury: 'coin', weaponry: 'sword', kitchen: 'pot', fortress: 'guild' } as const)[k as 'barracks'] ?? 'guild'} size={20} /></span>
                 <span><b>{info.name}</b> <small>{t('guild.bLevel', { n: lv, max: GUILD_BUILDING_MAX })}</small>
                   <div className="bar"><i style={{ width: `${(lv / GUILD_BUILDING_MAX) * 100}%` }} /></div>
                   <small>{t('guild.bNow', { pct: Math.round(info.pct * lv * 10) / 10, what: info.what })}{full ? '' : ` → +${Math.round(info.pct * (lv + 1) * 10) / 10}%`}</small></span>

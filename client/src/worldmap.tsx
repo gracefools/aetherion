@@ -14,6 +14,7 @@ import { miniColors as hdMiniColors } from './game/hdart';
 import type { Game, Hud } from './game/Game';
 import { settings } from './settings';
 import { t, useT, type Key } from './i18n';
+import { Icon } from './ui/icons';
 
 type Kind = 'you' | 'party' | 'town' | 'waystone' | 'dungeon' | 'hunt' | 'elite' | 'boss' | 'exit' | 'marker' | 'pvp';
 interface Pin { kind: Kind; x: number; y: number; label: string; id?: string; r?: number }
@@ -128,7 +129,7 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
     <div className="hud worldmap panel" role="dialog" aria-label={t('map.title')}>
       <div className="sheethead">
         <h2>{t('map.title')}</h2>
-        <button className="link" onClick={onClose} aria-label={t('map.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('map.close')}>{t('common.close')}</button>
       </div>
       <ol className="regions" aria-label={t('map.regions')}>
         {MAPS.map((r, i) => {
@@ -147,10 +148,10 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
                   {[...WORLD_BOSSES, ...DEPTH_BOSSES].some((b) => b.zone === r) && <i title={t('map.legend.boss')}>{GLYPH.boss}</i>}
                   {d.depth && <i title={t('pvp.zone.open')}>{GLYPH.pvp}</i>}
                   {hud.wevent?.zone === r && <i className="evpin" title={t(`ev.${hud.wevent.kind}` as any)}>✦</i>}
-                  {hud.territory.held.filter((x) => x.zone === r).map((x) => <i key="g" className="guildpin" title={t('map.heldBy', { name: x.name })}>🏰{x.tag}</i>)}
+                  {hud.territory.held.filter((x) => x.zone === r).map((x) => <i key="g" className="guildpin" title={t('map.heldBy', { name: x.name })}><Icon name="castle" size={12} className="inl" />{x.tag}</i>)}
                   {hud.territory.factions[r] && <i className="facpin" title={t('map.factionHolds', { name: hud.factions.find((f) => f.id === hud.territory.factions[r])?.name ?? hud.territory.factions[r] })}>⚑</i>}
                   {hud.siege?.zone === r && <i className="siegepin" title={t('siege.label')}>⚔</i>}
-                  {!ok && <i title={t('map.unexplored')}>🔒</i>}
+                  {!ok && <i title={t('map.unexplored')}><Icon name="lock" size={13} className="inl" /></i>}
                 </span>
               </button>
             </li>
@@ -249,7 +250,7 @@ function RegionView({ region, open, pins, adding, onPick, draft }: { region: str
         <span key={i} className={'pin ' + p.kind} style={{ left: `${(p.x / W) * 100}%`, top: `${(p.y / H) * 100}%` }} title={p.label} role="img" aria-label={p.label}>{GLYPH[p.kind]}</span>
       ))}
       {draft && <span className="pin marker draft" style={{ left: `${(draft.x / W) * 100}%`, top: `${(draft.y / H) * 100}%` }} aria-hidden="true">{GLYPH.marker}</span>}
-      {!open && <span className="lockover">🔒 {t('map.unexplored')}</span>}
+      {!open && <span className="lockover"><Icon name="lock" size={16} className="inl" /> {t('map.unexplored')}</span>}
     </div>
   );
 }

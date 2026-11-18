@@ -27,7 +27,11 @@ import { AscensionPanel } from './ascensionUi';
 import { LifePanel } from './lifeUi';
 import { FUSION_LEVEL, FUSION_RUNE_LEVEL, fusionsFor } from '../../shared/src/awakening';
 import { ASCENSION_LEVEL, COMBO_LEVEL, COMBO_WINDOW_MS, comboOf, PATH_INDEX, ULT_MAX } from '../../shared/src/ascension';
-import { Dock } from './dock';
+import { Dock, MENU_OF_ACTION, menuLock } from './dock';
+import { ChatBox } from './chat';
+import { startGamepad } from './gamepad';
+import { closeTopWindow, isNarrow, Win } from './windows';
+import { Icon, type IconName } from './ui/icons';
 import { StatSources } from './statsUi';
 import { Banner, BossBar, DungeonTracker, GateDialog, ReadyCheck, WorldEventTracker } from './encounters';
 import { InteractHint, NpcDialog } from './npcs';
@@ -52,6 +56,7 @@ import { STATUS } from '../../shared/src/combat';
 import { TradeInvite, TradePanel } from './trade';
 import { GuildInvite, GuildPanel } from './guild';
 import { CompanionsPanel, DepthAsk, DuelInvite, DuelStatus, PvpZoneBadge } from './pvp';
+import { toRail } from './rail';
 
 interface Character {
   id: number;
@@ -343,13 +348,14 @@ function Play({ token, character, onExit }: { token: string; character: Characte
   const [friendsP, setFriendsP] = useState(false);
   const [ascp, setAscp] = useState(false);
   const [lifep, setLifep] = useState(false);
-  // One window at a time: opening a panel closes whichever other was open, so windows never stack.
+  // Wide screens keep several windows open (see windows.tsx); on a phone opening one closes the others.
   const wins: [boolean, (b: boolean) => void][] = [[sheet, setSheet], [book, setBook], [bag, setBag], [opts, setOpts], [qlog, setQlog], [guild, setGuild], [comps, setComps], [map, setMap], [tut, setTut], [journal, setJournal], [mail, setMail], [friendsP, setFriendsP], [ascp, setAscp], [lifep, setLifep]];
   const wasOpen = useRef(wins.map((w) => w[0]));
   useEffect(() => {
     const opened = wins.findIndex((w, i) => w[0] && !wasOpen.current[i]);
-    if (opened >= 0) wins.forEach((w, i) => { if (i !== opened && w[0]) w[1](false); });
-    wasOpen.current = wins.map((w, i) => (opened >= 0 && i !== opened ? false : w[0]));
+    const single = isNarrow();
+    if (opened >= 0 && single) wins.forEach((w, i) => { if (i !== opened && w[0]) w[1](false); });
+    wasOpen.current = wins.map((w, i) => (single && opened >= 0 && i !== opened ? false : w[0]));
   });
   useEffect(() => {
     const g = new Game(canvas.current!, token, character.id);
@@ -357,6 +363,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
     (window as any).__icon = itemIcon;
     g.start(mini.current);
     setGame(g);
+    const stopPad = startGamepad(() => g.showNotice(t('pad.connected')));
     const toggles: Partial<Record<Action, (f: (b: boolean) => boolean) => void>> = {
       'panel.character': setSheet, 'panel.skills': setBook, 'panel.bag': setBag, 'panel.settings': setOpts, 'panel.auto': setAuto,
       'panel.quests': setQlog, 'panel.guild': setGuild, 'panel.companions': setComps, 'panel.map': setMap, 'panel.tutorial': setTut, 'panel.journal': setJournal, 'panel.mail': setMail, 'panel.friends': setFriendsP, 'panel.ascension': setAscp, 'panel.life': setLifep,
@@ -371,6 +378,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
         input.current?.focus();
       } else if (act === 'auto.toggle' && !e.repeat) {
         e.preventDefault();
+        if (menuLock('auto', g.hud)) return g.showNotice(t('dock.locked', { n: menuLock('auto', g.hud) }));
         if (g.hud.auto.on) g.stopAuto();
         else {
           g.startAuto();
@@ -378,9 +386,12 @@ function Play({ token, character, onExit }: { token: string; character: Characte
         }
       } else if (act && toggles[act]) {
         if (act === 'panel.tutorial') e.preventDefault(); // F1 would open the browser's help
+        const menu = MENU_OF_ACTION[act], need = menu ? menuLock(menu, g.hud) : 0;
+        if (need) return g.showNotice(t('dock.locked', { n: need }));
         toggles[act]!((s: boolean) => !s);
         if (act === 'panel.bag') markTutorial('inventory');
       } else if (e.code === 'Escape') {
+        if (closeTopWindow()) return; // one window at a time, top first
         setSheet(false);
         setBook(false);
         setBag(false);
@@ -408,29 +419,31 @@ function Play({ token, character, onExit }: { token: string; character: Characte
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerup', onUp);
+      stopPad();
       g.destroy();
     };
   }, [token, character.id]);
   return (
     <div className="play">
       <canvas ref={canvas} className="world" />
-      <div className="hud tr"><canvas ref={mini} width={144} height={144} className="minimap" /></div>
+      <div className="winlayer" />
+      <div className="hud rail"><canvas ref={mini} width={144} height={144} className="minimap" /></div>
       {game && <Guard><HudView game={game} onExit={onExit} input={input} sheet={sheet} setSheet={setSheet} book={book} setBook={setBook} bag={bag} setBag={(b) => { setBag(b); if (b) markTutorial('inventory'); }} setOpts={setOpts} auto={auto} setAuto={setAuto} setMap={setMap} /></Guard>}
-      {opts && <Guard><SettingsPanel onClose={() => setOpts(false)} signedIn inGame /></Guard>}
-      {game && map && <Guard><WorldMap game={game} onClose={() => setMap(false)} /></Guard>}
+      {opts && <Win id="settings" title={'settings.title'} width={520} onClose={() => setOpts(false)}><Guard><SettingsPanel onClose={() => setOpts(false)} signedIn inGame /></Guard></Win>}
+      {game && map && <Win id="map" title={'map.title'} width={980} onClose={() => setMap(false)}><Guard><WorldMap game={game} onClose={() => setMap(false)} /></Guard></Win>}
       {game && <Guard><TutorialCoach game={game} onOpen={() => setTut(true)} /></Guard>}
-      {game && tut && <Guard><TutorialPanel onClose={() => setTut(false)} /></Guard>}
-      {game && qlog && <Guard><QuestLog game={game} onClose={() => setQlog(false)} /></Guard>}
+      {game && tut && <Win id="help" title={'tut.panel'} onClose={() => setTut(false)}><Guard><TutorialPanel onClose={() => setTut(false)} /></Guard></Win>}
+      {game && qlog && <Win id="quests" title={'quest.log'} onClose={() => setQlog(false)}><Guard><QuestLog game={game} onClose={() => setQlog(false)} /></Guard></Win>}
       {game && <Guard><QuestTracker game={game} onOpen={() => setQlog(true)} /></Guard>}
       {game && <Guard><RiftTracker game={game} /></Guard>}
       {game && <Guard><RaidTracker game={game} /></Guard>}
       {game && <Guard><SiegeTracker game={game} /></Guard>}
       {game && <Guard><SocialPanels game={game} guild={guild} setGuild={setGuild} comps={comps} setComps={setComps} /></Guard>}
-      {game && journal && <Guard><JournalPanel game={game} onClose={() => setJournal(false)} /></Guard>}
-      {game && mail && <Guard><MailPanel game={game} onClose={() => setMail(false)} /></Guard>}
-      {game && friendsP && <Guard><FriendsPanel game={game} onClose={() => setFriendsP(false)} whisper={(name) => { const el = input.current; if (el) { el.value = `/w ${name} `; el.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(() => el.focus(), 0); } }} /></Guard>}
-      {game && ascp && <Guard><AscensionPanel game={game} onClose={() => setAscp(false)} /></Guard>}
-      {game && lifep && <Guard><LifePanel game={game} onClose={() => setLifep(false)} /></Guard>}
+      {game && journal && <Win id="journal" title={'jr.title'} onClose={() => setJournal(false)}><Guard><JournalPanel game={game} onClose={() => setJournal(false)} /></Guard></Win>}
+      {game && mail && <Win id="mail" title={'mail.title'} onClose={() => setMail(false)}><Guard><MailPanel game={game} onClose={() => setMail(false)} /></Guard></Win>}
+      {game && friendsP && <Win id="friends" title={'fr.title'} onClose={() => setFriendsP(false)}><Guard><FriendsPanel game={game} onClose={() => setFriendsP(false)} whisper={(name) => { const el = input.current; if (el) { el.value = `/w ${name} `; el.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(() => el.focus(), 0); } }} /></Guard></Win>}
+      {game && ascp && <Win id="ascension" title={'asc.title'} width={780} onClose={() => setAscp(false)}><Guard><AscensionPanel game={game} onClose={() => setAscp(false)} /></Guard></Win>}
+      {game && lifep && <Win id="life" title={'life.title'} onClose={() => setLifep(false)}><Guard><LifePanel game={game} onClose={() => setLifep(false)} /></Guard></Win>}
       {game && <DockView game={game} open={{ character: sheet, skills: book, bag, companions: comps, quests: qlog, map, auto, guild, settings: opts, help: tut, journal, mail, friends: friendsP, ascension: ascp, life: lifep }} act={{
         character: () => setSheet(!sheet), skills: () => setBook(!book), bag: () => { setBag(!bag); if (!bag) markTutorial('inventory'); }, companions: () => setComps(!comps),
         quests: () => setQlog(!qlog), map: () => setMap(!map), auto: () => setAuto(!auto), guild: () => setGuild(!guild),
@@ -452,7 +465,7 @@ function CharacterSheet({ hud, onClose }: { hud: Hud; onClose: () => void }) {
           <div className="sub">{t('common.level', { n: me.level })} {PATH_INDEX[hud.asc.path] && me.level >= ASCENSION_LEVEL ? PATH_INDEX[hud.asc.path].title : jobTitle(me.job, me.level)} · {d.role}</div>
           <div className="sub">{d.weapons[me.ap.weapon].name}: {d.weapons[me.ap.weapon].note}</div>
         </div>
-        <button className="link" onClick={onClose} aria-label={t('sheet.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('sheet.close')}>{t('common.close')}</button>
       </div>
       <div className="sheetcols">
         <div>
@@ -568,7 +581,7 @@ function SkillBook({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () =
           <button role="tab" aria-selected={tab === 'runes'} className={tab === 'runes' ? 'on' : ''} onClick={() => setTab('runes')}>{t('book.runes')}</button>
         </div>
         <div className="sub" aria-label={t('book.points')}>{t('book.points')}: <b>{hud.points}</b></div>
-        <button className="link" onClick={onClose} aria-label={t('book.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('book.close')}>{t('common.close')}</button>
       </div>
       {tab === 'skills' ? (
         <>
@@ -635,18 +648,6 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
   const hud: Hud = useSyncExternalStore(game.subscribe, game.getHud);
   useT();
   useSyncExternalStore(settings.subscribe, settings.get);
-  const [text, setText] = useState('');
-  const [ch, setCh] = useState('zone');
-  const log = useRef(null as HTMLDivElement | null);
-  useEffect(() => {
-    if (log.current) log.current.scrollTop = log.current.scrollHeight;
-  }, [hud.chat]);
-  const send = (e: any) => {
-    e.preventDefault();
-    if (text.trim()) game.sendChat(text, ch === 'party' && hud.party ? 'party' : ch === 'guild' && hud.guild ? 'guild' : 'zone');
-    setText('');
-    input.current?.blur();
-  };
   const me = hud.self, s = hud.stats;
   return (
     <>
@@ -688,14 +689,14 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
           {hud.party.members.filter((m) => m.id !== me.id).map((m) => (
             <div key={m.id} className={'pframe panel' + (m.on ? '' : ' off') + (m.hp <= 0 ? ' down' : '')}>
               <button className="pmain" onClick={() => game.selectAlly(m.id)} aria-label={t('party.select', { name: m.name })}>
-                <span>{hud.party!.leader === m.id && <i title={t('party.leader')}>★ </i>}<strong>{m.name}</strong> <small>{t('common.lv', { n: m.level })} {JOB_DEFS[m.job].name}</small></span>
+                <span>{hud.party!.leader === m.id && <i className="lead" title={t('party.leader')}><Icon name="star" size={12} /> </i>}<strong>{m.name}</strong> <small>{t('common.lv', { n: m.level })} {JOB_DEFS[m.job].name}</small></span>
                 <div className="vbar hp"><i style={{ width: `${(m.hp / m.mhp) * 100}%` }} /><span>{m.on ? (m.hp <= 0 ? t('party.fallen') : `${m.hp} / ${m.mhp}`) : t('party.disconnected')}</span></div>
                 {m.zone !== hud.party!.members.find((x) => x.id === me.id)?.zone && <small className="sub">{t('party.elsewhere')}</small>}
               </button>
               {hud.party!.leader === me.id && (
                 <span className="pctl">
-                  <button className="small" onClick={() => game.partyOp('promote', m.id)} aria-label={t('party.makeLeader', { name: m.name })} title={t('party.makeLeaderTip')}>★</button>
-                  <button className="small" onClick={() => game.partyOp('kick', m.id)} aria-label={t('party.remove', { name: m.name })} title={t('party.removeTip')}>✕</button>
+                  <button className="small" onClick={() => game.partyOp('promote', m.id)} aria-label={t('party.makeLeader', { name: m.name })} title={t('party.makeLeaderTip')}><Icon name="star" size={14} /></button>
+                  <button className="small" onClick={() => game.partyOp('kick', m.id)} aria-label={t('party.remove', { name: m.name })} title={t('party.removeTip')}><Icon name="close" size={14} /></button>
                 </span>
               )}
             </div>
@@ -715,7 +716,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       {me && s && hud.build && <Guard><Hotbar hud={hud} game={game} /></Guard>}
       {hud.cast && <div className="hud castbar" role="progressbar" aria-label={t('hud.casting', { name: hud.cast.name })}><i key={hud.cast.at} style={{ animationDuration: `${hud.cast.ms}ms` }} /><span>{hud.cast.name}</span></div>}
       {hud.notice && <div className="hud notice" role="alert">{tm(hud.notice)}</div>}
-      {book && me && s && hud.build && <Guard><SkillBook hud={hud} game={game} onClose={() => setBook(false)} /></Guard>}
+      {book && me && s && hud.build && <Win id="skills" title={'book.title'} onClose={() => setBook(false)}><Guard><SkillBook hud={hud} game={game} onClose={() => setBook(false)} /></Guard></Win>}
       {me && hud.points > 0 && !book && <button className="hud pointsbtn" onClick={() => setBook(true)}>{t(hud.points > 1 ? 'hud.points' : 'hud.point', { n: hud.points })} · {keyOf('panel.skills')}</button>}
       {hud.toast && <div className="hud toast" role="status">{tm(hud.toast)}</div>}
       {hud.dead > 0 && hud.status === 'playing' && (
@@ -726,15 +727,15 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
           <p className="sub">{t('dead.auto', { n: hud.dead })}</p>
         </div>
       )}
-      <div className="hud stats">{t('hud.nearby', { n: hud.nearby })} · {hud.ping} ms · {hud.fps} fps <button className="link" onClick={() => setKeysOpen(!keysOpen)} aria-expanded={keysOpen}>{t('dock.controls')}</button></div>
+      {toRail(<div className="hud stats">{t('hud.nearby', { n: hud.nearby })} · {hud.ping} ms · {hud.fps} fps <button className="link" onClick={() => setKeysOpen(!keysOpen)} aria-expanded={keysOpen}>{t('dock.controls')}</button></div>)}
       <div className={'hud keys' + (keysOpen ? ' open' : '')}>{t('hud.keys', {
         move: ['move.up', 'move.left', 'move.down', 'move.right'].map((a) => keyOf(a as Action)).join(''), walk: keyOf('walk'), target: keyOf('target'), attack: keyOf('attack'),
         skills: `${keyOf('skill.1')}-${keyOf('skill.7')}`, runes: `${runeKey(0, 0)} ${runeKey(0, 1)} ${runeKey(0, 2)}`, potions: `${keyOf('potion.hp')} ${keyOf('potion.mp')}`,
         interact: keyOf('interact'), bag: keyOf('panel.bag'), book: keyOf('panel.skills'), auto: keyOf('panel.auto'), quests: keyOf('panel.quests'), map: keyOf('panel.map'),
         guild: keyOf('panel.guild'), comps: keyOf('panel.companions'), settings: keyOf('panel.settings'), help: keyOf('panel.tutorial'),
       })}</div>
-      {sheet && me && s && <Guard><CharacterSheet hud={hud} onClose={() => setSheet(false)} /></Guard>}
-      {bag && me && s && <Guard><InventoryPanel hud={hud} game={game} onClose={() => setBag(false)} /></Guard>}
+      {sheet && me && s && <Win id="character" title={'sheet.title'} onClose={() => setSheet(false)}><Guard><CharacterSheet hud={hud} onClose={() => setSheet(false)} /></Guard></Win>}
+      {bag && me && s && <Win id="bag" title={'bag.title'} width={720} onClose={() => setBag(false)}><Guard><InventoryPanel hud={hud} game={game} onClose={() => setBag(false)} /></Guard></Win>}
       {(auto || hud.auto.on) && me && s && <Guard><AutoPanel hud={hud} game={game} onClose={() => setAuto(false)} /></Guard>}
       {me && <Guard><TradePanel hud={hud} game={game} /></Guard>}
       <Guard><TradeInvite hud={hud} game={game} /></Guard>
@@ -752,22 +753,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       {me && <Guard><WorldEventTracker hud={hud} /></Guard>}
       <Guard><InteractHint hud={hud} /></Guard>
       {me && <Guard><NpcDialog hud={hud} game={game} openBag={() => setBag(true)} /></Guard>}
-      <div className="hud bl panel chat">
-        <div className="chatlog" ref={log} aria-live="polite">
-          {hud.chat.map((c) => (
-            <div key={c.id} className={c.from ? c.ch ?? '' : 'sys'}>
-              {c.ch === 'party' && <i>[{t('chat.party')}] </i>}
-              {c.ch === 'guild' && <i>[{t('chat.guild')}] </i>}
-              {c.ch === 'whisper' && <i>{c.from === me?.name ? `[${t('chat.to', { name: c.to ?? '' })}] ` : `[${t('chat.whisper')}] `}</i>}
-              {c.from && !(c.ch === 'whisper' && c.from === me?.name) && <b>{c.from}: </b>}{c.from ? c.text : tm(c.text)}
-            </div>
-          ))}
-        </div>
-        <form onSubmit={send}>
-          <select aria-label={t('chat.channel')} value={ch} onChange={(e: any) => setCh(e.target.value)}><option value="zone">{t('chat.zone')}</option><option value="party" disabled={!hud.party}>{t('chat.party')}</option><option value="guild" disabled={!hud.guild}>{t('chat.guild')}</option></select>
-          <input ref={input} name="chat" value={text} onChange={(e: any) => setText(e.target.value)} maxLength={MAX_CHAT_LEN} placeholder={t('chat.placeholder', { key: keyOf('chat') })} autoComplete="off" />
-        </form>
-      </div>
+      <Guard><ChatBox hud={hud} game={game} input={input} /></Guard>
       {hud.status !== 'playing' && (
         <div className="overlay">
           <div className="panel">
@@ -840,8 +826,8 @@ function SocialPanels({ game, guild, setGuild, comps, setComps }: { game: Game; 
   if (!hud.self) return null;
   return (
     <>
-      {guild && <GuildPanel hud={hud} game={game} onClose={() => setGuild(false)} />}
-      {comps && <CompanionsPanel hud={hud} game={game} onClose={() => setComps(false)} />}
+      {guild && <Win id="guild" title={'guild.title'} onClose={() => setGuild(false)}><GuildPanel hud={hud} game={game} onClose={() => setGuild(false)} /></Win>}
+      {comps && <Win id="companions" title={'comp.title'} onClose={() => setComps(false)}><CompanionsPanel hud={hud} game={game} onClose={() => setComps(false)} /></Win>}
     </>
   );
 }
@@ -855,7 +841,7 @@ function SubSkills({ hud, game, parent }: { hud: Hud; game: Game; parent: string
         const r = b.skills[sb.id] ?? 0, why = learnBlock(me.job, me.level, b, sb.id);
         return (
           <div key={sb.id} className={'node row2 sub' + (r ? ' on' : '')}>
-            <span className="subicon" aria-hidden="true">{SUB_GLYPH[sb.mod.k]}</span>
+            <span className="subicon" aria-hidden="true"><Icon name={SUB_GLYPH[sb.mod.k] ?? 'skills'} size={18} /></span>
             <div className="grow">
               <b>{sb.name}</b> <small>{t('book.rank', { r, m: sb.maxRank })}</small>
               <div>{r ? t('sub.now', { e: subText(sb, r) }) : ''}{r && r < sb.maxRank ? ' · ' : ''}{r < sb.maxRank ? t('sub.next', { e: subText(sb, r + 1) }) : ''}</div>
@@ -867,7 +853,7 @@ function SubSkills({ hud, game, parent }: { hud: Hud; game: Game; parent: string
     </div>
   );
 }
-const SUB_GLYPH: Record<string, string> = { dmg: '⚔', cd: '⏱', cost: '◇', area: '◎', dur: '⧗', crit: '✦', heal: '✚', range: '➶', cast: '⚡', targets: '⋔', apply: '☣' };
+const SUB_GLYPH: Record<string, IconName> = { dmg: 'sword', cd: 'clock', cost: 'gem', area: 'target', dur: 'hourglass', crit: 'burst', heal: 'heal', range: 'bow', cast: 'bolt', targets: 'fork', apply: 'drop' };
 /** What a sub-skill does at a rank, in the player's language. */
 function subText(sb: SubSkillDef, rank: number): string {
   const m = sb.mod;

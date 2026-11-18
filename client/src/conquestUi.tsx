@@ -4,6 +4,8 @@ import { RAID_LEVEL, RAID_MAX, RAID_MIN, SIEGE_LEVEL } from '../../shared/src/co
 import { ZONES } from '../../shared/src/world';
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
+import { toRail } from './rail';
+import { Icon } from './ui/icons';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
@@ -24,7 +26,7 @@ export function RaidHerald({ hud, game }: { hud: Hud; game: Game }) {
       {!list.length && <p className="sub">{t('raid.none')}</p>}
       {list.map((l) => (
         <div key={l.id} className="shoprow">
-          <span className="glyph">⚔</span>
+          <span className="glyph"><Icon name="auto" size={18} /></span>
           <span>{t('raid.groupOf', { name: l.leader, n: l.members.length, max: RAID_MAX, lv: l.avg })}<small> {l.members.join(', ')}</small></span>
           {!mine && <button className="small" disabled={low || l.members.length >= RAID_MAX} onClick={() => game.raidOp('join', l.id)}>{t('raid.join')}</button>}
         </div>
@@ -38,7 +40,7 @@ export function RaidTracker({ game }: { game: Game }) {
   const hud = useSyncExternalStore(game.subscribe, game.getHud) as Hud;
   const r = hud.raid;
   if (!r) return null;
-  return (
+  return toRail(
     <div className="hud dtracker panel" role="status" aria-label={t('raid.progress')}>
       <strong>{t('raid.name')}</strong> <span className="sub">{t('raid.raiders', { n: r.players })}</span>
       <div className="stages">{[1, 2, 3].map((s) => <span key={s} className={r.stage > s || r.state === 'won' ? 'done' : r.stage === s ? 'on' : ''} />)}</div>

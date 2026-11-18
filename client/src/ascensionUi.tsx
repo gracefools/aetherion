@@ -38,7 +38,7 @@ export function AscensionPanel({ game, onClose }: { game: Game; onClose: () => v
     <div className="hud ascension panel" role="dialog" aria-label={t('asc.title')}>
       <div className="sheethead">
         <h2>{t('asc.title')}</h2>
-        <button className="link" onClick={onClose} aria-label={t('asc.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('asc.close')}>{t('common.close')}</button>
       </div>
       {me.level < ASCENSION_LEVEL && <p className="sub">{t('asc.locked', { n: ASCENSION_LEVEL })}</p>}
       <section aria-label={t('asc.paths')}>

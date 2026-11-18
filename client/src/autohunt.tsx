@@ -8,6 +8,8 @@ import { JOB_DEFS } from '../../shared/src/jobs';
 import type { Game, Hud } from './game/Game';
 import { t, tm, useT, type Key } from './i18n';
 import { keyOf } from './game/Game';
+import { toRail } from './rail';
+import { Icon } from './ui/icons';
 
 const TOGGLES: [keyof AutoConfig, Key, Key][] = [
   ['attack', 'auto.t.attack', 'auto.t.attackTip'],
@@ -69,22 +71,22 @@ export function AutoPanel({ hud, game, onClose }: { hud: Hud; game: Game; onClos
     ? <button className="danger small" onClick={() => game.stopAuto()} title={t('auto.keyTip', { key })}>{t('auto.stop')}</button>
     : <button className="primary small" disabled={hud.dead > 0 || hud.status !== 'playing'} onClick={() => game.startAuto()} title={t('auto.keyTip', { key })}>{t('auto.start')}</button>;
   if (min)
-    return (
+    return toRail(
       <div className={'hud autopanel automin panel' + (a.on ? ' on' : '')} role="region" aria-label={t('auto.title')}>
         <strong>{t('auto.short')}</strong>
         <span className={'chip ' + (a.on ? 'live' : 'idle')} role="status" aria-label={t('auto.statusLabel')}>{a.on ? t('auto.running') : t('auto.off')}</span>
         <span className="autominstat" aria-live="polite">{a.on ? `${tm(a.status)} · ${a.stats.kills}` : `${key}`}</span>
         {startStop}
-        <button className="link" onClick={() => setMin(false)} aria-label={t('auto.expand')} title={t('auto.expand')}>▢</button>
-        {!a.on && <button className="link" onClick={onClose} aria-label={t('auto.close')}>✕</button>}
+        <button className="link" onClick={() => setMin(false)} aria-label={t('auto.expand')} title={t('auto.expand')}><Icon name="expand" size={14} /></button>
+        {!a.on && <button className="link" onClick={onClose} aria-label={t('auto.close')}><Icon name="close" size={14} /></button>}
       </div>
     );
-  return (
+  return toRail(
     <div className={'hud autopanel panel' + (a.on ? ' on' : '')} role="region" aria-label={t('auto.title')}>
       <div className="autohead">
         <strong>{t('auto.title')}</strong>
         <span className={'chip ' + (a.on ? 'live' : 'idle')} role="status" aria-label={t('auto.statusLabel')}>{a.on ? t('auto.running') : t('auto.off')}</span>
-        <button className="link" onClick={() => setMin(true)} aria-label={t('auto.minimize')} title={t('auto.minimize')}>▁</button>
+        <button className="link" onClick={() => setMin(true)} aria-label={t('auto.minimize')} title={t('auto.minimize')}><Icon name="minimize" size={14} /></button>
         <button className="link" onClick={onClose} aria-label={t('auto.close')}>{t('common.close')}</button>
       </div>
       <div className="autostatus" aria-live="polite">{tm(a.status)}</div>

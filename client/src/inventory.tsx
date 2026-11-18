@@ -150,7 +150,7 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
             <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t(label)}</button>
           ))}
         </div>
-        <button className="link" onClick={onClose} aria-label={t('bag.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('bag.close')}>{t('common.close')}</button>
       </div>
       {tab === 'arm' && <ArmamentTab hud={hud} game={game} />}
       {tab === 'sigil' && <SigilTab hud={hud} game={game} />}

@@ -26,7 +26,7 @@ export function LifePanel({ game, onClose }: { game: Game; onClose: () => void }
     <div className="hud lifepanel panel" role="dialog" aria-label={t('life.title')}>
       <div className="sheethead">
         <h2>{t('life.title')}</h2>
-        <button className="link" onClick={onClose} aria-label={t('life.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('life.close')}>{t('common.close')}</button>
       </div>
       <div className="tabs" role="tablist">
         {TABS.map((x) => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{t(`life.tab.${x}` as any)}</button>)}

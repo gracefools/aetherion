@@ -308,4 +308,8 @@ export const id: Record<keyof typeof en, string> = {
   'v.Normal': 'Normal', 'v.Hard': 'Sulit', 'v.Nightmare': 'Mimpi Buruk',
   'v.Neutral': 'Netral', 'v.Friendly': 'Bersahabat', 'v.Honored': 'Dihormati', 'v.Revered': 'Dimuliakan', 'v.Exalted': 'Diagungkan',
   'v.Leader': 'Ketua', 'v.Officer': 'Perwira', 'v.Member': 'Anggota', 'v.Recruit': 'Rekrutan',
+  'mail.hasItems': 'Ada barang terlampir', 'win.close': 'Tutup {name}', 'win.moveHint': 'Seret untuk memindahkan · klik dua kali untuk mengembalikan ke tengah',
+  'chat.tabs': 'Tampilkan pesan dari', 'chat.tab.all': 'Semua', 'chat.tab.zone': 'Zona', 'chat.tab.party': 'Party', 'chat.tab.guild': 'Guild', 'chat.tab.whisper': 'Bisikan', 'chat.tab.sys': 'Sistem',
+  'chat.unread': '{n} baru', 'chat.emptyTab': 'Belum ada apa-apa.',
+  'dock.new': 'Baru', 'dock.locked': 'Terbuka di level {n}', 'gfx.questMarkers': 'Penanda misi', 'pad.connected': 'Kontroler tersambung',
 };

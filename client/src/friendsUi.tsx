@@ -28,7 +28,7 @@ export function FriendsPanel({ game, onClose, whisper }: { game: Game; onClose: 
     <div className="hud mailbox friends panel" role="dialog" aria-label={t('fr.title')}>
       <div className="sheethead">
         <h2>{t('fr.title')} <small className="sub">{t('fr.count', { n: friends.length, on: friends.filter((f) => f.online).length, max: FRIENDS_MAX })}</small></h2>
-        <button className="link" onClick={onClose} aria-label={t('fr.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('fr.close')}>{t('common.close')}</button>
       </div>
       <form className="actions" onSubmit={add}>
         <input value={name} onChange={(e: any) => setName(e.target.value)} placeholder={t('fr.addPlaceholder')} maxLength={20} aria-label={t('fr.addLabel')} />

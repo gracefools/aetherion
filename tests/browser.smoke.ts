@@ -785,7 +785,7 @@ try {
     a = await au();
     assert.equal(a.gains.master, 0, 'mute all silences everything');
     await forget();
-    await panel.getByRole('button', { name: 'Close settings' }).click();
+    await p1.getByRole('button', { name: 'Close Settings', exact: true }).click(); // the window's title-bar close
     await p1.waitForTimeout(200);
     assert.deepEqual((await au()).log, [], 'no effect is even started while muted');
     await p1.keyboard.press('KeyO');
@@ -1344,7 +1344,7 @@ try {
     await clash.getByRole('button', { name: 'Use it here instead' }).click();
     await p1.waitForFunction(() => (window as any).__settings.get().keys.attack[0] === 'KeyQ');
     assert.deepEqual((await gs()).keys['rune.1.1'], [], 'the key moved, it is not used twice');
-    await set.getByRole('button', { name: 'Close settings' }).click();
+    await p1.getByRole('button', { name: 'Close Settings', exact: true }).click();
     await p1.waitForFunction(() => /Q attack/.test(document.querySelector('.hud.keys')?.textContent ?? ''));
     // the rebound key attacks: the server starts an auto-attack on a monster next to the player
     const dummy = w.spawn(L.room, 'mossling', L.x + 30, L.y);
@@ -1382,7 +1382,7 @@ try {
     const atur = p1.getByRole('dialog', { name: 'Pengaturan' });
     await atur.getByRole('tab', { name: 'Antarmuka', selected: true }).waitFor();
     assert.equal(await p1.evaluate(() => document.documentElement.lang), 'id');
-    await atur.getByRole('button', { name: 'Tutup pengaturan' }).click();
+    await p1.getByRole('button', { name: 'Tutup Pengaturan', exact: true }).click();
     await p1.getByRole('button', { name: 'Buka inventaris' }).waitFor();
     await p1.getByRole('toolbar', { name: 'Kemampuan' }).waitFor();
     await p1.keyboard.press('Enter');
@@ -1395,7 +1395,7 @@ try {
     await atur.getByLabel('Bahasa').selectOption('en');
     await set.getByRole('tab', { name: 'Graphics' }).click();
     await set.getByLabel('Effects quality').selectOption('high');
-    await set.getByRole('button', { name: 'Close settings' }).click();
+    await p1.getByRole('button', { name: 'Close Settings', exact: true }).click();
 
     // the tutorial: steps already done in this session are ticked; skip, read again, resume
     await p1.keyboard.press('F1');

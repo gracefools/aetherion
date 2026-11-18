@@ -29,7 +29,7 @@ export function SettingsPanel({ onClose, signedIn, inGame = false }: { onClose: 
     <div className="modal settings panel" role="dialog" aria-label={t('settings.title')}>
       <div className="sheethead">
         <div><h2>{t('settings.title')}</h2></div>
-        <button className="link" onClick={onClose} aria-label={t('settings.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('settings.close')}>{t('common.close')}</button>
       </div>
       <div className="tabs" role="tablist" aria-label={t('settings.title')} onKeyDown={onTabKey}>
         {TABS.map(([k, label]) => (
@@ -145,6 +145,7 @@ function Graphics() {
         <label className="switch"><input type="checkbox" checked={g.shake} onChange={(e: any) => set({ shake: e.target.checked })} />{t('gfx.shake')}</label>
         <label className="switch"><input type="checkbox" checked={g.damageNumbers} onChange={(e: any) => set({ damageNumbers: e.target.checked })} />{t('gfx.numbers')}</label>
         <label className="switch"><input type="checkbox" checked={g.nameplates} onChange={(e: any) => set({ nameplates: e.target.checked })} />{t('gfx.names')}</label>
+        <label className="switch"><input type="checkbox" checked={g.questMarkers} onChange={(e: any) => set({ questMarkers: e.target.checked })} />{t('gfx.questMarkers')}</label>
         <label className="switch"><input type="checkbox" checked={g.weather} onChange={(e: any) => set({ weather: e.target.checked })} />{t('gfx.weather')}</label>
         <label className="switch"><input type="checkbox" checked={g.art === 'hd'} onChange={(e: any) => set({ art: e.target.checked ? 'hd' : 'classic' })} />{t('gfx.hdArt')}</label>
       </div>

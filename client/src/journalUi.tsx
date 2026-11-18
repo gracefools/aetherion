@@ -26,7 +26,7 @@ export function JournalPanel({ game, onClose }: { game: Game; onClose: () => voi
     <div className="hud journal panel" role="dialog" aria-label={t('jr.title')}>
       <div className="sheethead">
         <h2>{t('jr.title')}</h2>
-        <button className="link" onClick={onClose} aria-label={t('jr.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('jr.close')}>{t('common.close')}</button>
       </div>
       <div className="tabs" role="tablist" aria-label={t('jr.sections')}>
         {TABS.map((x) => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{t(`jr.tab.${x}` as any)}</button>)}

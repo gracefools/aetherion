@@ -11,6 +11,8 @@ import { settings } from './settings';
 import type { Game, Hud } from './game/Game';
 import { keyOf } from './game/Game';
 import { t, useT, type Key } from './i18n';
+import { toRail } from './rail';
+import { Icon } from './ui/icons';
 
 const ZONE_LABEL: Record<Hud['pvpZone'], [Key, Key]> = {
   safe: ['pvp.zone.safe', 'pvp.zone.safeTip'],
@@ -23,7 +25,7 @@ export function PvpZoneBadge({ hud, game }: { hud: Hud; game: Game }) {
   useT();
   if (!hud.self) return null;
   const [label, tip] = ZONE_LABEL[hud.pvpZone];
-  return (
+  return toRail(
     <div className={'hud pvpzone ' + hud.pvpZone} title={t(tip, { n: Math.round((DEPTH_MONSTER.exp - 1) * 100) })} role="status" aria-label={t('pvp.zone.label', { name: t(label) })}>
       {t(label)}
       {hud.arena && <button className="small" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveArena')}</button>}
@@ -38,7 +40,7 @@ export function DepthAsk({ hud, game }: { hud: Hud; game: Game }) {
   if (!v) return null;
   return (
     <div className="hud inviteask panel depthask" role="alertdialog" aria-label={t('depth.ask.title')}>
-      <h3>⚔ {t('depth.ask.title')}</h3>
+      <h3><Icon name="auto" size={14} className="inl" /> {t('depth.ask.title')}</h3>
       <p>{t('depth.ask.body', { name: ZONES[v.zone]?.name ?? '', n: Math.round((DEPTH_MONSTER.exp - 1) * 100) })}</p>
       <div className="actions"><button onClick={() => game.depthAnswer(false)}>{t('depth.ask.stay')}</button><button className="primary" onClick={() => game.depthAnswer(true)}>{t('depth.ask.enter')}</button></div>
     </div>
@@ -133,7 +135,7 @@ export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; 
   const c = hud.comp, [renaming, setRenaming] = useState(''), [name, setName] = useState(''), [releasing, setReleasing] = useState('');
   return (
     <div className="hud qlog panel" role="dialog" aria-label={t('comp.title')}>
-      <div className="sheethead"><h2>{t('comp.title')}</h2><button className="link" onClick={onClose} aria-label={t('comp.close')}>{t('common.close')}</button></div>
+      <div className="sheethead"><h2>{t('comp.title')}</h2><button className="link panelx" onClick={onClose} aria-label={t('comp.close')}>{t('common.close')}</button></div>
       <h3>{t('comp.pets')} <small className="sub">{c.pets.length}</small></h3>
       {!c.pets.length && <p className="sub">{t('comp.noPets')}</p>}
       <div className="comps">

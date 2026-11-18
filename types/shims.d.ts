@@ -23,7 +23,7 @@ declare module 'ws' {
 declare module 'react' {
   const React: any;
   export default React;
-  export const useState: any, useEffect: any, useRef: any, useCallback: any, useSyncExternalStore: any, memo: any;
+  export const useState: any, useEffect: any, useLayoutEffect: any, useRef: any, useCallback: any, useSyncExternalStore: any, memo: any;
 }
 declare module 'react-dom/client' {
   export const createRoot: any;

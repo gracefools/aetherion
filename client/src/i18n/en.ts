@@ -306,4 +306,8 @@ export const en = {
   'v.Normal': 'Normal', 'v.Hard': 'Hard', 'v.Nightmare': 'Nightmare',
   'v.Neutral': 'Neutral', 'v.Friendly': 'Friendly', 'v.Honored': 'Honored', 'v.Revered': 'Revered', 'v.Exalted': 'Exalted',
   'v.Leader': 'Leader', 'v.Officer': 'Officer', 'v.Member': 'Member', 'v.Recruit': 'Recruit',
+  'mail.hasItems': 'Items attached', 'win.close': 'Close {name}', 'win.moveHint': 'Drag to move · double-click to put back in the middle',
+  'chat.tabs': 'Show messages from', 'chat.tab.all': 'All', 'chat.tab.zone': 'Zone', 'chat.tab.party': 'Party', 'chat.tab.guild': 'Guild', 'chat.tab.whisper': 'Whisper', 'chat.tab.sys': 'System',
+  'chat.unread': '{n} new', 'chat.emptyTab': 'Nothing here yet.',
+  'dock.new': 'New', 'dock.locked': 'Opens at level {n}', 'gfx.questMarkers': 'Quest markers', 'pad.connected': 'Controller connected',
 };

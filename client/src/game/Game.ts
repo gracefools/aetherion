@@ -21,7 +21,7 @@ import { DEFAULT_AUTO, emptyAutoStats, withSkills, type AutoConfig, type AutoSta
 import { INVENTORY_SIZE } from '../../../shared/src/items';
 import type { Job, SortKey, TradeState } from '../../../shared/src/protocol';
 import { AutoHunter } from './autohunt';
-import { DEFAULT_FACTIONS, emptyQuests, type FactionDef, type QuestState } from '../../../shared/src/quests';
+import { DEFAULT_FACTIONS, emptyQuests, giverId, offeredAt, QUESTS, type FactionDef, type QuestState } from '../../../shared/src/quests';
 import { emptyCompanions, type Companions, isFlying, MOUNTS, petStage } from '../../../shared/src/companions';
 import { emptyBank, type AuctionRates, type Bank, type GuildView, type Listing } from '../../../shared/src/economy';
 import { inTown, pvpBlock, pvpRuleAt } from '../../../shared/src/pvp';
@@ -216,6 +216,8 @@ interface Drawable {
   flying?: boolean;
   /** A title worn by a player, drawn above the name. */
   title?: string;
+  /** Quest marker (U5): '!' quests on offer, '?' a quest to hand in, 'mob' a monster a quest still needs. */
+  mark?: string;
   y: number;
   x: number;
   sheet: HTMLCanvasElement;
@@ -642,6 +644,10 @@ export class Game {
   /** Marks a tutorial step done (it is a no-op once done). */
   tut(step: TutorialStep) {
     markTutorial(step);
+  }
+  /** A short line above the hotbar (interface refusals such as a menu that is not open yet). */
+  showNotice(text: string) {
+    this.notice(text);
   }
   private notice(text: string) {
     this.noticeUntil = performance.now() + 1600;
@@ -1768,6 +1774,7 @@ export class Game {
       const b = r.buf;
       const move = r.m || (b.length >= 6 && rt < b[b.length - 3] ? Move.Run : Move.Idle);
       const o = pool.pop() ?? ({} as Drawable);
+      o.mark = '';
       o.x = r.rx; o.y = r.ry; o.sheet = r.sheet; o.id = r.meta.id;
       const frac = r.mhp ? r.hp / r.mhp : 0;
       if (r.mt) {
@@ -1786,6 +1793,7 @@ export class Game {
         const show = targeted || def.elite || r.hp < r.mhp || !!r.meta.fz;
         o.label = show && r.hp > 0 ? `${r.meta.ev ? '✦ ' : r.meta.nt ? '☾ ' : r.meta.fz ? '⚔ ' : ''}${r.meta.name}  Lv.${r.meta.level}` : '';
         o.title = '';
+        o.mark = r.hp > 0 && this.questMarks().mobs.has(r.mt) ? 'mob' : '';
         o.labelY = monsterHeight(r.mt) * MK - 2 + (def.flying ? 6 : 0);
         o.color = r.meta.ev ? '#7fe8ff' : def.elite ? '#ffb347' : targeted ? '#ff9a8a' : r.meta.nt ? '#b9a2ff' : r.meta.fz ? '#ff7a5a' : '#f0d9d0';
         o.bar = show && r.hp > 0 ? frac : -1;
@@ -1817,6 +1825,7 @@ export class Game {
     }
     {
       const me = this.me, o = pool.pop() ?? ({} as Drawable), mhp = this.hud.stats?.maxHp ?? 1;
+      o.mark = '';
       o.x = px; o.y = py; o.sheet = this.sheet!; o.id = me.id;
       o.alpha = this.stealthed ? 0.5 : 1;
       if (hd) { o.sheet = getHDSheet(me.ap, me.job); o.sx = hcol(this.act, this.actAt, this.moving, this.selfHitAt, this.isDead ? this.diedAt : 0, this.castUntil) * HD; o.sy = this.dir * HD; o.sw = HD; o.ox = HD_OX; o.oy = HD_OY; }
@@ -1842,6 +1851,7 @@ export class Game {
     for (const ob of this.objs) {
       if (Math.abs(ob.x - px) > 760 || Math.abs(ob.y - py) > 480) continue;
       const o = pool.pop() ?? ({} as Drawable), npc = isNpc(ob);
+      o.mark = npc ? this.questMarks().npc.get(ob.id) ?? '' : '';
       o.x = ob.x; o.y = ob.y; o.id = 0; o.aura = npc ? ob.ap!.aura : 0; o.bar = -1; o.barW = 0; o.alpha = 1;
       o.pet = o.mount = null; o.flip = false; o.wa = 0;
       if (npc) {
@@ -1994,6 +2004,7 @@ export class Game {
           g.font = f;
         }
       }
+      if (o.mark) this.drawQuestMark(g, o.mark, tx, ty - (o.title ? 26 : 12), now);
     }
     const showDmg = settings.get().graphics.damageNumbers;
     g.lineJoin = 'round';
@@ -2037,6 +2048,52 @@ export class Game {
     }
   }
 
+  /** Quest givers with something for this character, and the monsters active quests still need; refreshed twice a second. */
+  private qm = { at: -1e9, npc: new Map<string, string>(), mobs: new Set<string>() };
+  private questMarks() {
+    const now = performance.now();
+    if (now - this.qm.at < 500) return this.qm;
+    const h = this.hud, zone = this.map?.def.id, lv = h.self?.level ?? 0, npc = new Map<string, string>(), mobs = new Set<string>();
+    if (settings.get().graphics.questMarkers !== false) {
+      for (const id of Object.keys(h.quests.active)) {
+        const q = QUESTS[id];
+        if (!q) continue;
+        const p = h.qprog[id] ?? q.objectives.map(() => 0);
+        if (q.objectives.every((o, i) => (p[i] ?? 0) >= o.n)) npc.set(giverId(q), '?');
+        else q.objectives.forEach((o, i) => {
+          if ((o.kind === 'kill' || o.kind === 'boss') && o.mob && (p[i] ?? 0) < o.n && (o.kind === 'boss' || !o.zone || o.zone === zone)) mobs.add(o.mob);
+        });
+      }
+      for (const ob of this.objs) if (ob.kind === 'lorekeeper' && !npc.has(ob.id) && offeredAt(ob.zone, h.quests, lv, h.rep, Date.now()).length) npc.set(ob.id, '!');
+    }
+    this.qm = { at: now, npc, mobs };
+    return this.qm;
+  }
+  private drawQuestMark(g: CanvasRenderingContext2D, mark: string, x: number, y: number, now: number) {
+    const bob = Math.round(Math.sin(now / 260) * 2);
+    g.save();
+    if (mark === 'mob') {
+      // a small gold diamond over a monster a quest needs
+      const s = 4, cy = y - 4 + bob;
+      g.fillStyle = '#ffd24a';
+      g.strokeStyle = '#2a1c05';
+      g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(x, cy - s); g.lineTo(x + s, cy); g.lineTo(x, cy + s); g.lineTo(x - s, cy); g.closePath();
+      g.stroke(); g.fill();
+    } else {
+      const cy = y - 10 + bob;
+      g.font = 'bold 20px Georgia, serif';
+      g.textAlign = 'center';
+      g.lineWidth = 4;
+      g.strokeStyle = '#2a1c05';
+      g.strokeText(mark, x, cy);
+      g.fillStyle = mark === '?' ? '#ffe14a' : '#ffc23a';
+      g.shadowColor = 'rgba(255,200,60,0.8)';
+      g.shadowBlur = 8;
+      g.fillText(mark, x, cy);
+    }
+    g.restore();
+  }
   private drawMinimap(map: ZoneMap, px: number, py: number) {
     const c = this.mini!, g = c.getContext('2d')!;
     if (!this.miniBase) {
@@ -2054,10 +2111,33 @@ export class Game {
     g.imageSmoothingEnabled = false;
     g.drawImage(this.miniBase, 0, 0, c.width, c.height);
     const sx = c.width / (map.w * TILE), sy = c.height / (map.h * TILE);
+    const qm = this.questMarks();
     for (const r of this.remotes.values()) {
       if (r.mt && r.hp <= 0) continue;
+      if (r.mt && qm.mobs.has(r.mt)) {
+        // monsters an active quest needs: larger gold dots with a dark rim
+        g.fillStyle = '#2a1c05';
+        g.fillRect(r.rx * sx - 2, r.ry * sy - 2, 5, 5);
+        g.fillStyle = '#ffd24a';
+        g.fillRect(r.rx * sx - 1, r.ry * sy - 1, 3, 3);
+        continue;
+      }
       g.fillStyle = r.mt ? (MONSTERS[r.mt].elite ? '#ffb347' : '#e2523f') : '#ffffff';
       g.fillRect(r.rx * sx - 1, r.ry * sy - 1, r.mt ? 2 : 3, r.mt ? 2 : 3);
+    }
+    if (qm.npc.size) {
+      g.font = 'bold 12px Georgia, serif';
+      g.textAlign = 'center';
+      g.lineWidth = 3;
+      g.strokeStyle = '#2a1c05';
+      for (const ob of this.objs) {
+        const m = qm.npc.get(ob.id);
+        if (!m) continue;
+        g.strokeText(m, ob.x * sx, ob.y * sy + 4);
+        g.fillStyle = '#ffe14a';
+        g.fillText(m, ob.x * sx, ob.y * sy + 4);
+      }
+      g.textAlign = 'left';
     }
     // party members in this zone, including those beyond the visible area
     const party = this.hud.party;

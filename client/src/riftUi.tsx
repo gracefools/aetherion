@@ -4,6 +4,7 @@ import { JOB_DEFS } from '../../shared/src/jobs';
 import { RIFT_BOSS_EVERY, RIFT_FLOOR_MS, RIFT_MIN_LEVEL } from '../../shared/src/rift';
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
+import { toRail } from './rail';
 
 export function RiftWarden({ hud, game }: { hud: Hud; game: Game }) {
   useT();
@@ -34,7 +35,7 @@ export function RiftTracker({ game }: { game: Game }) {
   const hud = useSyncExternalStore(game.subscribe, game.getHud) as Hud;
   const r = hud.rift;
   if (!r) return null;
-  return (
+  return toRail(
     <div className="hud dtracker panel rifttracker" role="status" aria-label={t('rift.progress')}>
       <strong>{t('rift.name')}</strong> <span className="sub">{t('rift.floorN', { n: Math.max(1, r.floor) })}{r.floor % RIFT_BOSS_EVERY === 0 && r.floor ? ` · ${t('rift.bossFloor')}` : ''}</span>
       {r.state === 'fight' && <div className="sub">{t('rift.fight', { n: r.left, s: r.time })}</div>}

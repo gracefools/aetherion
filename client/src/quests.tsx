@@ -10,6 +10,7 @@ import { ZONES } from '../../shared/src/world';
 import type { Game, Hud } from './game/Game';
 import { Icon } from './inventory';
 import { t, tm, tv, useT, type Key } from './i18n';
+import { toRail } from './rail';
 
 const TYPE_NAME: Record<string, Key> = { main: 'qt.main', side: 'qt.side', daily: 'qt.daily', repeatable: 'qt.repeatable', dungeon: 'qt.dungeon', boss: 'qt.boss', collect: 'qt.collect', faction: 'qt.faction', explore: 'qt.explore' };
 const typeName = (q: QuestDef | undefined) => (q ? t(TYPE_NAME[q.type]) : '');
@@ -115,7 +116,7 @@ export function QuestLog({ game, onClose }: { game: Game; onClose: () => void })
             <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
-        <button className="link" onClick={onClose} aria-label={t('quest.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('quest.close')}>{t('common.close')}</button>
       </div>
       {tab === 'active' && (
         <>
@@ -163,7 +164,7 @@ export function QuestTracker({ game, onOpen }: { game: Game; onOpen: () => void 
   useT();
   const hud = useHud(game), list = Object.keys(hud.quests.active).map((id) => QUESTS[id]).filter(Boolean).slice(0, 4);
   if (!list.length || !hud.self) return null;
-  return (
+  return toRail(
     <div className="qtracker" role="region" aria-label={t('quest.tracker')}>
       {list.map((q) => {
         const p = prog(hud, q), done = complete(hud, q);

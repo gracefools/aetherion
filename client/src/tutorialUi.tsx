@@ -51,7 +51,7 @@ export function TutorialPanel({ onClose }: { onClose: () => void }) {
     <div className="hud qlog panel" role="dialog" aria-label={t('tut.panel')}>
       <div className="sheethead">
         <h2>{t('tut.panel')} <small className="sub">{t('tut.done', { n: done, of: TUTORIAL_STEPS.length })}</small></h2>
-        <button className="link" onClick={onClose} aria-label={t('tut.close')}>{t('common.close')}</button>
+        <button className="link panelx" onClick={onClose} aria-label={t('tut.close')}>{t('common.close')}</button>
       </div>
       <p className="sub">{tu.skipped ? t('tut.skippedNote') : done === TUTORIAL_STEPS.length ? t('tut.completeNote') : t('tut.activeNote')}</p>
       <div className="tutgrid">

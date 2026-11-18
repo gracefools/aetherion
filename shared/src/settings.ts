@@ -123,6 +123,8 @@ export interface GameSettings {
     nameplates: boolean;
     /** Night and weather drawn over the world. */
     weather: boolean;
+    /** Quest markers over quest givers and the monsters a quest needs, in the world and on the minimap. */
+    questMarkers: boolean;
     /** Art style: the detailed HD pixel art, or the classic sprites and tiles. */
     art: 'hd' | 'classic';
   };
@@ -145,7 +147,7 @@ export const defaultGameSettings = (): GameSettings => ({
   keys: defaultBindings(),
   lang: 'en',
   uiScale: 1,
-  graphics: { quality: 'high', shake: true, damageNumbers: true, nameplates: true, weather: true, art: 'hd' },
+  graphics: { quality: 'high', shake: true, damageNumbers: true, nameplates: true, weather: true, questMarkers: true, art: 'hd' },
   camera: { zoom: 0 },
   movement: { walkToggle: false },
   tutorial: { done: [], skipped: false },
@@ -176,7 +178,7 @@ export function cleanGameSettings(raw: unknown): GameSettings {
   const g = obj(r.graphics);
   out.graphics = {
     quality: QUALITIES.includes(g.quality as Quality) ? (g.quality as Quality) : 'high',
-    shake: bool(g.shake, true), damageNumbers: bool(g.damageNumbers, true), nameplates: bool(g.nameplates, true), weather: bool(g.weather, true),
+    shake: bool(g.shake, true), damageNumbers: bool(g.damageNumbers, true), nameplates: bool(g.nameplates, true), weather: bool(g.weather, true), questMarkers: bool(g.questMarkers, true),
     art: g.art === 'classic' ? 'classic' : 'hd',
   };
   out.camera = { zoom: obj(r.camera).zoom === 1 ? 1 : 0 };

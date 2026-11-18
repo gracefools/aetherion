@@ -7,6 +7,7 @@ import { ZONES } from '../../shared/src/world';
 import type { Game, Hud } from './game/Game';
 import { rarName } from './inventory';
 import { t, tm, tv, useT } from './i18n';
+import { toRail } from './rail';
 
 export function BossBar({ hud }: { hud: Hud }) {
   useT();
@@ -37,7 +38,7 @@ export function DungeonTracker({ hud, game }: { hud: Hud; game: Game }) {
   const d = hud.dungeon;
   if (!d) return null;
   const def = DUNGEONS[d.id];
-  return (
+  return toRail(
     <div className="hud dtracker panel" role="status" aria-label={t('dng.progress')}>
       <strong>{def.name}</strong> <span className="sub">{tv(DIFFICULTY[d.diff].name)}</span>
       <div className="stages">{def.stages.map((s, i) => <span key={i} className={d.state === 'cleared' || i < d.stage ? 'done' : i === d.stage ? 'on' : ''} title={s.name} />)}</div>

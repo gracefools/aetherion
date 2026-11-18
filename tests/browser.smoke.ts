@@ -486,6 +486,8 @@ try {
     await bar.waitFor();
     assert.ok(await bar.getByText('Phase 1: Dormant Seals').isVisible());
     w.hurt(boss, Math.ceil(boss.maxHp * 0.45), 0, pl);
+    // the page polled here is the one in the background: wait on the game state, then on what it shows
+    await p1.waitForFunction(() => (window as any).__game.debug().hud.boss?.phase === 1);
     await bar.getByText('Phase 2: Seals Unbound').waitFor();
     await p1.locator('.banner').getByText(/seals shatter/).waitFor();
     await p1.waitForTimeout(900);

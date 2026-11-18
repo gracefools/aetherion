@@ -383,3 +383,30 @@ export function renderStyleASheet(ap: Appearance, job: Job): HTMLCanvasElement {
 
 // style A is the character art of the HD look
 setHDRenderer(renderStyleASheet);
+
+/**
+ * Style A finish for art painted as plain pixels (monsters, pets, mounts): light on the top-left
+ * edge of the silhouette, shade on the bottom-right edge, and a coloured outline (a deep version of
+ * the colour beside it) instead of a black one. Takes and returns RGBA data of a W x H image.
+ */
+export function styleAFinish(src: Uint8ClampedArray, W: number, H: number): Uint8ClampedArray<ArrayBuffer> {
+  const out = new Uint8ClampedArray(src.length) as Uint8ClampedArray<ArrayBuffer>;
+  const a = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : src[(y * W + x) * 4 + 3]);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    if (src[i + 3]) {
+      const s = (a(x - 1, y) ? 0 : 1) + (a(x, y - 1) ? 0 : 1) - (a(x + 1, y) ? 0 : 1) - (a(x, y + 1) ? 0 : 1);
+      const k = s > 0 ? 1.18 : s < 0 ? 0.8 : 1, lift = s > 0 ? 14 : 0;
+      out[i] = Math.min(255, src[i] * k + lift); out[i + 1] = Math.min(255, src[i + 1] * k + lift); out[i + 2] = Math.min(255, src[i + 2] * k + lift * 0.6);
+      out[i + 3] = src[i + 3];
+      continue;
+    }
+    // outline: the colour of the nearest opaque neighbour (below first, as the samples do), deepened
+    let n = -1;
+    for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) if (a(x + dx, y + dy)) { n = ((y + dy) * W + x + dx) * 4; break; }
+    if (n < 0) continue;
+    const r = src[n] * 0.7, g = src[n + 1] * 0.7, b = src[n + 2] * 0.7;
+    out[i] = r * 0.42 + 12; out[i + 1] = g * 0.36 + 6; out[i + 2] = b * 0.45 + 22; out[i + 3] = 255;
+  }
+  return out;
+}

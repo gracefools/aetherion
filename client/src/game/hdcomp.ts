@@ -4,6 +4,7 @@
 import { MOUNTS, PETS } from '../../../shared/src/companions';
 import { ramp } from './hdart';
 import { Buf, type RGB } from './hdchars';
+import { styleAFinish } from './stylea';
 
 export const HD_PET = 24, HD_MOUNT_W = 64, HD_MOUNT_H = 48;
 const cache = new Map<string, HTMLCanvasElement>();
@@ -15,7 +16,9 @@ function sheet(key: string, w: number, h: number, draw: (b: Buf, f: number) => v
   for (let f = 0; f < 2; f++) {
     const b = new Buf(w, h);
     draw(b, f);
-    const fc = b.canvas();
+    // style A: edge light and a coloured outline instead of the ink line
+    const fc = b.canvas(false), fg = fc.getContext('2d')!;
+    fg.putImageData(new ImageData(styleAFinish(fg.getImageData(0, 0, w, h).data, w, h), w, h), 0, 0);
     if (after) after(fc.getContext('2d')!, f);
     g.drawImage(fc, f * w, 0);
   }

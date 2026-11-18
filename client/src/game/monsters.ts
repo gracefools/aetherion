@@ -5,6 +5,7 @@ import { MONSTER_LOOK } from '../../../shared/src/expansion';
 import { mk } from './art';
 import { outlined, ramp, type Ramp } from './chars';
 import { ramp as hdRamp } from './hdart';
+import { styleAFinish } from './stylea';
 
 // Drawing scale: 1 for the classic 48px frames, 4/3 for HD (64px frames, the density of the HD
 // characters). Every primitive below scales its own coordinates, so each monster design draws at
@@ -525,7 +526,7 @@ export function getMonsterSheet(type: string, hd = false): HTMLCanvasElement {
         }
       d = o;
     }
-    const out2 = outlined(d, F, F);
+    const out2 = hd ? styleAFinish(d, F, F) : outlined(d, F, F); // HD: the style A edge light and coloured outline
     d = out2;
     if (fr.flash || fr.alpha)
       for (let i = 0; i < d.length; i += 4) {

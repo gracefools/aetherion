@@ -1,0 +1,1221 @@
+{
+ "version": 1,
+ "size": 64,
+ "icons": [
+  {
+   "id": "skill/fireball",
+   "kind": "skill",
+   "ref": "fireball",
+   "name": "Fireball",
+   "file": "icons/skill/fireball.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/flame_burst",
+   "kind": "skill",
+   "ref": "flame_burst",
+   "name": "Flame Burst",
+   "file": "icons/skill/flame_burst.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/meteor_strike",
+   "kind": "skill",
+   "ref": "meteor_strike",
+   "name": "Meteor Strike",
+   "file": "icons/skill/meteor_strike.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/water_bolt",
+   "kind": "skill",
+   "ref": "water_bolt",
+   "name": "Water Bolt",
+   "file": "icons/skill/water_bolt.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/healing_rain",
+   "kind": "skill",
+   "ref": "healing_rain",
+   "name": "Healing Rain",
+   "file": "icons/skill/healing_rain.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ice_spear",
+   "kind": "skill",
+   "ref": "ice_spear",
+   "name": "Ice Spear",
+   "file": "icons/skill/ice_spear.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/thunder_strike",
+   "kind": "skill",
+   "ref": "thunder_strike",
+   "name": "Thunder Strike",
+   "file": "icons/skill/thunder_strike.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/chain_lightning",
+   "kind": "skill",
+   "ref": "chain_lightning",
+   "name": "Chain Lightning",
+   "file": "icons/skill/chain_lightning.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/stone_shield",
+   "kind": "skill",
+   "ref": "stone_shield",
+   "name": "Stone Shield",
+   "file": "icons/skill/stone_shield.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/earthquake",
+   "kind": "skill",
+   "ref": "earthquake",
+   "name": "Earthquake",
+   "file": "icons/skill/earthquake.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/wind_slash",
+   "kind": "skill",
+   "ref": "wind_slash",
+   "name": "Wind Slash",
+   "file": "icons/skill/wind_slash.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/tornado",
+   "kind": "skill",
+   "ref": "tornado",
+   "name": "Tornado",
+   "file": "icons/skill/tornado.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/shield_bash",
+   "kind": "skill",
+   "ref": "shield_bash",
+   "name": "Shield Bash",
+   "file": "icons/skill/shield_bash.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/taunt",
+   "kind": "skill",
+   "ref": "taunt",
+   "name": "Taunt",
+   "file": "icons/skill/taunt.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/guard_stance",
+   "kind": "skill",
+   "ref": "guard_stance",
+   "name": "Guard Stance",
+   "file": "icons/skill/guard_stance.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/cleave",
+   "kind": "skill",
+   "ref": "cleave",
+   "name": "Cleave",
+   "file": "icons/skill/cleave.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/rallying_cry",
+   "kind": "skill",
+   "ref": "rallying_cry",
+   "name": "Rallying Cry",
+   "file": "icons/skill/rallying_cry.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/last_stand",
+   "kind": "skill",
+   "ref": "last_stand",
+   "name": "Last Stand",
+   "file": "icons/skill/last_stand.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/arcane_bolt",
+   "kind": "skill",
+   "ref": "arcane_bolt",
+   "name": "Arcane Bolt",
+   "file": "icons/skill/arcane_bolt.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/blink",
+   "kind": "skill",
+   "ref": "blink",
+   "name": "Blink",
+   "file": "icons/skill/blink.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/elemental_surge",
+   "kind": "skill",
+   "ref": "elemental_surge",
+   "name": "Elemental Surge",
+   "file": "icons/skill/elemental_surge.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/mana_shield",
+   "kind": "skill",
+   "ref": "mana_shield",
+   "name": "Mana Shield",
+   "file": "icons/skill/mana_shield.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/cataclysm",
+   "kind": "skill",
+   "ref": "cataclysm",
+   "name": "Cataclysm",
+   "file": "icons/skill/cataclysm.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/power_shot",
+   "kind": "skill",
+   "ref": "power_shot",
+   "name": "Power Shot",
+   "file": "icons/skill/power_shot.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/snare_trap",
+   "kind": "skill",
+   "ref": "snare_trap",
+   "name": "Snare Trap",
+   "file": "icons/skill/snare_trap.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/poison_arrow",
+   "kind": "skill",
+   "ref": "poison_arrow",
+   "name": "Poison Arrow",
+   "file": "icons/skill/poison_arrow.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/explosive_trap",
+   "kind": "skill",
+   "ref": "explosive_trap",
+   "name": "Explosive Trap",
+   "file": "icons/skill/explosive_trap.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fleet_step",
+   "kind": "skill",
+   "ref": "fleet_step",
+   "name": "Fleet Step",
+   "file": "icons/skill/fleet_step.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/volley",
+   "kind": "skill",
+   "ref": "volley",
+   "name": "Volley",
+   "file": "icons/skill/volley.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/hunters_mark",
+   "kind": "skill",
+   "ref": "hunters_mark",
+   "name": "Hunter's Mark",
+   "file": "icons/skill/hunters_mark.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/backstab",
+   "kind": "skill",
+   "ref": "backstab",
+   "name": "Backstab",
+   "file": "icons/skill/backstab.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/stealth",
+   "kind": "skill",
+   "ref": "stealth",
+   "name": "Stealth",
+   "file": "icons/skill/stealth.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/shadow_step",
+   "kind": "skill",
+   "ref": "shadow_step",
+   "name": "Shadow Step",
+   "file": "icons/skill/shadow_step.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/twin_fangs",
+   "kind": "skill",
+   "ref": "twin_fangs",
+   "name": "Twin Fangs",
+   "file": "icons/skill/twin_fangs.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/smoke_bomb",
+   "kind": "skill",
+   "ref": "smoke_bomb",
+   "name": "Smoke Bomb",
+   "file": "icons/skill/smoke_bomb.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/death_mark",
+   "kind": "skill",
+   "ref": "death_mark",
+   "name": "Death Mark",
+   "file": "icons/skill/death_mark.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/mend",
+   "kind": "skill",
+   "ref": "mend",
+   "name": "Mend",
+   "file": "icons/skill/mend.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/smite",
+   "kind": "skill",
+   "ref": "smite",
+   "name": "Smite",
+   "file": "icons/skill/smite.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/blessing",
+   "kind": "skill",
+   "ref": "blessing",
+   "name": "Blessing",
+   "file": "icons/skill/blessing.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/purify",
+   "kind": "skill",
+   "ref": "purify",
+   "name": "Purify",
+   "file": "icons/skill/purify.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/sanctuary",
+   "kind": "skill",
+   "ref": "sanctuary",
+   "name": "Sanctuary",
+   "file": "icons/skill/sanctuary.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/resurrection",
+   "kind": "skill",
+   "ref": "resurrection",
+   "name": "Resurrection",
+   "file": "icons/skill/resurrection.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/divine_aegis",
+   "kind": "skill",
+   "ref": "divine_aegis",
+   "name": "Divine Aegis",
+   "file": "icons/skill/divine_aegis.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/rend",
+   "kind": "skill",
+   "ref": "rend",
+   "name": "Rend",
+   "file": "icons/skill/rend.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/war_cry",
+   "kind": "skill",
+   "ref": "war_cry",
+   "name": "War Cry",
+   "file": "icons/skill/war_cry.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/whirlwind",
+   "kind": "skill",
+   "ref": "whirlwind",
+   "name": "Whirlwind",
+   "file": "icons/skill/whirlwind.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/charge",
+   "kind": "skill",
+   "ref": "charge",
+   "name": "Charge",
+   "file": "icons/skill/charge.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/frenzy",
+   "kind": "skill",
+   "ref": "frenzy",
+   "name": "Frenzy",
+   "file": "icons/skill/frenzy.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/executioner",
+   "kind": "skill",
+   "ref": "executioner",
+   "name": "Executioner",
+   "file": "icons/skill/executioner.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_divine_judgment",
+   "kind": "skill",
+   "ref": "ult_divine_judgment",
+   "name": "Divine Judgment",
+   "file": "icons/skill/ult_divine_judgment.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_war_banner",
+   "kind": "skill",
+   "ref": "ult_war_banner",
+   "name": "War Banner",
+   "file": "icons/skill/ult_war_banner.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_astral_storm",
+   "kind": "skill",
+   "ref": "ult_astral_storm",
+   "name": "Astral Storm",
+   "file": "icons/skill/ult_astral_storm.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_time_stop",
+   "kind": "skill",
+   "ref": "ult_time_stop",
+   "name": "Time Stop",
+   "file": "icons/skill/ult_time_stop.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_stampede",
+   "kind": "skill",
+   "ref": "ult_stampede",
+   "name": "Stampede",
+   "file": "icons/skill/ult_stampede.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_deadeye",
+   "kind": "skill",
+   "ref": "ult_deadeye",
+   "name": "Deadeye",
+   "file": "icons/skill/ult_deadeye.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_shadow_legion",
+   "kind": "skill",
+   "ref": "ult_shadow_legion",
+   "name": "Shadow Legion",
+   "file": "icons/skill/ult_shadow_legion.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_plague_burst",
+   "kind": "skill",
+   "ref": "ult_plague_burst",
+   "name": "Plague Burst",
+   "file": "icons/skill/ult_plague_burst.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_prophecy",
+   "kind": "skill",
+   "ref": "ult_prophecy",
+   "name": "Prophecy",
+   "file": "icons/skill/ult_prophecy.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_holy_fire",
+   "kind": "skill",
+   "ref": "ult_holy_fire",
+   "name": "Holy Fire",
+   "file": "icons/skill/ult_holy_fire.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_warpath",
+   "kind": "skill",
+   "ref": "ult_warpath",
+   "name": "Warpath",
+   "file": "icons/skill/ult_warpath.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/ult_blood_moon",
+   "kind": "skill",
+   "ref": "ult_blood_moon",
+   "name": "Blood Moon",
+   "file": "icons/skill/ult_blood_moon.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_steam",
+   "kind": "skill",
+   "ref": "fu_steam",
+   "name": "Steam Burst",
+   "file": "icons/skill/fu_steam.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_plasma",
+   "kind": "skill",
+   "ref": "fu_plasma",
+   "name": "Plasma Lance",
+   "file": "icons/skill/fu_plasma.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_magma",
+   "kind": "skill",
+   "ref": "fu_magma",
+   "name": "Magma Pool",
+   "file": "icons/skill/fu_magma.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_firestorm",
+   "kind": "skill",
+   "ref": "fu_firestorm",
+   "name": "Firestorm",
+   "file": "icons/skill/fu_firestorm.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_storm_surge",
+   "kind": "skill",
+   "ref": "fu_storm_surge",
+   "name": "Storm Surge",
+   "file": "icons/skill/fu_storm_surge.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_mudslide",
+   "kind": "skill",
+   "ref": "fu_mudslide",
+   "name": "Mudslide",
+   "file": "icons/skill/fu_mudslide.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_blizzard",
+   "kind": "skill",
+   "ref": "fu_blizzard",
+   "name": "Blizzard",
+   "file": "icons/skill/fu_blizzard.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_magnetism",
+   "kind": "skill",
+   "ref": "fu_magnetism",
+   "name": "Magnetic Crush",
+   "file": "icons/skill/fu_magnetism.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_tempest",
+   "kind": "skill",
+   "ref": "fu_tempest",
+   "name": "Tempest",
+   "file": "icons/skill/fu_tempest.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "skill/fu_sandstorm",
+   "kind": "skill",
+   "ref": "fu_sandstorm",
+   "name": "Sandstorm",
+   "file": "icons/skill/fu_sandstorm.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/fortify",
+   "kind": "passive",
+   "ref": "fortify",
+   "name": "Fortify",
+   "file": "icons/passive/fortify.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/bulwark",
+   "kind": "passive",
+   "ref": "bulwark",
+   "name": "Bulwark",
+   "file": "icons/passive/bulwark.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/iron_will",
+   "kind": "passive",
+   "ref": "iron_will",
+   "name": "Iron Will",
+   "file": "icons/passive/iron_will.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/retribution",
+   "kind": "passive",
+   "ref": "retribution",
+   "name": "Retribution",
+   "file": "icons/passive/retribution.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/rune_focus",
+   "kind": "passive",
+   "ref": "rune_focus",
+   "name": "Rune Focus",
+   "file": "icons/passive/rune_focus.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/rune_mastery",
+   "kind": "passive",
+   "ref": "rune_mastery",
+   "name": "Rune Mastery",
+   "file": "icons/passive/rune_mastery.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/arcane_mind",
+   "kind": "passive",
+   "ref": "arcane_mind",
+   "name": "Arcane Mind",
+   "file": "icons/passive/arcane_mind.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/elemental_attunement",
+   "kind": "passive",
+   "ref": "elemental_attunement",
+   "name": "Elemental Attunement",
+   "file": "icons/passive/elemental_attunement.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/overflow",
+   "kind": "passive",
+   "ref": "overflow",
+   "name": "Overflow",
+   "file": "icons/passive/overflow.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/eagle_eye",
+   "kind": "passive",
+   "ref": "eagle_eye",
+   "name": "Eagle Eye",
+   "file": "icons/passive/eagle_eye.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/steady_aim",
+   "kind": "passive",
+   "ref": "steady_aim",
+   "name": "Steady Aim",
+   "file": "icons/passive/steady_aim.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/toxicology",
+   "kind": "passive",
+   "ref": "toxicology",
+   "name": "Toxicology",
+   "file": "icons/passive/toxicology.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/evasion",
+   "kind": "passive",
+   "ref": "evasion",
+   "name": "Evasion",
+   "file": "icons/passive/evasion.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/fleet_foot",
+   "kind": "passive",
+   "ref": "fleet_foot",
+   "name": "Fleet Foot",
+   "file": "icons/passive/fleet_foot.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/lethality",
+   "kind": "passive",
+   "ref": "lethality",
+   "name": "Lethality",
+   "file": "icons/passive/lethality.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/ambush",
+   "kind": "passive",
+   "ref": "ambush",
+   "name": "Ambush",
+   "file": "icons/passive/ambush.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/devotion",
+   "kind": "passive",
+   "ref": "devotion",
+   "name": "Devotion",
+   "file": "icons/passive/devotion.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/serenity",
+   "kind": "passive",
+   "ref": "serenity",
+   "name": "Serenity",
+   "file": "icons/passive/serenity.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/guardian_spirit",
+   "kind": "passive",
+   "ref": "guardian_spirit",
+   "name": "Guardian Spirit",
+   "file": "icons/passive/guardian_spirit.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/blood_pact",
+   "kind": "passive",
+   "ref": "blood_pact",
+   "name": "Blood Pact",
+   "file": "icons/passive/blood_pact.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/bloodthirst",
+   "kind": "passive",
+   "ref": "bloodthirst",
+   "name": "Bloodthirst",
+   "file": "icons/passive/bloodthirst.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/brutality",
+   "kind": "passive",
+   "ref": "brutality",
+   "name": "Brutality",
+   "file": "icons/passive/brutality.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "passive/undying_fury",
+   "kind": "passive",
+   "ref": "undying_fury",
+   "name": "Undying Fury",
+   "file": "icons/passive/undying_fury.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/poison",
+   "kind": "status",
+   "ref": "poison",
+   "name": "Poison",
+   "file": "icons/status/poison.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/slow",
+   "kind": "status",
+   "ref": "slow",
+   "name": "Slowed",
+   "file": "icons/status/slow.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/stun",
+   "kind": "status",
+   "ref": "stun",
+   "name": "Stunned",
+   "file": "icons/status/stun.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/weaken",
+   "kind": "status",
+   "ref": "weaken",
+   "name": "Weakened",
+   "file": "icons/status/weaken.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/bleed",
+   "kind": "status",
+   "ref": "bleed",
+   "name": "Bleeding",
+   "file": "icons/status/bleed.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/enrage",
+   "kind": "status",
+   "ref": "enrage",
+   "name": "Enraged",
+   "file": "icons/status/enrage.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/ward",
+   "kind": "status",
+   "ref": "ward",
+   "name": "Returning Ward",
+   "file": "icons/status/ward.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/burn",
+   "kind": "status",
+   "ref": "burn",
+   "name": "Burning",
+   "file": "icons/status/burn.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/root",
+   "kind": "status",
+   "ref": "root",
+   "name": "Rooted",
+   "file": "icons/status/root.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/mark",
+   "kind": "status",
+   "ref": "mark",
+   "name": "Hunter's Mark",
+   "file": "icons/status/mark.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/guard",
+   "kind": "status",
+   "ref": "guard",
+   "name": "Guard Stance",
+   "file": "icons/status/guard.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/rally",
+   "kind": "status",
+   "ref": "rally",
+   "name": "Rallying Cry",
+   "file": "icons/status/rally.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/blessing",
+   "kind": "status",
+   "ref": "blessing",
+   "name": "Blessing",
+   "file": "icons/status/blessing.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/haste",
+   "kind": "status",
+   "ref": "haste",
+   "name": "War Cry",
+   "file": "icons/status/haste.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/frenzy",
+   "kind": "status",
+   "ref": "frenzy",
+   "name": "Frenzy",
+   "file": "icons/status/frenzy.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/surge",
+   "kind": "status",
+   "ref": "surge",
+   "name": "Elemental Surge",
+   "file": "icons/status/surge.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/last_stand",
+   "kind": "status",
+   "ref": "last_stand",
+   "name": "Last Stand",
+   "file": "icons/status/last_stand.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/aegis",
+   "kind": "status",
+   "ref": "aegis",
+   "name": "Divine Aegis",
+   "file": "icons/status/aegis.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/stealth",
+   "kind": "status",
+   "ref": "stealth",
+   "name": "Stealth",
+   "file": "icons/status/stealth.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/mana_shield",
+   "kind": "status",
+   "ref": "mana_shield",
+   "name": "Mana Shield",
+   "file": "icons/status/mana_shield.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/barrier",
+   "kind": "status",
+   "ref": "barrier",
+   "name": "Barrier",
+   "file": "icons/status/barrier.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/retribution",
+   "kind": "status",
+   "ref": "retribution",
+   "name": "Retribution",
+   "file": "icons/status/retribution.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/shock",
+   "kind": "status",
+   "ref": "shock",
+   "name": "Shocked",
+   "file": "icons/status/shock.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/death_mark",
+   "kind": "status",
+   "ref": "death_mark",
+   "name": "Death Mark",
+   "file": "icons/status/death_mark.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "status/rested",
+   "kind": "status",
+   "ref": "rested",
+   "name": "Rested",
+   "file": "icons/status/rested.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/sword_shield",
+   "kind": "attack",
+   "ref": "sword_shield",
+   "name": "Attack (sword shield)",
+   "file": "icons/attack/sword_shield.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/greatsword",
+   "kind": "attack",
+   "ref": "greatsword",
+   "name": "Attack (greatsword)",
+   "file": "icons/attack/greatsword.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/staff",
+   "kind": "attack",
+   "ref": "staff",
+   "name": "Attack (staff)",
+   "file": "icons/attack/staff.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/orb",
+   "kind": "attack",
+   "ref": "orb",
+   "name": "Attack (orb)",
+   "file": "icons/attack/orb.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/bow",
+   "kind": "attack",
+   "ref": "bow",
+   "name": "Attack (bow)",
+   "file": "icons/attack/bow.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/crossbow",
+   "kind": "attack",
+   "ref": "crossbow",
+   "name": "Attack (crossbow)",
+   "file": "icons/attack/crossbow.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/daggers",
+   "kind": "attack",
+   "ref": "daggers",
+   "name": "Attack (daggers)",
+   "file": "icons/attack/daggers.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/holy_staff",
+   "kind": "attack",
+   "ref": "holy_staff",
+   "name": "Attack (holy staff)",
+   "file": "icons/attack/holy_staff.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/mace",
+   "kind": "attack",
+   "ref": "mace",
+   "name": "Attack (mace)",
+   "file": "icons/attack/mace.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/axe",
+   "kind": "attack",
+   "ref": "axe",
+   "name": "Attack (axe)",
+   "file": "icons/attack/axe.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "attack/dual_axe",
+   "kind": "attack",
+   "ref": "dual_axe",
+   "name": "Attack (dual axe)",
+   "file": "icons/attack/dual_axe.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "rune/fire",
+   "kind": "rune",
+   "ref": "fire",
+   "name": "Fire Rune",
+   "file": "icons/rune/fire.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "rune/water",
+   "kind": "rune",
+   "ref": "water",
+   "name": "Water Rune",
+   "file": "icons/rune/water.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "rune/lightning",
+   "kind": "rune",
+   "ref": "lightning",
+   "name": "Lightning Rune",
+   "file": "icons/rune/lightning.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "rune/earth",
+   "kind": "rune",
+   "ref": "earth",
+   "name": "Earth Rune",
+   "file": "icons/rune/earth.png",
+   "width": 64,
+   "height": 64
+  },
+  {
+   "id": "rune/wind",
+   "kind": "rune",
+   "ref": "wind",
+   "name": "Wind Rune",
+   "file": "icons/rune/wind.png",
+   "width": 64,
+   "height": 64
+  }
+ ]
+}

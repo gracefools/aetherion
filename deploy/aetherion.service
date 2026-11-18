@@ -1,0 +1,27 @@
+# systemd unit. NOT VERIFIED here (no systemd in the build sandbox); the command it runs is the one
+# scripts/verify-deploy.sh exercises. Install: copy to /etc/systemd/system/, then
+#   systemctl daemon-reload && systemctl enable --now aetherion
+[Unit]
+Description=Aetherion Online game server
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aetherion
+WorkingDirectory=/opt/aetherion
+EnvironmentFile=/etc/aetherion.env
+ExecStart=/usr/bin/node dist/server.mjs
+Restart=on-failure
+RestartSec=3
+# SIGTERM makes the server save every online character before exiting
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

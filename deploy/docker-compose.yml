@@ -1,0 +1,32 @@
+# NOT VERIFIED: no Docker daemon was available where this project was built (see docs/deploy.md).
+# Usage: POSTGRES_PASSWORD=... METRICS_TOKEN=... docker compose -f deploy/docker-compose.yml up --build
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: aetherion
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: aetherion
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aetherion"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+  game:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    environment:
+      DATABASE_URL: postgres://aetherion:${POSTGRES_PASSWORD}@postgres:5432/aetherion
+      REDIS_URL: redis://redis:6379
+      METRICS_TOKEN: ${METRICS_TOKEN:?set METRICS_TOKEN}
+      # set to 1 when a reverse proxy (deploy/nginx.conf) sits in front
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+    ports: ["8080:8080"]
+    stop_grace_period: 30s   # SIGTERM saves every player before exit
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+volumes:
+  pgdata:

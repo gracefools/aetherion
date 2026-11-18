@@ -1,0 +1,24 @@
+# Development / test image: everything the test suites and the audio build need, in one container.
+# Node 22 + PostgreSQL 16 + Redis + ffmpeg (OGG encoding) + Chromium (browser test).
+# The project is bind-mounted at /app; see docs/M10.md ("Running the tests in Docker").
+#
+#   docker build -t aetherion-dev -f deploy/Dockerfile.dev .
+#   docker run --rm -v "${PWD}:/app" -v aetherion_node_modules:/app/node_modules aetherion-dev npm test
+FROM postgres:16-bookworm
+COPY --from=node:22-bookworm-slim /usr/local/ /usr/local/
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends redis-server ffmpeg curl ca-certificates procps \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/deps
+COPY package.json ./
+RUN npm install --no-audit --no-fund \
+ && npx playwright-core install --with-deps chromium \
+ && rm -rf /var/lib/apt/lists/*
+COPY deploy/dev-entrypoint.sh /usr/local/bin/dev-entrypoint
+# tr strips Windows line endings in case the checkout converted them
+RUN tr -d '\r' < /usr/local/bin/dev-entrypoint > /usr/local/bin/dev-entrypoint.lf \
+ && mv /usr/local/bin/dev-entrypoint.lf /usr/local/bin/dev-entrypoint \
+ && chmod +x /usr/local/bin/dev-entrypoint
+WORKDIR /app
+ENTRYPOINT ["dev-entrypoint"]
+CMD ["bash"]

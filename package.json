@@ -1,0 +1,42 @@
+{
+  "name": "aetherion-online",
+  "version": "0.24.0-alpha",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "build:all": "node scripts/build-client.mjs && node scripts/build-server.mjs",
+    "start": "tsx server/src/main.ts",
+    "start:prod": "NODE_ENV=production node dist/server.mjs",
+    "assets:validate": "tsx scripts/validate-assets.ts",
+    "audio:build": "tsx scripts/audio/build.ts",
+    "audio:check": "tsx scripts/import-audio.ts --check",
+    "audio:verify": "tsx scripts/audio/verify.ts",
+    "assets:export": "tsx scripts/export-assets.ts",
+    "bench": "tsx scripts/bench.ts",
+    "dev": "node scripts/build-client.mjs && tsx watch server/src/main.ts",
+    "typecheck": "tsc -p .",
+    "test": "tsx --test tests/unit.test.ts tests/integration.test.ts",
+    "test:browser": "tsx tests/browser.smoke.ts",
+    "load": "tsx scripts/loadtest.ts"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "ws": "^8.18.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.160.0",
+    "@types/ws": "^8.5.0",
+    "esbuild": "^0.28.0",
+    "playwright-core": "^1.63.0",
+    "three": "^0.160.0",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.0"
+  }
+}

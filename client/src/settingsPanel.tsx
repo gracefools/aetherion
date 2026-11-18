@@ -148,6 +148,7 @@ function Graphics() {
         <label className="switch"><input type="checkbox" checked={g.questMarkers} onChange={(e: any) => set({ questMarkers: e.target.checked })} />{t('gfx.questMarkers')}</label>
         <label className="switch"><input type="checkbox" checked={g.weather} onChange={(e: any) => set({ weather: e.target.checked })} />{t('gfx.weather')}</label>
         <label className="switch"><input type="checkbox" checked={g.art === 'hd'} onChange={(e: any) => set({ art: e.target.checked ? 'hd' : 'classic' })} />{t('gfx.hdArt')}</label>
+        <label className="switch"><input type="checkbox" checked={g.renderer === 'hd2d'} onChange={(e: any) => set({ renderer: e.target.checked ? 'hd2d' : '2d' })} />{t('gfx.hd2d')}</label>
       </div>
     </>
   );

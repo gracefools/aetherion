@@ -127,6 +127,8 @@ export interface GameSettings {
     questMarkers: boolean;
     /** Art style: the detailed HD pixel art, or the classic sprites and tiles. */
     art: 'hd' | 'classic';
+    /** World renderer: 'hd2d' draws the world with WebGL (light, shadows, depth of field); '2d' is the plain canvas. */
+    renderer: 'hd2d' | '2d';
   };
   camera: {
     /** Extra integer zoom on top of the automatic zoom (0 = default, 1 = closer). */
@@ -147,7 +149,7 @@ export const defaultGameSettings = (): GameSettings => ({
   keys: defaultBindings(),
   lang: 'en',
   uiScale: 1,
-  graphics: { quality: 'high', shake: true, damageNumbers: true, nameplates: true, weather: true, questMarkers: true, art: 'hd' },
+  graphics: { quality: 'high', shake: true, damageNumbers: true, nameplates: true, weather: true, questMarkers: true, art: 'hd', renderer: 'hd2d' },
   camera: { zoom: 0 },
   movement: { walkToggle: false },
   tutorial: { done: [], skipped: false },
@@ -180,6 +182,7 @@ export function cleanGameSettings(raw: unknown): GameSettings {
     quality: QUALITIES.includes(g.quality as Quality) ? (g.quality as Quality) : 'high',
     shake: bool(g.shake, true), damageNumbers: bool(g.damageNumbers, true), nameplates: bool(g.nameplates, true), weather: bool(g.weather, true), questMarkers: bool(g.questMarkers, true),
     art: g.art === 'classic' ? 'classic' : 'hd',
+    renderer: g.renderer === '2d' ? '2d' : 'hd2d',
   };
   out.camera = { zoom: obj(r.camera).zoom === 1 ? 1 : 0 };
   out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false) };

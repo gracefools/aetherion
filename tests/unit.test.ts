@@ -4746,7 +4746,7 @@ test('M16 settings document: every field is validated; bad values fall back to d
   });
   assert.equal(s.lang, 'id');
   assert.equal(s.uiScale, 1.25);
-  assert.deepEqual(s.graphics, { quality: 'low', shake: false, damageNumbers: true, nameplates: false, weather: true, questMarkers: true, art: 'hd' });
+  assert.deepEqual(s.graphics, { quality: 'low', shake: false, damageNumbers: true, nameplates: false, weather: true, questMarkers: true, art: 'hd', renderer: 'hd2d' });
   assert.deepEqual([s.camera.zoom, s.movement.walkToggle], [1, true]);
   assert.deepEqual(s.tutorial, { done: ['move', 'auto'], skipped: true });
   assert.deepEqual(s.markers, [{ id: 'a1', zone: 'verdant', x: 100, y: 200, label: 'bHerbs/b by the river an' }], 'markup stripped, length capped, malformed markers dropped');

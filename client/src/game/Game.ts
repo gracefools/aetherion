@@ -54,6 +54,8 @@ import { blastImpact, drawBlastAir, drawBlastGround, drawCastCircle, drawFxAir, 
 const CAST_COLOR: Record<string, string> = { knight: '#ffd36a', mage: '#7fc8ff', ranger: '#8fe07a', assassin: '#c08aff', cleric: '#fff0a8', berserker: '#ff7a4a' };
 import { getMonsterSheet, hasMonsterSheet, HD_M_FRAME, M_FRAME, mAnimDuration, mAnimFrame, monsterHeight, monsterScale, type MAnim } from './monsters';
 import { HD_MOUNT_H, HD_MOUNT_W, hdMountSprite, hdPetSprite } from './hdcomp';
+import { Stage3D, stageSupported } from './stage3d';
+import { darkness } from '../../../shared/src/events';
 
 export interface ChatLine {
   id: number;
@@ -414,7 +416,7 @@ export class Game {
   stats = { snaps: 0, corrections: 0, maxCorrection: 0, dmgSeen: 0 };
 
   constructor(private canvas: HTMLCanvasElement, private token: string, private characterId: number) {
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
+    this.ctx = canvas.getContext('2d')!; // transparent: with style B the WebGL world shows through
     screenFx.reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
@@ -467,6 +469,7 @@ export class Game {
   }
   destroy() {
     this.dead = true;
+    this.stage?.destroy();
     cancelAnimationFrame(this.raf);
     this.bgWorker?.terminate();
     clearTimeout(this.retryTimer);
@@ -1203,6 +1206,7 @@ export class Game {
     this.act = null;
     if (zoneChanged) {
       this.chunks.clear();
+      this.stage?.reset();
       this.miniBase = null;
       this.pushChat({ text: `You have entered ${ZONES[m.zone].name}.` });
     }
@@ -1598,7 +1602,8 @@ export class Game {
   }
 
   private render(now: number, alpha: number) {
-    const g = this.ctx, map = this.map, z = this.zoom;
+    let g = this.ctx;
+    const map = this.map, z = this.zoom;
     const W = this.canvas.width, H = this.canvas.height;
     g.setTransform(1, 0, 0, 1, 0, 0);
     if (!map || !this.me) {
@@ -1620,9 +1625,18 @@ export class Game {
     this.camX = Math.round(vw >= mw ? (mw - vw) / 2 : Math.max(0, Math.min(mw - vw, px - vw / 2)));
     this.camY = Math.round(vh >= mh ? (mh - vh) / 2 : Math.max(0, Math.min(mh - vh, py - vh / 2)));
     const camX = this.camX + Math.round(Math.sin(now / 23) * shake), camY = this.camY + Math.round(Math.cos(now / 19) * shake);
+    // style B: the world goes to the WebGL stage; this canvas keeps only the interface on top
+    const st = this.stageNow();
+    if (st) {
+      st.begin(W, H);
+      this.ctx.clearRect(0, 0, W, H);
+      g = st.groundCtx;
+      st.groundDirty = true;
+    } else {
+      g.fillStyle = '#10131c';
+      g.fillRect(0, 0, W, H);
+    }
     g.imageSmoothingEnabled = false;
-    g.fillStyle = '#10131c';
-    g.fillRect(0, 0, W, H);
     g.setTransform(z, 0, 0, z, -camX * z, -camY * z);
 
     const cx0 = Math.max(0, Math.floor(camX / CHUNK_PX)), cx1 = Math.min(Math.ceil(map.w / CHUNK) - 1, Math.floor((camX + vw) / CHUNK_PX));
@@ -1633,13 +1647,13 @@ export class Game {
     const mcx = (camX + vw / 2) / CHUNK_PX, mcy = (camY + vh / 2) / CHUNK_PX;
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
       const c = this.chunk(cx, cy, map, false);
-      if (c) { g.drawImage(c.ground, cx * CHUNK_PX, cy * CHUNK_PX); continue; }
+      if (c) { if (st) st.chunk(cx, cy, CHUNK_PX, c.ground); else g.drawImage(c.ground, cx * CHUNK_PX, cy * CHUNK_PX); continue; }
       g.fillStyle = hdMiniColors(map.def.theme)[0];
       g.fillRect(cx * CHUNK_PX, cy * CHUNK_PX, CHUNK_PX, CHUNK_PX);
       const d = (cx + 0.5 - mcx) ** 2 + (cy + 0.5 - mcy) ** 2;
       if (d < best) { best = d; missing = [cx, cy]; }
     }
-    if (missing) { const c = this.chunk(missing[0], missing[1], map)!; g.drawImage(c.ground, missing[0] * CHUNK_PX, missing[1] * CHUNK_PX); }
+    if (missing) { const c = this.chunk(missing[0], missing[1], map)!; if (st) st.chunk(missing[0], missing[1], CHUNK_PX, c.ground); else g.drawImage(c.ground, missing[0] * CHUNK_PX, missing[1] * CHUNK_PX); }
     let warm = !missing;
 
     for (const p of map.def.portals) {
@@ -1880,8 +1894,33 @@ export class Game {
     screenFx.density = low ? 0.35 : gfx.quality === 'medium' ? 0.65 : 1;
     screenFx.glow = !low;
     screenFx.noShake = !gfx.shake;
+    // style B: everything drawn from here on lies over the sprites (air effects, canopy, night)
+    if (st) {
+      g = st.airCtx;
+      g.imageSmoothingEnabled = false;
+      g.setTransform(z, 0, 0, z, -camX * z, -camY * z);
+    }
+    let order = 0;
     for (const o of list) {
       const sx = Math.round(o.x), sy = Math.round(o.y);
+      if (st) { // billboards with real shadows instead of drawn ones
+        const PW = o.pet ? o.pet.width / 2 : 0;
+        if (o.pet) {
+          const stg = o.petStage ?? 0, pw = Math.round(PW * (1 + 0.15 * stg)), hx = sx + (o.flip ? 18 : -18) - pw / 2;
+          st.sprite(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, hx, sy - pw + 8, pw, pw, sy, order++, o.alpha, o.flip && PW !== PET_W);
+        }
+        let lift = 0;
+        if (o.mount) {
+          const MS = 2, hover = o.flying ? 16 + Math.round(Math.sin(now / 300 + o.id) * 2) : 0, f = Math.floor(now / 160 + o.id) & 1;
+          lift = 14 + hover;
+          if (o.mount.width === HD_MOUNT_W * 2) st.sprite(o.mount, f * HD_MOUNT_W, 0, HD_MOUNT_W, HD_MOUNT_H, sx - HD_MOUNT_W / 2, sy - hover - HD_MOUNT_H + 12, HD_MOUNT_W, HD_MOUNT_H, sy, order++, o.alpha, o.flip);
+          else st.sprite(o.mount, f * MOUNT_W, 0, MOUNT_W, MOUNT_H, sx - (MOUNT_W * MS) / 2, sy - hover - MOUNT_H * MS + 14, MOUNT_W * MS, MOUNT_H * MS, sy, order++, o.alpha, o.flip);
+        }
+        st.sprite(o.sheet, o.sx, o.sy, o.sw, o.sw, sx - o.ox, sy - o.oy - lift, o.sw, o.sw, sy, order++, o.alpha);
+        if (o.wa) drawWeaponGlow(g, (o.wk && AURA_SKINS[o.wk]?.color) || WEAPON_AURA_COLORS[o.wa], sx + (o.flip ? -8 : 8), sy - 15 - lift, now, o.wa, o.id);
+        if (o.aura && !low) drawAura(g, o.aura, sx, sy, now, o.id);
+        continue;
+      }
       if (!low) {
         g.fillStyle = 'rgba(0,0,0,0.25)';
         g.beginPath();
@@ -1976,6 +2015,10 @@ export class Game {
       this.sky.draw(g, W, H, now, now + (this.timeOffset ?? 0), map.def.id, map.def.theme, map.def.kind === 'dungeon', lights, screenFx.density);
     }
     // Name plates, health bars and combat text in screen space so they stay sharp at any zoom.
+    if (st) {
+      g = this.ctx;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+    }
     g.font = '600 12px "Trebuchet MS", sans-serif';
     g.textAlign = 'center';
     g.lineWidth = 3;
@@ -2042,10 +2085,35 @@ export class Game {
       g.fillStyle = 'rgba(40,10,14,0.35)';
       g.fillRect(0, 0, W, H);
     }
+    if (st) {
+      st.airDirty = true;
+      const indoor = map.def.kind === 'dungeon';
+      st.render(camX, camY, z, Math.max(0, Math.min(1, ((py - camY) * z) / H)), 1 - darkness(now + (this.timeOffset ?? 0)), indoor, gfx.quality === 'high');
+    }
     if (this.mini && now - this.miniAt > 200) {
       this.miniAt = now;
       this.drawMinimap(map, px, py);
     }
+  }
+
+  /** The WebGL stage when style B is on and this browser can run it; created on first use. */
+  private stage: Stage3D | null = null;
+  private stageOff = false;
+  private stageNow(): Stage3D | null {
+    if (settings.get().graphics.renderer !== 'hd2d' || this.stageOff) {
+      if (this.stage) { this.stage.destroy(); this.stage = null; this.canvas.classList.remove('over3d'); }
+      return null;
+    }
+    if (this.stage) return this.stage;
+    if (!stageSupported()) { this.stageOff = true; return null; }
+    try {
+      this.stage = new Stage3D(this.canvas.parentElement!, this.canvas, CHUNK_PX);
+      this.canvas.classList.add('over3d');
+    } catch (e) {
+      console.warn('3D stage unavailable, using the 2D renderer', e);
+      this.stageOff = true;
+    }
+    return this.stage;
   }
 
   /** Quest givers with something for this character, and the monsters active quests still need; refreshed twice a second. */

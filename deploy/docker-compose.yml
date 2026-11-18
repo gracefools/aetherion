@@ -28,5 +28,19 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
+  backup:
+    image: postgres:16
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_EVERY_HOURS: ${BACKUP_EVERY_HOURS:-6}
+      BACKUP_KEEP: ${BACKUP_KEEP:-28}
+    volumes:
+      - ./backup/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    # tr strips Windows line endings in case the checkout converted them
+    entrypoint: ["sh", "-c", "tr -d '\r' < /backup.sh > /tmp/b.sh && exec sh /tmp/b.sh"]
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
 volumes:
   pgdata:

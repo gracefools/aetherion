@@ -1,0 +1,31 @@
+# Automated checks on every push and pull request: the typecheck, the unit and integration tests,
+# the client build and the real-browser test, all inside the same dev image used locally
+# (deploy/Dockerfile.dev: Node 22, PostgreSQL 16, Redis, Chromium).
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the test image
+        run: docker build -t aetherion-dev -f deploy/Dockerfile.dev .
+      - name: Typecheck, tests, build, browser test
+        run: |
+          docker run --rm -v "$PWD:/app" aetherion-dev bash -c "
+            set -e
+            npx tsc -p .
+            npm test
+            npm run -s build
+            npm run -s test:browser
+          "
+      - name: Keep the browser test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: .run/*.png
+          if-no-files-found: ignore

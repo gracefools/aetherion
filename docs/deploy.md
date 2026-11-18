@@ -64,3 +64,23 @@ npm run start:prod
 - **Shutdown:** `SIGTERM`/`SIGINT` menyimpan semua pemain lalu keluar. Beri waktu 30 detik.
 - **Backup:** semua state permanen ada di PostgreSQL. Redis boleh hilang.
 - **Skala:** satu proses. Kapasitas terukur ada di `docs/M9.md`. Tidak ada sharding antar proses.
+
+## Backup database
+
+Layanan `backup` di `deploy/docker-compose.yml` menjalankan `pg_dump` terkompresi setiap 6 jam
+(`BACKUP_EVERY_HOURS`) dan menyimpan 28 file terbaru (`BACKUP_KEEP`, satu minggu) di
+`deploy/backups/` pada host. Folder itu tidak masuk git.
+
+Memulihkan satu backup (hentikan dulu layanan `game` agar tidak ada yang menulis):
+
+```
+docker compose -f deploy/docker-compose.yml stop game
+gunzip -c deploy/backups/aetherion-YYYYmmdd-HHMM.sql.gz | docker compose -f deploy/docker-compose.yml exec -T postgres psql -U aetherion -d aetherion
+docker compose -f deploy/docker-compose.yml start game
+```
+
+## Pemeriksaan otomatis (CI)
+
+`.github/workflows/ci.yml` berjalan di GitHub Actions pada setiap push dan pull request: typecheck,
+tes unit dan integrasi, build klien, dan tes browser, semuanya di dalam image dev yang sama
+(`deploy/Dockerfile.dev`). Screenshot tes browser disimpan sebagai artifact.

@@ -13,6 +13,7 @@ import {
 import { JOBS, MAX_CHAT_LEN, type Job } from '../../shared/src/protocol';
 import { COLORS, drawAura, EYE, getCharSheet, HAIR, LAYERS, renderSheet, SKIN, SPRITE_OX, SPRITE_OY } from './game/chars';
 import { getHDSheet, HD, hdFrame } from './game/hdchars';
+import './game/stylea'; // style A characters
 import { Game, keyOf, runeKey, type Hud } from './game/Game';
 import { getMonsterSheet, MONSTER_TYPES, monsterScale } from './game/monsters';
 import { PROP_KINDS, propSprite } from './game/props';
@@ -104,8 +105,8 @@ function Sprite({ ap, job, scale = 3, anim, dir = 0 }: { ap: Appearance; job: Jo
       g.clearRect(0, 0, FRAME_W * scale, FRAME_H * scale);
       // one-shot animations replay with a short pause so they can be inspected
       const t = anim ? (performance.now() - t0) % 1400 : 0;
-      // HD frames are 64px: the 48px window around the figure keeps the same canvas size and scale
-      if (hd) g.drawImage(sheet, hdFrame(anim ?? 'idle', t) * HD + 8, dir * HD + 14, 48, 48, 0, 0, FRAME_W * scale, FRAME_H * scale);
+      // HD frames are 64px: a 40px window around the (style A) figure fills the same canvas
+      if (hd) g.drawImage(sheet, hdFrame(anim ?? 'idle', t) * HD + 12, dir * HD + 21, 40, 40, 0, 0, FRAME_W * scale, FRAME_H * scale);
       else g.drawImage(sheet, animFrame(anim ?? 'idle', t) * FRAME_W, dir * FRAME_H, FRAME_W, FRAME_H, 0, 0, FRAME_W * scale, FRAME_H * scale);
       if (anim && ap.aura) {
         g.save();

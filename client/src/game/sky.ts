@@ -16,7 +16,7 @@ export class Sky {
   /** What the weather is now (for the HUD). */
   weather: Weather = 'clear';
 
-  draw(g: CanvasRenderingContext2D, W: number, H: number, now: number, serverNow: number, zone: string, theme: Theme, indoors: boolean, light: { x: number; y: number }[], density: number) {
+  draw(g: CanvasRenderingContext2D, W: number, H: number, now: number, serverNow: number, zone: string, theme: Theme, indoors: boolean, light: { x: number; y: number }[], density: number, darkScale = 1) {
     const dt = Math.min(0.1, (now - (this.last || now)) / 1000);
     this.last = now;
     const w = indoors ? 'clear' : weatherAt(zone, theme, serverNow);
@@ -76,7 +76,7 @@ export class Sky {
     }
     g.restore();
     // ---- night ----
-    const dark = indoors ? 0 : darkness(serverNow) * (w === 'storm' ? 1 : 0.9);
+    const dark = (indoors ? 0 : darkness(serverNow) * (w === 'storm' ? 1 : 0.9)) * darkScale; // style B lights the night itself, so less shade
     if (dark > 0.02) {
       const s = (this.shade ??= document.createElement('canvas'));
       if (s.width !== W || s.height !== H) {

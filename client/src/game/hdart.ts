@@ -269,10 +269,19 @@ function decos(theme: string): HTMLCanvasElement[] {
 }
 
 // ------------------------------------------------------------------ the chunk
-export interface Chunk { ground: HTMLCanvasElement; over: HTMLCanvasElement | null }
+export interface Chunk {
+  ground: HTMLCanvasElement;
+  over: HTMLCanvasElement | null;
+  /** Style B: trees to stand up as billboards (map pixels; x, y the top-left, footY the row they stand on). */
+  trees?: { img: HTMLCanvasElement; x: number; y: number; footY: number }[];
+}
 const isW = (t: T) => t === T.Water, isPl = (t: T) => t === T.Plaza || t === T.Portal || t === T.Gate, isPa = (t: T) => t === T.Path;
 
-export function buildChunk(map: ZoneMap, cx: number, cy: number): Chunk {
+/**
+ * `stage`: the chunk is for the 3D stage (style B). Buildings are left out (the stage raises them as
+ * blocks), wall shadows are not painted (the sun casts real ones) and trees are listed, not painted.
+ */
+export function buildChunk(map: ZoneMap, cx: number, cy: number, stage = false): Chunk {
   const theme = map.def.theme, p = PALS[theme] ?? KINGDOM, R = ramps(theme);
   const ground = mk(CHUNK_PX, CHUNK_PX), g = ground.getContext('2d', { willReadFrequently: true })!;
   const x0 = cx * CHUNK, y0 = cy * CHUNK, M = CHUNK + 4;
@@ -370,8 +379,8 @@ export function buildChunk(map: ZoneMap, cx: number, cy: number): Chunk {
   for (let ty = 0; ty < CHUNK; ty++) for (let tx = 0; tx < CHUNK; tx++) {
     const t = at(tx, ty), ox = tx * TS, oy = ty * TS, wx = x0 + tx, wy = y0 + ty;
     if (t === T.Rock) cliff(g, map, wx, wy, ox, oy, p);
-    else if (t === T.Wall || t === T.Roof) building(g, map, wx, wy, ox, oy, t, p);
-    else {
+    else if (t === T.Wall || t === T.Roof) { if (!stage) building(g, map, wx, wy, ox, oy, t, p); }
+    else if (!stage) {
       // soft shadows cast by walls and cliffs (light from the upper left)
       const above = at(tx, ty - 1), left = at(tx - 1, ty);
       if (above === T.Wall || above === T.Rock) shadeRect(g, ox, oy, TS, 7, 'down');
@@ -381,11 +390,16 @@ export function buildChunk(map: ZoneMap, cx: number, cy: number): Chunk {
   // trees: a ground part (shadow and lower body) and an overlay part (everything above the tile's top)
   const trees = treeSprites(theme);
   let over: HTMLCanvasElement | null = null, og: G | null = null;
+  const list: NonNullable<Chunk['trees']> = [];
   for (let ty = -2; ty <= CHUNK + 1; ty++) for (let tx = -2; tx <= CHUNK + 1; tx++) {
     if (at(tx, ty) !== T.Tree) continue;
     const wx = x0 + tx, wy = y0 + ty, h = hash(wx, wy, 5), s = trees[h % trees.length];
     const footX = tx * TS + 16 + ((h >> 4) % 7) - 3, footY = ty * TS + 28 + ((h >> 8) % 3);
     const dx = footX - s.fx, dy = footY - s.fy, cut = ty * TS - dy; // sprite row at the tile's top edge
+    if (stage) { // each tree once, by the chunk that holds its tile
+      if (tx >= 0 && ty >= 0 && tx < CHUNK && ty < CHUNK) list.push({ img: s.img, x: x0 * TS + dx, y: y0 * TS + dy, footY: y0 * TS + footY });
+      continue;
+    }
     g.fillStyle = 'rgba(30,40,40,0.28)';
     g.beginPath(); g.ellipse(footX + 6, footY - 2, 20, 7, 0, 0, 7); g.fill();
     if (cut < s.img.height) g.drawImage(s.img, 0, Math.max(0, cut), s.img.width, s.img.height - Math.max(0, cut), dx, dy + Math.max(0, cut), s.img.width, s.img.height - Math.max(0, cut));
@@ -394,7 +408,20 @@ export function buildChunk(map: ZoneMap, cx: number, cy: number): Chunk {
       og!.drawImage(s.img, 0, 0, s.img.width, Math.min(cut, s.img.height), dx, dy, s.img.width, Math.min(cut, s.img.height));
     }
   }
-  return { ground, over };
+  return stage ? { ground, over: null, trees: list } : { ground, over };
+}
+
+/**
+ * Style B: the painted faces of one building, for the stage's 3D blocks. The canvas covers the tile
+ * rectangle (tx0, ty0) to (tx1, ty1) inclusive, each Roof and Wall tile painted as on the flat map.
+ */
+export function paintBuilding(map: ZoneMap, tx0: number, ty0: number, tx1: number, ty1: number): HTMLCanvasElement {
+  const p = PALS[map.def.theme] ?? KINGDOM, c = mk((tx1 - tx0 + 1) * TS, (ty1 - ty0 + 1) * TS), g = c.getContext('2d', { willReadFrequently: true })!;
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+    const t = tileAt(map, tx, ty);
+    if (t === T.Wall || t === T.Roof) building(g, map, tx, ty, (tx - tx0) * TS, (ty - ty0) * TS, t, p);
+  }
+  return c;
 }
 
 function tuft(g: G, x: number, y: number, rp: RGB[], r: () => number) {

@@ -136,6 +136,8 @@ export class Stage3D {
   private groundPlane: THREE.Mesh;
   private airTex: THREE.CanvasTexture;
   private base: THREE.Mesh;
+  private statics: THREE.Mesh[] = [];
+  private lamps: THREE.PointLight[] = [];
   private W = 0;
   private H = 0;
   groundDirty = false;
@@ -161,6 +163,12 @@ export class Stage3D {
     this.sun.shadow.normalBias = 0.6;
     this.sun.shadow.radius = 3;
     this.scene.add(this.sun, this.sun.target, this.sky);
+    // a fixed pool of lights for the night (a changing light count would recompile every material)
+    for (let i = 0; i < 6; i++) {
+      const l = new THREE.PointLight(0xffb060, 0, 300, 2);
+      this.lamps.push(l);
+      this.scene.add(l);
+    }
 
     // anything outside the loaded chunks shows the dark backdrop
     this.scene.background = new THREE.Color(0x10131c);
@@ -196,7 +204,7 @@ export class Stage3D {
     this.overlay = new ShaderPass(OverlayShader);
     this.overlay.uniforms.tOver.value = this.airTex;
     this.composer.addPass(this.overlay);
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(640, 360), 0.55, 0.5, 0.82);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(640, 360), 0.4, 0.5, 0.85);
     this.composer.addPass(this.bloom);
     this.finish = new ShaderPass(FinishShader);
     this.composer.addPass(this.finish);
@@ -351,20 +359,20 @@ export class Stage3D {
     // the sun: high in the back-left by day, so shadows fall forward and to the right; low and blue at night
     const d = Math.max(0, Math.min(1, day));
     const cx = camX + vw / 2, cz = camY + vh / 2;
-    this.sun.position.set(cx - 260, 520, cz - 340);
+    this.sun.position.set(cx - 240, 700, cz - 220);
     this.sun.target.position.set(cx, 0, cz);
     this.sun.target.updateMatrixWorld();
     const sc = this.sun.shadow.camera;
     const half = Math.max(vw, vh) * 0.75 + 120;
     sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 10; sc.far = 2000;
     sc.updateProjectionMatrix();
-    this.sun.intensity = indoor ? 0.8 : 0.6 + 1.1 * d;
+    this.sun.intensity = indoor ? 0.8 : 0.12 + 1.58 * d;
     this.sun.color.setRGB(1, 0.9 + 0.06 * d, 0.78 + 0.16 * d);
     // lit ground comes out near its painted colour, shadowed ground at about 60% (the night overlay darkens further)
-    this.sky.intensity = indoor ? 2.6 : 2.0 + 0.4 * d;
-    this.sky.color.setRGB(0.62 + 0.2 * d, 0.7 + 0.18 * d, 0.95);
+    this.sky.intensity = indoor ? 2.6 : 0.75 + 1.65 * d;
+    this.sky.color.setRGB(0.42 + 0.4 * d, 0.52 + 0.36 * d, 0.95);
     // sprites are unlit pixel art: the time of day tints them to sit in the same light as the ground
-    const tint = indoor ? 0.95 : 0.88 + 0.12 * d;
+    const tint = indoor ? 0.95 : 0.55 + 0.45 * d;
     for (let i = 0; i < this.used; i++) this.bills[i].mesh.material.color.setRGB(tint, tint * (0.96 + 0.04 * d), tint * (0.94 + 0.08 * (1 - d) * 0.5));
 
     const u = this.finish.uniforms;
@@ -375,6 +383,31 @@ export class Stage3D {
     this.composer.render();
     this.groundDirty = false;
     this.airDirty = false;
+  }
+
+  /** Meshes that belong to the zone and stay put (buildings). Replaces the previous zone's. */
+  setStatic(meshes: THREE.Mesh[]) {
+    for (const m of this.statics) {
+      this.scene.remove(m);
+      m.geometry.dispose();
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+    }
+    this.statics = meshes;
+    for (const m of meshes) this.scene.add(m);
+  }
+
+  /** Night lights for this frame: up to six, nearest first (map pixels; h is the height). */
+  setLights(list: { x: number; y: number; h: number; color: number; power: number; range: number }[]) {
+    for (let i = 0; i < this.lamps.length; i++) {
+      const l = this.lamps[i], s = list[i];
+      if (!s) { l.intensity = 0; continue; }
+      l.position.set(s.x, s.h, s.y);
+      l.color.setHex(s.color);
+      l.intensity = s.power;
+      l.distance = s.range;
+    }
   }
 
   /** Clears the chunks (a zone change: the old map's terrain must not linger). */
@@ -388,6 +421,7 @@ export class Stage3D {
 
   destroy() {
     this.reset();
+    this.setStatic([]);
     this.renderer.dispose();
     this.canvas.remove();
   }

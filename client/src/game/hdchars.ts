@@ -416,13 +416,19 @@ export function renderHDSheet(ap: Appearance, job: Job): HTMLCanvasElement {
   return sheet;
 }
 const sheets = new Map<string, HTMLCanvasElement>();
+/** What builds a sheet: this module's renderer, or style A once stylea.ts is loaded. */
+let renderer: (ap: Appearance, job: Job) => HTMLCanvasElement = renderHDSheet;
+export function setHDRenderer(f: (ap: Appearance, job: Job) => HTMLCanvasElement) {
+  renderer = f;
+  sheets.clear();
+}
 /** The sheet if it is already built (no work). */
 export const peekHDSheet = (ap: Appearance, job: Job) => sheets.get(appearanceKey(ap, job));
 export function getHDSheet(ap: Appearance, job: Job): HTMLCanvasElement {
   const key = appearanceKey(ap, job);
   let s = sheets.get(key);
   if (s) { sheets.delete(key); sheets.set(key, s); return s; }
-  s = renderHDSheet(ap, job);
+  s = renderer(ap, job);
   if (sheets.size >= 120) sheets.delete(sheets.keys().next().value!);
   sheets.set(key, s);
   return s;

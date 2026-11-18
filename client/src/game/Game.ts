@@ -44,8 +44,8 @@ import { markTutorial } from '../tutorial';
 import { t as tr, tv } from '../i18n';
 import { enhance } from '../../../shared/src/subskills';
 import { sound } from '../audio/gameSound';
-import { buildChunk, CHUNK, CHUNK_PX, miniColors, type Chunk } from './art';
-import { buildChunk as buildHDChunk, miniColors as hdMiniColors } from './hdart';
+import { buildChunk, CHUNK, CHUNK_PX, miniColors } from './art';
+import { buildChunk as buildHDChunk, miniColors as hdMiniColors, type Chunk } from './hdart';
 import { getHDSheet, HD, HD_COL, HD_FEET, HD_OX, hdDuration, hdFrame, peekHDSheet, type HdAnim } from './hdchars';
 import { drawAura, getCharSheet, NAME_OY, SPRITE_OX, SPRITE_OY } from './chars';
 import { drawFx, drawHit, fxDuration, screenFx, type Fx } from './fx';
@@ -56,6 +56,7 @@ import { getMonsterSheet, hasMonsterSheet, HD_M_FRAME, M_FRAME, mAnimDuration, m
 import { HD_MOUNT_H, HD_MOUNT_W, hdMountSprite, hdPetSprite } from './hdcomp';
 import { Stage3D, stageSupported } from './stage3d';
 import { darkness } from '../../../shared/src/events';
+import { buildBuildings } from './buildings3d';
 
 export interface ChatLine {
   id: number;
@@ -1576,13 +1577,13 @@ export class Game {
   // ---------- rendering ----------
   /** A cached terrain chunk; null when it is not built yet and `build` is false (HD chunks are built one per frame). */
   private chunk(cx: number, cy: number, map: ZoneMap, build = true): Chunk | null {
-    const hd = settings.get().graphics.art === 'hd';
-    if (hd !== this.chunksHD) { this.chunks.clear(); this.chunksHD = hd; }
+    const hd = settings.get().graphics.art === 'hd', staged = hd && !!this.stage;
+    if (hd !== this.chunksHD || staged !== this.chunksStaged) { this.chunks.clear(); this.chunksHD = hd; this.chunksStaged = staged; }
     const key = cx + cy * 1024;
     let c = this.chunks.get(key);
     if (c) return c;
     if (!build && hd) return null;
-    c = hd ? buildHDChunk(map, cx, cy) : buildChunk(map, cx, cy);
+    c = hd ? buildHDChunk(map, cx, cy, staged) : buildChunk(map, cx, cy);
     if (this.chunks.size >= 40) this.chunks.delete(this.chunks.keys().next().value!);
     this.chunks.set(key, c);
     return c;
@@ -1644,10 +1645,18 @@ export class Game {
     // HD terrain is costly to paint: one new chunk per frame, nearest to the camera first; until then
     // its area shows the region's ground colour, so a zone change never stalls a frame
     let missing: [number, number] | null = null, best = Infinity;
+    const visTrees: NonNullable<Chunk['trees']>[] = [];
+    // style B: the zone's buildings rise as 3D blocks (built once per zone, HD art only)
+    if (st && this.stageZone !== map.def.id + (this.chunksHD ? ':hd' : '')) {
+      this.stageZone = map.def.id + (this.chunksHD ? ':hd' : '');
+      const b = this.chunksHD ? buildBuildings(map) : { meshes: [], doors: [] };
+      st.setStatic(b.meshes);
+      this.doors = b.doors;
+    }
     const mcx = (camX + vw / 2) / CHUNK_PX, mcy = (camY + vh / 2) / CHUNK_PX;
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
       const c = this.chunk(cx, cy, map, false);
-      if (c) { if (st) st.chunk(cx, cy, CHUNK_PX, c.ground); else g.drawImage(c.ground, cx * CHUNK_PX, cy * CHUNK_PX); continue; }
+      if (c) { if (st) { st.chunk(cx, cy, CHUNK_PX, c.ground); if (c.trees) visTrees.push(c.trees); } else g.drawImage(c.ground, cx * CHUNK_PX, cy * CHUNK_PX); continue; }
       g.fillStyle = hdMiniColors(map.def.theme)[0];
       g.fillRect(cx * CHUNK_PX, cy * CHUNK_PX, CHUNK_PX, CHUNK_PX);
       const d = (cx + 0.5 - mcx) ** 2 + (cy + 0.5 - mcy) ** 2;
@@ -1901,6 +1910,10 @@ export class Game {
       g.setTransform(z, 0, 0, z, -camX * z, -camY * z);
     }
     let order = 0;
+    if (st) for (const tl of visTrees) for (const t of tl) {
+      if (t.x > camX + vw + 40 || t.x + t.img.width < camX - 40 || t.y > camY + vh + 40 || t.footY < camY - 40) continue;
+      st.sprite(t.img, 0, 0, t.img.width, t.img.height, t.x, t.y, t.img.width, t.img.height, t.footY, order++);
+    }
     for (const o of list) {
       const sx = Math.round(o.x), sy = Math.round(o.y);
       if (st) { // billboards with real shadows instead of drawn ones
@@ -2012,7 +2025,7 @@ export class Game {
       const lights = [{ x: (px - camX) * z, y: (py - 10 - camY) * z }];
       const town = map.def.town;
       if (town) lights.push({ x: (town.tx * TILE - camX) * z, y: (town.ty * TILE - camY) * z });
-      this.sky.draw(g, W, H, now, now + (this.timeOffset ?? 0), map.def.id, map.def.theme, map.def.kind === 'dungeon', lights, screenFx.density);
+      this.sky.draw(g, W, H, now, this.skyNow(now), map.def.id, map.def.theme, map.def.kind === 'dungeon', lights, screenFx.density, st ? 0.3 : 1);
     }
     // Name plates, health bars and combat text in screen space so they stay sharp at any zoom.
     if (st) {
@@ -2087,8 +2100,18 @@ export class Game {
     }
     if (st) {
       st.airDirty = true;
-      const indoor = map.def.kind === 'dungeon';
-      st.render(camX, camY, z, Math.max(0, Math.min(1, ((py - camY) * z) / H)), 1 - darkness(now + (this.timeOffset ?? 0)), indoor, gfx.quality === 'high');
+      const indoor = map.def.kind === 'dungeon', day = 1 - darkness(this.skyNow(now)), night = indoor ? 0.6 : 1 - day;
+      // night lights: the hero's lantern, the town square and the doors of houses, nearest first
+      const lamps: { x: number; y: number; h: number; color: number; power: number; range: number }[] = [];
+      if (night > 0.15) {
+        lamps.push({ x: px, y: py - 4, h: 46, color: 0xffc27a, power: 7000 * night, range: 300 });
+        const town = map.def.town;
+        if (town) lamps.push({ x: town.tx * TILE + 16, y: town.ty * TILE + 16, h: 70, color: 0xffb060, power: 16000 * night, range: 420 });
+        const near = this.doors.filter((d) => Math.abs(d.x - px) < vw && Math.abs(d.y - py) < vh).sort((a, b) => Math.hypot(a.x - px, a.y - py) - Math.hypot(b.x - px, b.y - py));
+        for (const d of near.slice(0, 4)) lamps.push({ x: d.x, y: d.y, h: 34, color: 0xff9a40, power: 4500 * night, range: 240 });
+      }
+      st.setLights(lamps);
+      st.render(camX, camY, z, Math.max(0, Math.min(1, ((py - camY) * z) / H)), day, indoor, gfx.quality === 'high');
     }
     if (this.mini && now - this.miniAt > 200) {
       this.miniAt = now;
@@ -2096,8 +2119,16 @@ export class Game {
     }
   }
 
+  /** The world clock for light and weather (visual checks may shift it with window.__clockShift). */
+  private skyNow(now: number) {
+    return now + (this.timeOffset ?? 0) + (Number((window as any).__clockShift) || 0);
+  }
+
   /** The WebGL stage when style B is on and this browser can run it; created on first use. */
   private stage: Stage3D | null = null;
+  private chunksStaged = false;
+  private stageZone = '';
+  private doors: { x: number; y: number }[] = [];
   private stageOff = false;
   private stageNow(): Stage3D | null {
     if (settings.get().graphics.renderer !== 'hd2d' || this.stageOff) {
@@ -2296,7 +2327,7 @@ export class Game {
       act && now >= at && now - at < animDuration(act as Anim) ? act : move === Move.Run ? 'run' : move === Move.Walk ? 'walk' : 'idle';
     const all = [...this.remotes.values()];
     return {
-      x: this.cur.x, y: this.cur.y, zone: this.map?.def.id, warm: this.warm, remotes: all.filter((r) => !r.mt).length, pending: this.pending.length / 4, ...this.stats, hud: this.hud,
+      x: this.cur.x, y: this.cur.y, zone: this.map?.def.id, warm: this.warm, skyClock: this.skyNow(now) - (Number((window as any).__clockShift) || 0), remotes: all.filter((r) => !r.mt).length, pending: this.pending.length / 4, ...this.stats, hud: this.hud,
       anim: this.isDead ? 'death' : this.castUntil > now ? 'cast' : anim(this.act, this.actAt, this.moving), dead: this.isDead, fx: this.fx.map((f) => f.def.id), targetId: this.targetId, zoom: this.zoom, camX: this.camX, camY: this.camY,
       remoteList: all.filter((r) => !r.mt).map((r) => ({ id: r.meta.id, name: r.meta.name, ap: r.meta.ap, anim: r.castUntil > now ? 'cast' : anim(r.act, r.actAt, r.m), x: r.rx, y: r.ry, hp: r.hp, st: r.st })),
       dev: this.dev, dbgOn: this.dbgOn, dbgMobs: this.dbgMobs, auto: { on: this.hunter.on, status: this.hunter.status, target: this.hunter.targetName, area: this.hunter.on ? this.hunter.area() : null },

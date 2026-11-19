@@ -288,7 +288,10 @@ export class Matches {
         for (const p of m.fighters) {
           const won = m.side.get(p.id) === winner;
           this.pvp.bump(p, won ? { duels_won: 1, rating: delta, honor: RANKED.winHonor } : { duels_lost: 1, rating: -delta, honor: RANKED.loseHonor });
-          if (won) this.w.journals.add(p, 'duel');
+          if (won) {
+            this.w.journals.add(p, 'duel');
+            this.w.seasons.add(p, 'rated', 1);
+          }
           this.w.send(p, { t: 'sys', text: won ? `Your team won the rated 2v2: rating +${delta}, +${RANKED.winHonor} honour.` : `Your team lost the rated 2v2: rating -${delta}, +${RANKED.loseHonor} honour.`, cue: won ? 'pvp' : undefined });
         }
       }
@@ -317,6 +320,7 @@ export class Matches {
     this.pvp.bump(win, { duels_won: 1, rating: delta, honor: RANKED.winHonor });
     this.pvp.bump(lose, { duels_lost: 1, rating: -delta, honor: forfeit ? 0 : RANKED.loseHonor });
     this.w.journals.add(win, 'duel');
+    this.w.seasons.add(win, 'rated', 1);
     this.w.send(win, { t: 'sys', text: `You won the rated duel against ${lose.name}${forfeit ? ' (they left)' : ''}: rating +${delta}, +${RANKED.winHonor} honour.`, cue: 'pvp' });
     this.w.send(lose, { t: 'sys', text: forfeit ? `You left the rated duel and lost it: rating -${delta}.` : `You lost the rated duel against ${win.name}: rating -${delta}, +${RANKED.loseHonor} honour.` });
   }

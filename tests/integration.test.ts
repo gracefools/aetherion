@@ -289,7 +289,9 @@ test('M3: fight over the network: targeting, server damage, kill, EXP, level-up 
   const mine = a.dmg.filter((d) => d[3] === a.characterId && d[0] === m.id);
   const maxHits = Math.floor((Date.now() - t0) / p.stats.atkIntervalMs) + 2;
   assert.ok(mine.length >= 2 && mine.length <= maxHits, `${mine.length} hits in ${Date.now() - t0}ms (max ${maxHits})`);
-  assert.ok(mine.every((d) => d[1] <= Math.ceil(p.stats.atk * 1.1 * p.stats.critDmg)), 'no hit exceeds what the stats allow');
+  // every third blow in a row is a finisher (G1), which may hit harder by its multiplier
+  const cap = (k: number) => Math.ceil(p.stats.atk * 1.1 * p.stats.critDmg * k);
+  assert.ok(mine.every((d, i) => d[1] <= cap(i % BASIC_COMBO.hits === BASIC_COMBO.hits - 1 ? BASIC_COMBO.mul : 1)), `no hit exceeds what the stats allow: ${mine.map((d) => d[1])} (cap ${cap(1)}, finisher ${cap(BASIC_COMBO.mul)})`);
   assert.equal(a.xp, 12);
   assert.equal(a.me!.exp, 12);
   assert.equal(a.remotes.get(m.id)?.hp ?? 0, 0);
@@ -1053,6 +1055,7 @@ test('M13 quest progress and reputation are stored with the character; factions 
 // M14: guilds, auction house and bank over the real network and database
 // ---------------------------------------------------------------------------------------------
 import { AUCTION_MAX_LISTINGS, BANK_SIZE, GUILD_CREATE_COST, guildExpToNext, listingFee, saleTax, DEFAULT_AUCTION_RATES } from '../shared/src/economy';
+import { BASIC_COMBO } from '../shared/src/combat';
 
 /** A bot that records every message and can send a command and wait for its answer. */
 async function econBot(user: string, name: string, job: any = 'knight') {

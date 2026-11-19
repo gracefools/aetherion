@@ -1,6 +1,6 @@
 // G7: seasonal ladders. A season is a calendar month (UTC). Four ladders rank what characters did
-// this season; when it ends the top ten of each are rewarded by mail.
-export type LadderId = 'rift' | 'honor' | 'raid' | 'dungeon';
+// this season; when it ends the top ten of each are rewarded by mail. (G8 added the rated-match ladder.)
+export type LadderId = 'rift' | 'honor' | 'raid' | 'dungeon' | 'rated';
 export interface LadderDef {
   id: LadderId;
   name: string;
@@ -13,6 +13,7 @@ export const LADDERS: LadderDef[] = [
   { id: 'honor', name: 'Arena and Depths', score: 'Honour earned', mode: 'add' },
   { id: 'raid', name: 'Raids', score: 'Raid bosses defeated', mode: 'add' },
   { id: 'dungeon', name: 'Dungeons', score: 'Dungeons cleared on Hard or above', mode: 'add' },
+  { id: 'rated', name: 'Rated matches', score: 'Rated duels and 2v2s won', mode: 'add' },
 ];
 export const LADDER_TOP = 20;
 /** The season a moment belongs to: "2026-11". */

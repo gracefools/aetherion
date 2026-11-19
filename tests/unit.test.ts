@@ -5033,8 +5033,11 @@ test('G8 rated duel: queued anywhere, matched by rating, fought in a private hal
   m.startsAt = Date.now() - 1;
   for (const p of [A.p, B.p]) p.pvpShieldUntil = 0;
   assert.equal(world.pvp.block(A.p, B.p), '', 'then they fight');
-  const ra = world.pvp.rating.get(A.p.id) ?? 1000;
+  const ra = world.pvp.rating.get(A.p.id) ?? 1000, ladder: [string, number][] = [];
+  const add = world.seasons.add.bind(world.seasons);
+  (world.seasons as any).add = (p: any, l: any, n: number) => (ladder.push([p.name, n, l] as any), add(p, l, n));
   world.hurt(B.p, 1e9, 0, A.p);
+  assert.ok(ladder.some((x: any) => x[0] === A.p.name && x[2] === 'rated'), 'a rated win counts on the season ladder');
   assert.ok(B.p.dead && m.overAt > 0 && m.winner === m.side.get(A.p.id));
   assert.ok((world.pvp.rating.get(A.p.id) ?? 0) > ra, 'the winner gains rating');
   assert.ok(A.out.some((x) => x.t === 'match' && x.v?.result === 'won') && B.out.some((x) => x.t === 'match' && x.v?.result === 'lost'));
@@ -6639,7 +6642,7 @@ test('G7 seasons: monthly, the season before, rewards for the top ten, and payou
   (world.seasons as any).lastCheck = 0;
   await world.seasons.tick(now + 1);
   assert.equal(mails.length, 2, 'and only once');
-  assert.equal(LADDERS.length, 4);
+  assert.equal(LADDERS.length, 5);
 });
 
 test('raids: a group at the Raid Herald, two waves of elites, Aetherion\'s Shadow scaled to the raiders, rewards for everyone inside', () => {

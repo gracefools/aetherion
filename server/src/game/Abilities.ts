@@ -540,6 +540,12 @@ export function learn(w: World, p: Player, id: unknown): string {
 export function respec(w: World, p: Player): string {
   if ((w.tick - p.lastCombat) * TICK_MS <= COMBAT_TIMEOUT_MS) return 'Cannot do that in combat';
   p.build.skills = {};
+  // awakenings were paid for with skill points: a respec takes them back too
+  if (p.asc.awake.length) {
+    p.asc.awake = [];
+    p.progDirty = true;
+    w.sendAsc(p);
+  }
   buildChanged(w, p);
   return '';
 }

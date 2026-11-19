@@ -7,7 +7,7 @@ import { allDiscoveries, isNpc, NODE_RESPAWN_MS, objById, RECIPES, REGION_RES, t
 import { speakerName, STORY, STORY_REGIONS } from '../shared/src/story';
 import { traitOf, TRAITS } from '../shared/src/traits';
 import { statusNames } from '../shared/src/combat';
-import { AUTO_EXP, AUTO_REST_MS, AUTO_WEARY_EXP, AUTO_WEARY_MS, RHYTHM_EXP, RHYTHM_MAX, RHYTHM_WINDOW_MS, talentsOf } from '../shared/src/talents';
+import { talentsOf, TALENT_TIERS } from '../shared/src/talents';
 import { FACTIONS, LORE } from '../shared/src/lore';
 import { validateDir, validateSheet, type SheetEntry } from '../scripts/assets';
 import { decodePng, encodePng, type Image } from '../scripts/png';
@@ -2262,6 +2262,31 @@ test('M7 dungeon entry: gate, level and leadership rules; a private instance sca
   assert.equal(mate.out.filter((m) => m.t === 'dng').at(-1).run, null);
 });
 
+test('every dungeon: entered from its gate, cleared, and its boss gives equipment', () => {
+  const report: string[] = [];
+  for (const zone of REGIONS) {
+    if (!ZONES[zone].gates?.length) continue;
+    const g = gateOf(zone), def = DUNGEONS[g.id];
+    const { world, join } = harness({ capacity: 20 });
+    const a = join(g.dx, g.dy, 'knight', Math.max(def.minLevel, def.level), -1, zone);
+    const why = world.dungeon(a.p, 'enter', g.id, 'normal');
+    if (why) { report.push(`${g.id}: cannot enter: ${why}`); continue; }
+    const run = world.dungeons.runs.get(a.p.room)!;
+    const before = a.p.inv.filter((i) => ITEMS[i.base].kind === 'equip').length;
+    let now = Date.now(), bossSeen = '';
+    for (let s = 0; s < def.stages.length + 3; s++) {
+      for (const m of [...run.alive]) { if (m.def.boss) bossSeen = m.def.id; world.hurt(m, 1e9, 0, a.p); }
+      world.dungeons.tick((now = Date.now()));
+      world.dungeons.tick(now + 3000);
+    }
+    const after = a.p.inv.filter((i) => ITEMS[i.base].kind === 'equip').length;
+    if (!bossSeen) report.push(`${g.id}: no boss`);
+    else if (after <= before) report.push(`${g.id}: boss ${bossSeen} gave no equipment (bag ${a.p.inv.length})`);
+
+  }
+  assert.deepEqual(report, []);
+});
+
 test('M7 dungeon run: waves, elite, boss with phases, completion rewards, closing, and immediate re-entry', () => {
   const g = gateOf('verdant');
   const { world, join, step } = harness({ capacity: 20 });
@@ -3454,7 +3479,7 @@ test('M11 configuration: sanitised and clamped; only skills that are safe to aut
   assert.deepEqual([c.hpPct, c.mpPct, c.radius], [95, 5, AUTO_RADIUS.max], 'thresholds and radius are clamped');
   assert.equal(c.attack, true, 'a non-boolean keeps the default');
   assert.deepEqual([c.loot, c.lootMode, c.onFull, c.returnTo, c.ignore], [false, 'all', 'stop', 'none', ['potion']]);
-  assert.deepEqual(c.skillList.map((s) => s.id), ['fireball'], 'movement skills, unknown ids and duplicates are dropped');
+  assert.deepEqual(c.skillList.map((s) => s.id), ['fireball', 'blink'], 'unknown ids and duplicates are dropped');
   assert.deepEqual([c.skillList[0].minMp, c.skillList[0].minEnemies, c.skillList[0].hpBelow], [100, 9, 1]);
   // what may be automated
   assert.equal(autoKind(ABILITIES.fireball), 'enemy');
@@ -3462,7 +3487,11 @@ test('M11 configuration: sanitised and clamped; only skills that are safe to aut
   assert.equal(autoKind(ABILITIES.healing_rain), 'heal');
   assert.equal(autoKind(ABILITIES.mend), 'heal');
   assert.equal(autoKind(ABILITIES.guard_stance), 'buff');
-  for (const id of ['blink', 'shadow_step', 'charge', 'fleet_step', 'stealth', 'smoke_bomb', 'resurrection', 'taunt']) assert.equal(autoKind(ABILITIES[id]), null, `${id} is never used automatically`);
+  assert.equal(autoKind(ABILITIES.resurrection), null, 'raising the dead is never automated');
+  for (const id of ['shadow_step', 'charge']) assert.equal(autoKind(ABILITIES[id]), 'enemy', `${id} closes the gap`);
+  for (const id of ['taunt', 'smoke_bomb']) assert.equal(autoKind(ABILITIES[id]), 'area', id);
+  for (const id of ['blink', 'fleet_step', 'stealth', 'purify']) assert.equal(autoKind(ABILITIES[id]), 'buff', id);
+  assert.equal(defaultAutoSkill(ABILITIES.charge, 0).on, false, 'movement skills start switched off');
   // the list follows the character: learned job skills and the spells of attuned runes
   const build = emptyBuild('mage');
   assert.deepEqual(autoAbilities('mage', build), []);
@@ -3543,7 +3572,7 @@ test('M11 server session: figures, loot rules, and every way a session ends; the
   const a = join(0, 0, 'knight', 20), p = a.p;
   const autoMsgs = () => a.out.filter((m) => m.t === 'auto');
   assert.deepEqual(a.out.find((m) => m.t === 'welcome').auto, DEFAULT_AUTO, 'the saved configuration arrives with the character');
-  world.auto(p, { on: true, cfg: { ...DEFAULT_AUTO, hpPct: 500, lootMode: 'equip', skillList: [{ id: 'blink' }] } });
+  world.auto(p, { on: true, cfg: { ...DEFAULT_AUTO, hpPct: 500, lootMode: 'equip', skillList: [{ id: 'resurrection' }] } });
   assert.equal(p.autoOn, true);
   assert.deepEqual([p.autoCfg.hpPct, p.autoCfg.lootMode, p.autoCfg.skillList.length], [95, 'equip', 0], 'the server sanitises what it stores');
   assert.equal(p.autoCfgDirty, true, 'and saves it with the character');
@@ -4368,7 +4397,7 @@ test('G4 region traits: every region past level 45 has its own mechanic, and eac
 test('G2 talents: one per tier, free, changeable outside combat, and each changes how the character fights', () => {
   const h = harness({ rng: () => 0.5, capacity: 10 }), { world } = h;
   const a = h.join(0, 0, 'knight', 15), p = a.p;
-  assert.equal(world.learn(p, 'talent.1.1'), 'Requires level 20');
+  assert.equal(world.learn(p, 'talent.1.1'), 'Requires level 30');
   for (const junk of ['talent.9.1', 'talent.1.7', 'talent.x']) assert.equal(world.learn(p, junk), 'Unknown talent');
   const lv = (n: number) => { p.level = n; p.recalc(); };
   lv(65);
@@ -4440,35 +4469,44 @@ test('G2 talents: one per tier, free, changeable outside combat, and each change
   assert.ok(side.every((m) => m.hp < m.maxHp), 'Cleaving Blows: basic attacks strike the enemies beside the target');
 });
 
-test('G5 active play beats idling: Battle Rhythm for kills made by hand, less experience while auto hunting, more less after an hour', () => {
-  const h = harness({ capacity: 10 }), { world } = h, a = h.join(0, 0, 'knight', 10), p = a.p;
-  assert.equal(world.grindFactor(p), 1);
-  kill(world, p, 'boar');
-  kill(world, p, 'boar');
-  kill(world, p, 'boar');
-  assert.equal(p.rhythm, 3, 'kills in quick succession build a streak');
-  assert.ok(Math.abs(world.grindFactor(p) - (1 + RHYTHM_EXP * 3)) < 1e-9);
-  assert.ok(a.out.some((m) => m.t === 'rhythm' && m.n === 3));
-  for (let i = 0; i < 20; i++) kill(world, p, 'boar');
-  assert.equal(p.rhythm, RHYTHM_MAX, 'capped');
-  h.step(Math.round(RHYTHM_WINDOW_MS / TICK_MS) + 2);
-  kill(world, p, 'boar');
-  assert.equal(p.rhythm, 1, 'a pause ends the streak');
-  // auto hunting: less experience, and no streak
-  world.auto(p, { on: true });
-  assert.equal(world.grindFactor(p), AUTO_EXP);
-  kill(world, p, 'boar');
-  assert.equal(p.rhythm, 1, 'auto hunting kills do not build the streak');
-  p.autoSince -= AUTO_WEARY_MS;
-  assert.equal(world.grindFactor(p), AUTO_WEARY_EXP, 'weary after an hour');
-  world.auto(p, { on: false });
-  world.auto(p, { on: true });
-  assert.equal(world.grindFactor(p), AUTO_WEARY_EXP, 'a short break does not reset it');
-  world.auto(p, { on: false });
-  p.autoOffAt -= AUTO_REST_MS;
-  world.auto(p, { on: true });
-  assert.equal(world.grindFactor(p), AUTO_EXP, 'ten minutes away does');
-  assert.ok(a.out.some((m) => m.t === 'auto' && m.xp === AUTO_EXP));
+test('G2 talents, tiers 4 to 6; awakening costs skill points; auto hunting uses every fighting skill', () => {
+  assert.deepEqual(TALENT_TIERS.map((t) => t.level), [30, 60, 90, 120, 160, 200]);
+  const h = harness({ rng: () => 0.5, capacity: 10 }), { world } = h, p = h.join(0, 0, 'knight', 200).p;
+  const mob = (boss = false) => { const m = world.spawn(p.room, boss ? 'old_tusk' : 'boar', p.x + 30, p.y); m.noRespawn = true; m.maxHp = m.hp = 1e7; return m; };
+  const base = world.strike(p, mob(), 1), eliteBase = world.strike(p, mob(true), 1);
+  p.build.skills['talent.4'] = 1;
+  assert.ok(world.strike(p, mob(true), 1) > eliteBase * 1.2 && world.strike(p, mob(), 1) === base, 'Predator: elites and bosses only');
+  p.build.skills['talent.4'] = 3; // Second Wind
+  p.hp = 50;
+  world.hurt(p, 1e6, 0, mob());
+  assert.ok(!p.dead && p.hp === 1, 'Second Wind: the killing blow leaves 1 health');
+  delete p.build.skills['talent.4'];
+  p.hp = p.maxHp;
+  p.build.skills['talent.5'] = 1; // Glass Cannon
+  assert.ok(world.strike(p, mob(), 1) > base * 1.15);
+  const hpG = p.hp; world.hurt(p, 100, 0, mob());
+  assert.equal(hpG - p.hp, 115, 'and takes 15% more');
+  p.build.skills['talent.5'] = 2; // Iron Skin
+  const hpI = p.hp; world.hurt(p, 100, 0, mob());
+  assert.equal(hpI - p.hp, 85);
+  delete p.build.skills['talent.5'];
+  p.build.skills['talent.6'] = 2; // Vampiric Mastery
+  p.hp = Math.round(p.maxHp / 2); const hpV = p.hp;
+  world.strike(p, mob(), 1);
+  assert.ok(p.hp > hpV, 'Vampiric Mastery heals');
+  // awakening: 10 skill points, given back by a respec
+  const a = h.join(0, 0, 'mage', 90).p, sk = JOB_DEFS.mage.skills.find((x) => x.type === 'active')!;
+  a.build.skills[sk.id] = sk.maxRank;
+  const town = zoneObjects('eldoria').find((o) => o.kind === 'lorekeeper')!; a.x = town.x; a.y = town.y;
+  const free = freePoints(a.level, a.build);
+  assert.equal(world.ascOp(a, { op: 'awaken', id: sk.id }), '');
+  assert.equal(freePoints(a.level, a.build), free - 10, 'awakening costs 10 skill points');
+  assert.ok(a.asc.awake.includes(sk.id));
+  a.lastCombat = -1e9;
+  assert.equal(world.respec(a), '');
+  assert.deepEqual([a.asc.awake, freePoints(a.level, a.build)], [[], a.level], 'a respec clears the awakening and returns its points');
+  // auto hunting: every active skill except raising the dead
+  for (const j of JOBS) for (const d of jobActives(j)) assert.ok(!!autoKind(d) === !(d.special === 'revive' || d.target === 'deadAlly'), `${j}: ${d.id}`);
 });
 
 test('M13 accepting: level, prerequisites, reputation, once, daily reset at midnight UTC, and the active limit', () => {
@@ -5248,7 +5286,7 @@ function huntSim(zone: string, start: { x: number; y: number }, mob: { type: str
       attackedFrom = { ...me };
       if (!lineOfSight(map, me.x, me.y, m.x, m.y, !!MONSTERS[m.type].flying)) throughWall++;
     },
-    abilityReady: () => false, abilityCost: () => 0, useAbility: () => {}, potions: () => 0, potionReady: () => false, quaff: () => {},
+    abilityReady: () => false, abilityCost: () => 0, useAbility: () => {}, ultReady: () => null, potions: () => 0, potionReady: () => false, quaff: () => {},
     usesMana: () => true, bagFull: () => false, notify: () => {},
   };
   const hunter = new AutoHunter(host);
@@ -6103,7 +6141,7 @@ test('combos, mastery and loadouts', () => {
 // ---------------------------------------------------------------------------------------------
 import { awaken as awakenDef, awakenKind, FUSIONS, fusionsFor } from '../shared/src/awakening';
 
-test('awakening: a full-rank skill changes how it works, once, for essence and gold, in a village', () => {
+test('awakening: a full-rank skill changes how it works, once, for 10 skill points, in a village', () => {
   assert.equal(awakenKind(ABIL.shield_bash), 'ripple');
   const w = awakenDef(ABIL.shield_bash);
   assert.ok(w.hit!.splash! >= 60 && w.hit!.mul > ABIL.shield_bash.hit!.mul, 'ripples to enemies nearby');
@@ -6115,13 +6153,17 @@ test('awakening: a full-rank skill changes how it works, once, for essence and g
   p.build.skills.shield_bash = 1;
   assert.equal(world.ascOp(p, { op: 'awaken', id: 'shield_bash' }), 'Train the skill to its full rank first');
   p.build.skills.shield_bash = JOB_DEFS.knight.skills.find((s) => s.id === 'shield_bash')!.maxRank;
-  p.gold = 1e6;
-  assert.equal(world.ascOp(p, { op: 'awaken', id: 'shield_bash' }), 'Requires 3 Awakening Essence');
-  give(p, { base: 'awakening_essence', rar: 0, ilvl: 1, aff: [], up: 0, qty: 3 });
+  // it costs 10 skill points: not enough free points, no awakening
+  const filler = JOB_DEFS.knight.skills.filter((s) => s.id !== 'shield_bash');
+  for (const n of filler) if (freePoints(p.level, p.build) > 5) p.build.skills[n.id] = Math.min(n.maxRank, freePoints(p.level, p.build) - 5);
+  while (freePoints(p.level, p.build) > 5) p.build.skills.taunt = (p.build.skills.taunt ?? 0) + 1;
+  assert.equal(world.ascOp(p, { op: 'awaken', id: 'shield_bash' }), 'Awakening costs 10 skill points');
+  for (const n of filler) delete p.build.skills[n.id];
+  delete p.build.skills.taunt;
   assert.equal(world.ascOp(p, { op: 'awaken', id: 'shield_bash' }), '');
   assert.deepEqual(p.asc.awake, ['shield_bash']);
   assert.equal(world.ascOp(p, { op: 'awaken', id: 'shield_bash' }), 'That skill is already awakened');
-  assert.ok(!p.inv.some((i) => i.base === 'awakening_essence'), 'the essence is spent');
+  assert.equal(p.build.skills['awake.shield_bash'], 10, 'the points are spent in the build');
   // the server casts the awakened form: a neighbour of the target is struck too
   p.res = p.stats.maxRes;
   const t = world.spawn(p.room, 'rootwarden', p.x + 30, p.y), n = world.spawn(p.room, 'rootwarden', p.x + 60, p.y);

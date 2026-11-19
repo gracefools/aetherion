@@ -7,7 +7,7 @@ import {
   type PathDef,
 } from '../../shared/src/ascension';
 import { JOB_DEFS } from '../../shared/src/jobs';
-import { AWAKEN_LEVEL, awakenCost, awakenKind } from '../../shared/src/awakening';
+import { AWAKEN_LEVEL, AWAKEN_POINTS, awakenKind } from '../../shared/src/awakening';
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
 
@@ -69,7 +69,7 @@ export function AscensionPanel({ game, onClose }: { game: Game; onClose: () => v
         </section>
       )}
       <section aria-label={t('aw.title')}>
-        <h3>{t('aw.title')} <small className="sub">{t('aw.help', { n: AWAKEN_LEVEL, e: awakenCost(me.level).essence, g: awakenCost(me.level).gold.toLocaleString(), have: hud.inv.filter((i) => i.base === 'awakening_essence').reduce((n, i) => n + i.qty, 0) })}</small></h3>
+        <h3>{t('aw.title')} <small className="sub">{t('aw.help', { n: AWAKEN_LEVEL, e: AWAKEN_POINTS, have: hud.points })}</small></h3>
         <div className="mastery">
           {JOB_DEFS[me.job].skills.filter((s) => s.type === 'active').map((s) => {
             const on = a.awake.includes(s.id), full = (hud.build?.skills[s.id] ?? 0) >= s.maxRank;
@@ -77,7 +77,7 @@ export function AscensionPanel({ game, onClose }: { game: Game; onClose: () => v
               <div key={s.id} className="mrow" title={t(`aw.kind.${awakenKind(ABILITIES[s.id])}` as any)}>
                 <span>{on ? '✦ ' : ''}{s.name}</span>
                 <small className="sub">{on ? t('aw.done') : t(`aw.kind.${awakenKind(ABILITIES[s.id])}` as any)}</small>
-                <button className="small" disabled={on || !full || me.level < AWAKEN_LEVEL} onClick={() => game.ascOp('awaken', { id: s.id })}>{on ? '✦' : t('aw.awaken')}</button>
+                <button className="small" disabled={on || !full || me.level < AWAKEN_LEVEL || hud.points < AWAKEN_POINTS} onClick={() => game.ascOp('awaken', { id: s.id })}>{on ? '✦' : t('aw.awaken')}</button>
               </div>
             );
           })}

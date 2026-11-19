@@ -917,7 +917,7 @@ test('M11 auto hunting over the network: session messages, and the configuration
   a.raw({ t: 'auto', on: true, cfg: { ...DEFAULT_AUTO, hpPct: 77, mpPct: 22, radius: 9, lootMode: 'rare', onFull: 'stop', returnTo: 'town', skillList: [{ id: 'arcane_bolt', on: true, pri: 0, minMp: 35, minEnemies: 1, hpBelow: 100 }, { id: 'blink', on: true }] } });
   await a.until(() => autos.length > 0, 2000, 'auto reply');
   assert.equal(autos[0].on, true);
-  assert.deepEqual([autos[0].cfg.hpPct, autos[0].cfg.lootMode, autos[0].cfg.skillList.map((s: any) => s.id)], [77, 'rare', ['arcane_bolt']], 'the server answers with the cleaned configuration');
+  assert.deepEqual([autos[0].cfg.hpPct, autos[0].cfg.lootMode, autos[0].cfg.skillList.map((s: any) => s.id)], [77, 'rare', ['arcane_bolt', 'blink']], 'the server answers with the cleaned configuration (Blink may now be automated)');
   const p = app.world.online.get(a.characterId)!;
   assert.equal(p.autoOn, true);
   // a kill made during the session is counted by the server and reported
@@ -938,7 +938,7 @@ test('M11 auto hunting over the network: session messages, and the configuration
   const again = new Bot(base, a.token, a.characterId, 'Autohuntr');
   await again.connect();
   assert.equal(again.welcome!.auto.hpPct, 77, 'and back after logging in again');
-  assert.deepEqual(again.welcome!.auto.skillList.map((s) => s.id), ['arcane_bolt']);
+  assert.deepEqual(again.welcome!.auto.skillList.map((s) => s.id), ['arcane_bolt', 'blink']);
   again.close();
 });
 

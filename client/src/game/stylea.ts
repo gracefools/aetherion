@@ -99,10 +99,12 @@ interface Pose {
   bob: number; liftL: number; liftR: number; armL: number; armR: number; // front and back
   A: number; l1: number; l2: number; arm: number; bend: number; armFar: number; sway: number; // side
   atk: number | null; cast: number; hit: boolean;
+  /** Attacks: where the swing came from (its trail is drawn between) and how far the body lunges. */
+  atkPrev: number | null; lunge: number;
 }
 const TAU = Math.PI * 2, ease = (t: number) => t * t * (3 - 2 * t);
 function poseFor(a: HdAnim, f: number): Pose {
-  const p: Pose = { bob: 0, liftL: 0, liftR: 0, armL: 0, armR: 0, A: 0, l1: 0, l2: 0, arm: 0.1, bend: 0.3, armFar: -0.05, sway: 0, atk: null, cast: 0, hit: false };
+  const p: Pose = { bob: 0, liftL: 0, liftR: 0, armL: 0, armR: 0, A: 0, l1: 0, l2: 0, arm: 0.1, bend: 0.3, armFar: -0.05, sway: 0, atk: null, cast: 0, hit: false, atkPrev: null, lunge: 0 };
   if (a === 'idle') { p.bob = f >= 2 ? 1 : 0; p.sway = p.bob; }
   else if (a === 'walk' || a === 'run') {
     const k = a === 'run' ? 1.4 : 1, ph = (f / 6) * TAU, s = Math.sin(ph), c = Math.cos(ph);
@@ -112,8 +114,12 @@ function poseFor(a: HdAnim, f: number): Pose {
     p.A = s * k; p.l1 = Math.round(Math.max(0, c) * 2 * k); p.l2 = Math.round(Math.max(0, -c) * 2 * k);
     p.arm = -s * 0.6 * k; p.armFar = s * 0.6 * k; p.sway = 1;
   } else if (a === 'attack') {
-    const t = f / 4, ang = 3.6 + (0.7 - 3.6) * ease(t);
+    const at = (k: number) => 3.6 + (0.7 - 3.6) * ease(Math.max(0, k) / 4), ang = at(f);
     p.atk = ang; p.A = 0.6; p.arm = ang; p.bend = 0.25; p.armFar = -0.4; p.sway = 2;
+    // the wind-up, the strike with a bright trail behind the blade, the follow-through
+    p.atkPrev = f >= 1 && f <= 3 ? at(f - 1.4) : null;
+    p.lunge = [0, 1, 3, 2, 1][f];
+    p.bob = f === 2 ? 1 : 0;
   } else if (a === 'cast') {
     p.cast = [0.3, 0.7, 1, 1, 0.6][f]; p.bob = f === 2 || f === 3 ? -1 : 0; p.arm = 2.2 + p.cast * 0.6; p.armFar = 2 + p.cast * 0.5;
   } else if (a === 'hit') { p.hit = true; p.bob = 1; p.armL = p.armR = -1; p.arm = 0.6; p.armFar = 0.4; }
@@ -127,10 +133,22 @@ type View = 'f' | 's' | 'b';
 
 function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
   const G = new Grid(HD, HD), b = pose.bob;
-  const r = (x: number, y: number, w: number, h: number, i: number) => G.r(x + PX, y + PY, w, h, i);
-  const p = (x: number, y: number, i: number) => G.p(x + PX, y + PY, i);
-  const e = (x: number, y: number, rx: number, ry: number, i: number) => G.e(x + PX, y + PY, rx, ry, i);
-  const l = (x1: number, y1: number, x2: number, y2: number, t: number, i: number) => G.l(x1 + PX, y1 + PY, x2 + PX, y2 + PY, t, i);
+  const LX = view === 's' ? pose.lunge : 0, LY = view === 'f' ? Math.round(pose.lunge / 2) : view === 'b' ? -Math.round(pose.lunge / 2) : 0;
+  const OX = PX + LX, OY = PY + LY;
+  const r = (x: number, y: number, w: number, h: number, i: number) => G.r(x + OX, y + OY, w, h, i);
+  const p = (x: number, y: number, i: number) => G.p(x + OX, y + OY, i);
+  const e = (x: number, y: number, rx: number, ry: number, i: number) => G.e(x + OX, y + OY, rx, ry, i);
+  const l = (x1: number, y1: number, x2: number, y2: number, t: number, i: number) => G.l(x1 + OX, y1 + OY, x2 + OX, y2 + OY, t, i);
+  /** A swing's trail: a bright arc around the shoulder from where the blade was to where it is. */
+  const trail = (sx: number, sy: number, a0: number, a1: number, sg: number) => {
+    const melee = !['bow', 'crossbow', 'orb', 'staff', 'holy_staff'].includes(L.weapon);
+    if (!melee) return;
+    const R0 = L.weapon === 'greatsword' || L.weapon === 'axe' ? 15 : L.weapon === 'daggers' ? 9 : 12, steps = 14;
+    for (let k = 0; k <= steps; k++) {
+      const a = a0 + ((a1 - a0) * k) / steps, fade = k / steps;
+      for (let rr = R0 - 3 * fade; rr <= R0 + 3; rr += 1) p(sx + sg * Math.sin(a) * rr, sy + Math.cos(a) * rr, fade > 0.55 ? L.glowHi : L.glow);
+    }
+  };
   const plate = L.armorKind >= 2, top = L.armorKind ? L.armor : L.c1, sleeve = plate ? L.armor : L.c1;
   const robe = L.clothing === 1, coat = L.clothing === 3;
 
@@ -139,44 +157,44 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
     const ux = sg * Math.sin(rr), uy = Math.cos(rr), at = (k: number): [number, number] => [hx + ux * k, hy + uy * k];
     const k = L.weapon;
     if (k === 'sword_shield' || k === 'greatsword') {
-      const len = k === 'greatsword' ? 17 : 12, [x0, y0] = at(1.5), [x1, y1] = at(len);
+      const len = k === 'greatsword' ? 21 : 15, [x0, y0] = at(1.5), [x1, y1] = at(len);
       l(x0, y0, x1, y1, k === 'greatsword' ? 3 : 2, L.blade);
-      const qx = uy * 2.2, qy = -ux * 2.2;
+      const qx = uy * 2.8, qy = -ux * 2.8;
       l(x0 - qx, y0 - qy, x0 + qx, y0 + qy, 1, L.goldF);
     } else if (k === 'axe' || k === 'dual_axe') {
-      const len = k === 'axe' ? 13 : 9, [x1, y1] = at(len), [xm, ym] = at(len - 3);
-      l(hx - ux * 2, hy - uy * 2, x1, y1, 1, L.wood);
-      e(xm + uy * 2.5 * sg, ym - ux * 2.5 * sg, k === 'axe' ? 3 : 2.3, k === 'axe' ? 3.5 : 2.6, L.steel);
+      const len = k === 'axe' ? 17 : 12, [x1, y1] = at(len), [xm, ym] = at(len - 3.5);
+      l(hx - ux * 2, hy - uy * 2, x1, y1, 2, L.wood);
+      e(xm + uy * 3 * sg, ym - ux * 3 * sg, k === 'axe' ? 4 : 3, k === 'axe' ? 4.6 : 3.4, L.steel);
     } else if (k === 'mace') {
-      const [x1, y1] = at(10);
-      l(hx - ux, hy - uy, x1, y1, 1, L.wood);
-      e(x1, y1, 2.6, 2.6, L.steel);
-      p(x1, y1 - 3.5, L.steel); p(x1 + 3.5, y1, L.steel); p(x1 - 3.5, y1, L.steel);
+      const [x1, y1] = at(13);
+      l(hx - ux, hy - uy, x1, y1, 2, L.wood);
+      e(x1, y1, 3.4, 3.4, L.steel);
+      p(x1, y1 - 4.5, L.steel); p(x1 + 4.5, y1, L.steel); p(x1 - 4.5, y1, L.steel); p(x1, y1 + 4.5, L.steel);
     } else if (k === 'daggers') {
-      const [x0, y0] = at(1), [x1, y1] = at(7);
-      l(x0, y0, x1, y1, 1, L.blade);
+      const [x0, y0] = at(1), [x1, y1] = at(9);
+      l(x0, y0, x1, y1, 2, L.blade);
       p(x0, y0, L.goldF);
     } else if (k === 'staff' || k === 'holy_staff') {
       if (second) return;
-      const [x0, y0] = at(-7), [x1, y1] = at(17);
+      const [x0, y0] = at(-8), [x1, y1] = at(21);
       l(x0, y0, x1, y1, 2, L.wood);
-      e(x1, y1 - 1, 2.6, 2.6, L.magic);
+      e(x1, y1 - 1, 3.4, 3.4, L.magic);
       if (k === 'holy_staff') { l(x1, y1 - 6, x1, y1 + 3, 1, L.goldF); l(x1 - 3, y1 - 2, x1 + 3, y1 - 2, 1, L.goldF); }
       else p(x1 - 1, y1 - 2, L.glowHi);
     } else if (k === 'orb') {
       if (second) return;
-      e(hx, hy - 5 - pose.cast * 3, 3.2, 3.2, L.magic);
+      e(hx, hy - 6 - pose.cast * 3, 4, 4, L.magic);
       p(hx - 1, hy - 6 - pose.cast * 3, L.glowHi);
     } else if (k === 'bow') {
       if (second) return;
       const px = uy, py = -ux; // across the aim
-      for (let t = -1; t <= 1; t += 0.1) p(hx + px * t * 10 + ux * (1 - t * t) * 3.5, hy + py * t * 10 + uy * (1 - t * t) * 3.5, L.wood);
-      l(hx + px * 10, hy + py * 10, hx - px * 10, hy - py * 10, 1, L.white);
+      for (let t = -1; t <= 1; t += 0.05) { const bx = hx + px * t * 12 + ux * (1 - t * t) * 4.5, by = hy + py * t * 12 + uy * (1 - t * t) * 4.5; p(bx, by, L.wood); p(bx + ux * 0.8, by + uy * 0.8, L.wood); }
+      l(hx + px * 12, hy + py * 12, hx - px * 12, hy - py * 12, 1, L.white);
     } else if (k === 'crossbow') {
       if (second) return;
-      const [x1, y1] = at(9);
+      const [x1, y1] = at(11);
       l(hx, hy, x1, y1, 2, L.wood);
-      l(x1 + uy * 5, y1 - ux * 5, x1 - uy * 5, y1 + ux * 5, 1, L.steel);
+      l(x1 + uy * 6, y1 - ux * 6, x1 - uy * 6, y1 + ux * 6, 2, L.steel);
     }
   };
   const twoHanded = L.weapon === 'daggers' || L.weapon === 'dual_axe';
@@ -221,6 +239,7 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
     }
     helmet(15, b, true);
     accessory(true);
+    if (pose.atkPrev != null) trail(15, 42 + b, pose.atkPrev + 0.25, pose.arm + 0.25, 1);
     const near = limb(15, 42 + b, pose.atk != null ? pose.arm : pose.cast ? pose.arm : pose.arm, pose.bend);
     weapon(near[0], near[1], pose.atk != null ? pose.arm + 0.25 : 2.2, 1); // held forward and up, ahead of the face
     if (pose.cast) castGlow(near[0] + 1, near[1] - 2);
@@ -304,6 +323,7 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
   if (!back) accessory(false);
   if (atk) {
     const s = S, ax = (s ? 21 : 8) + 1, sg = s ? -1 : 1, a = pose.atk!;
+    if (pose.atkPrev != null) trail(ax, 42 + b, pose.atkPrev + 0.2, a + 0.2, sg);
     const ex = ax + sg * Math.sin(a) * 3.5, ey = 42 + b + Math.cos(a) * 3.5, hx = ex + sg * Math.sin(a + 0.2) * 3.5, hy = ey + Math.cos(a + 0.2) * 3.5;
     l(ax, 42 + b, ex, ey, 3, sleeve); l(ex, ey, hx, hy, 3, plate ? L.steel : sleeve); r(Math.round(hx) - 1, Math.round(hy) - 1, 2, 2, L.skin);
     weapon(hx, hy, a + 0.2, sg);

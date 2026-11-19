@@ -1,24 +1,16 @@
-# Talenta (G2) dan irama bermain (G5)
+# Talenta (G2)
 
-## Talenta
+Enam tingkat talenta terbuka di level 30, 60, 90, 120, 160 dan 200 (`shared/src/talents.ts`). Di tiap tingkat pemain memilih tepat satu dari tiga. Talenta tidak memakai poin skill, bisa diganti di luar pertempuran, dan dihapus oleh respec.
 
-Tiga tingkat talenta terbuka di level 20, 40 dan 60 (`shared/src/talents.ts`). Di tiap tingkat pemain memilih tepat satu dari tiga. Talenta tidak memakai poin skill, bisa diganti di luar pertempuran, dan dihapus oleh respec. Disimpan di peta skill build sebagai `talent.<tingkat>` = pilihan (1–3).
+| Tingkat | Pilihan |
+|---|---|
+| 30 Way of Striking | Momentum · Opportunist · Executioner's Eye |
+| 60 Way of Enduring | Bloodthirst · Arcane Flow · Bulwark |
+| 90 Way of Mastery | Echo · Overload · Cleaving Blows |
+| 120 Way of the Hunt | Predator (+25% ke elite/boss) · Swiftness (kill: +30% kecepatan 4 detik) · Second Wind (pukulan mematikan menyisakan 1 HP, sekali tiap 90 detik) |
+| 160 Way of Power | Glass Cannon (+20% damage, +15% diterima) · Iron Skin (−15% diterima, −10% damage) · Precision (+10% kritikal, kritikal +20%) |
+| 200 Way of Legend | Avatar (tiap pukulan ke-15: gelombang kejut 150%) · Vampiric Mastery (5% damage menjadi HP) · Storm Caller (pukulan skill 15%: petir 100% ke musuh lain) |
 
-| Tingkat | Talenta | Efek |
-|---|---|---|
-| Way of Striking (20) | Momentum | Tiap pukulan ke target yang sama +4% damage, maks 5 tumpuk; ganti target = mulai lagi. |
-| | Opportunist | +40% damage ke target di atas 90% HP. |
-| | Executioner's Eye | +30% damage ke target di bawah 35% HP. |
-| Way of Enduring (40) | Bloodthirst | Tiap kill memulihkan 6% HP maksimum. |
-| | Arcane Flow | Tiap kill memulihkan 8% mana/rage dan memotong 1 detik semua cooldown skill. |
-| | Bulwark | Saat HP turun melewati 50%, barrier 15% HP maksimum (sekali tiap 20 detik). |
-| Way of Mastery (60) | Echo | Pukulan skill 20% menyerang lagi dengan 50% damage. |
-| | Overload | Kritikal skill memotong 0,5 detik semua cooldown. |
-| | Cleaving Blows | Serangan dasar juga mengenai sampai 2 musuh di samping target (40%). |
+Awakening sekarang memakai **10 poin skill** (disimpan di build sebagai `awake.<skill>`); respec mengembalikan poinnya dan menghapus awakening.
 
-Gema dan tebasan tambahan tidak memicu talenta lagi. Server mengirim `cdcut` agar pengatur waktu cooldown di klien ikut berkurang.
-
-## Bermain aktif mengalahkan idle
-
-- **Battle Rhythm**: kill buatan tangan dalam 12 detik dari kill sebelumnya menambah tumpukan (maks 10), +3% EXP per tumpukan (maks +30%). Ditampilkan di atas hotbar.
-- **Auto hunting**: 80% EXP. Setelah satu jam berburu otomatis tanpa jeda, 50% ("Weary") sampai berhenti 10 menit. Kill auto hunting tidak menambah Battle Rhythm. Panel auto hunting menampilkan persentasenya.
+(Fitur G5 Battle Rhythm dan penalti EXP auto hunting sudah dihapus atas permintaan.)

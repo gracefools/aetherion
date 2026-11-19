@@ -117,12 +117,15 @@ export function StoryScene({ game }: { game: Game }) {
   const s = useSyncExternalStore((f: () => void) => (sceneSubs.add(f), () => void sceneSubs.delete(f)), () => scene) as Scene | null;
   const hud = useHud(game);
   const [i, setI] = useState(0), [n, setN] = useState(0);
-  const done = useRef(null as Record<string, number> | null);
+  // closing lines play when a story step is handed in, never for what was already done at login:
+  // the first quest state the server sends is only the baseline
+  const done = useRef(null as Record<string, number> | null), pristine = useRef(hud.quests), loaded = useRef(false);
   useEffect(() => {
     const now = Object.fromEntries(Object.entries(hud.quests.done).map(([k, v]) => [k, v.n])) as Record<string, number>;
-    if (done.current) for (const [k, c] of Object.entries(now)) if (c > (done.current[k] ?? 0) && QUESTS[k]?.outro) openScene({ zone: QUESTS[k].zone, title: QUESTS[k].name, lines: QUESTS[k].outro! });
+    if (done.current && loaded.current) for (const [k, c] of Object.entries(now)) if (c > (done.current[k] ?? 0) && QUESTS[k]?.outro) openScene({ zone: QUESTS[k].zone, title: QUESTS[k].name, lines: QUESTS[k].outro! });
     done.current = now;
-  }, [hud.quests.done]);
+    if (hud.quests !== pristine.current) loaded.current = true;
+  }, [hud.quests]);
   useEffect(() => { setI(0); setN(0); }, [s]);
   const line = s?.lines[i];
   useEffect(() => {

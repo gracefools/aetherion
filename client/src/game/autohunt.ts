@@ -38,6 +38,8 @@ export interface HunterHost {
   abilityReady(id: string): boolean;
   abilityCost(id: string): number;
   useAbility(id: string): void;
+  /** The ascension ultimate, when its gauge is full (null otherwise). */
+  ultReady(): string | null;
   potions(base: string): number;
   potionReady(): boolean;
   quaff(base: string): void;
@@ -230,8 +232,14 @@ export class AutoHunter {
     const sight = lineOfSight(map, me.x, me.y, t.x, t.y, !!def.flying);
     const inPlace = sight && dist <= reachEff;
 
+    // --- the ultimate first, as soon as it is charged and the target is in sight ---
+    const ult = cfg.skills ? h.ultReady() : null;
+    if (ult && sight && dist <= 220 && now - this.lastSkill > 300) {
+      this.lastSkill = now;
+      h.useAbility(ult);
+    }
     // --- skills: by priority, each under its own conditions; never through an obstacle ---
-    if (cfg.skills && now - this.lastSkill > 300) {
+    else if (cfg.skills && now - this.lastSkill > 300) {
       const near = (cx: number, cy: number, r: number) => mobs.filter((m) => m.hp > 0 && Math.hypot(m.x - cx, m.y - cy) <= r + (MONSTERS[m.type]?.radius ?? 0)).length;
       const id = chooseSkill(cfg, {
         hpPct, resPct, res: h.res(), hasTarget: sight, targetDist: dist, targetHpFrac: t.hp / Math.max(1, t.mhp), targetElite: def.elite,

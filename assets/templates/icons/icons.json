@@ -1083,6 +1083,15 @@
    "height": 64
   },
   {
+   "id": "status/swift",
+   "kind": "status",
+   "ref": "swift",
+   "name": "Swiftness",
+   "file": "icons/status/swift.png",
+   "width": 64,
+   "height": 64
+  },
+  {
    "id": "attack/sword_shield",
    "kind": "attack",
    "ref": "sword_shield",

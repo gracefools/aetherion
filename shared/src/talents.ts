@@ -1,4 +1,4 @@
-// Talents (G2): three tiers that open at levels 20, 40 and 60. In each tier a character picks
+// Talents (G2): six tiers that open at levels 30, 60, 90, 120, 160 and 200. In each tier a character picks
 // exactly one of three talents, and each one changes how the character fights rather than adding a
 // percentage: whom to hit, how to stay alive, what a skill does after it lands. Talents cost no
 // skill points and can be changed outside combat; a respec clears them.
@@ -13,24 +13,45 @@ export interface TalentDef {
 }
 export const TALENT_TIERS: { level: number; name: string; options: TalentDef[] }[] = [
   {
-    level: 20, name: 'Way of Striking', options: [
+    level: 30, name: 'Way of Striking', options: [
       { id: 'momentum', tier: 1, name: 'Momentum', desc: 'Each hit on the same target deals 4% more damage, up to 5 times. Changing targets starts over.' },
       { id: 'opportunist', tier: 1, name: 'Opportunist', desc: 'Hits on targets above 90% health deal 40% more damage.' },
       { id: 'executioner_eye', tier: 1, name: "Executioner's Eye", desc: 'Hits on targets below 35% health deal 30% more damage.' },
     ],
   },
   {
-    level: 40, name: 'Way of Enduring', options: [
+    level: 60, name: 'Way of Enduring', options: [
       { id: 'bloodthirst', tier: 2, name: 'Bloodthirst', desc: 'Every kill restores 6% of your maximum health.' },
       { id: 'arcane_flow', tier: 2, name: 'Arcane Flow', desc: 'Every kill restores 8% of your mana or rage and takes 1 second off every skill cooldown.' },
       { id: 'bulwark', tier: 2, name: 'Bulwark', desc: 'Falling below half health raises a barrier worth 15% of your maximum health (once every 20 seconds).' },
     ],
   },
   {
-    level: 60, name: 'Way of Mastery', options: [
+    level: 90, name: 'Way of Mastery', options: [
       { id: 'echo', tier: 3, name: 'Echo', desc: 'Skill hits have a 20% chance to strike again for half damage.' },
       { id: 'overload', tier: 3, name: 'Overload', desc: 'Critical hits with skills take 0.5 seconds off every skill cooldown.' },
       { id: 'cleaving_blows', tier: 3, name: 'Cleaving Blows', desc: 'Basic attacks also strike up to two enemies beside the target for 40% damage.' },
+    ],
+  },
+  {
+    level: 120, name: 'Way of the Hunt', options: [
+      { id: 'predator', tier: 4, name: 'Predator', desc: 'You deal 25% more damage to elites and bosses.' },
+      { id: 'swiftness', tier: 4, name: 'Swiftness', desc: 'Every kill makes you 30% faster for 4 seconds.' },
+      { id: 'second_wind', tier: 4, name: 'Second Wind', desc: 'A blow that would kill you leaves you at 1 health and unkillable for 5 seconds (once every 90 seconds).' },
+    ],
+  },
+  {
+    level: 160, name: 'Way of Power', options: [
+      { id: 'glass_cannon', tier: 5, name: 'Glass Cannon', desc: 'You deal 20% more damage and take 15% more.' },
+      { id: 'iron_skin', tier: 5, name: 'Iron Skin', desc: 'You take 15% less damage and deal 10% less.' },
+      { id: 'precision', tier: 5, name: 'Precision', desc: '10% more critical chance, and critical hits deal 20% more.' },
+    ],
+  },
+  {
+    level: 200, name: 'Way of Legend', options: [
+      { id: 'avatar', tier: 6, name: 'Avatar', desc: 'Every 15th hit releases a shockwave that strikes every enemy close to the target for 150% damage.' },
+      { id: 'vampiric_mastery', tier: 6, name: 'Vampiric Mastery', desc: '5% of all the damage you deal heals you.' },
+      { id: 'storm_caller', tier: 6, name: 'Storm Caller', desc: 'Skill hits have a 15% chance to call lightning on another enemy nearby for 100% magic damage.' },
     ],
   },
 ];
@@ -53,16 +74,3 @@ export function talentBlock(level: number, skills: Record<string, number>, id: s
   if (skills[talentKey(tier)] === choice) return 'Already chosen';
   return '';
 }
-
-// ---------- G5: active play beats idling ----------
-/** Battle Rhythm: kills you make yourself within this long of the last one build a streak. */
-export const RHYTHM_WINDOW_MS = 12_000;
-export const RHYTHM_MAX = 10;
-/** Experience bonus per streak step (10 steps: +30%). */
-export const RHYTHM_EXP = 0.03;
-/** Auto hunting earns this share of the experience; after an hour of it without a break, less. */
-export const AUTO_EXP = 0.8;
-export const AUTO_WEARY_EXP = 0.5;
-export const AUTO_WEARY_MS = 60 * 60_000;
-/** A break this long (auto hunting off) clears the weariness. */
-export const AUTO_REST_MS = 10 * 60_000;

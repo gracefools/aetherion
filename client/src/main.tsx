@@ -60,8 +60,8 @@ import { GuildInvite, GuildPanel } from './guild';
 import { CompanionsPanel, DepthAsk, DuelInvite, DuelStatus, PvpZoneBadge } from './pvp';
 import { toRail } from './rail';
 import { TraitBadge } from './traitsUi';
-import { RhythmMeter } from './grindUi';
 import { TalentPicker } from './talentsUi';
+import { StatusBar } from './statusUi';
 
 interface Character {
   id: number;
@@ -332,6 +332,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
     wasOpen.current = wins.map((w, i) => (single && opened >= 0 && i !== opened ? false : w[0]));
   });
   useEffect(() => {
+    document.body.classList.add('ingame');
     const g = new Game(canvas.current!, token, character.id);
     (window as any).__game = g;
     (window as any).__icon = itemIcon;
@@ -394,6 +395,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerup', onUp);
       stopPad();
+      document.body.classList.remove('ingame');
       g.destroy();
     };
   }, [token, character.id]);
@@ -631,12 +633,12 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
         <div className="hud tl panel">
           <button className="portrait" onClick={() => setSheet(!sheet)} aria-label={t('sheet.open')}><Sprite ap={me.ap} job={me.job} scale={2} /></button>
           <div className="vitals">
-            <strong>{me.name}</strong> <span className="sub">{t('common.lv', { n: me.level })} {jobTitle(me.job, me.level)}</span>
+            <strong>{me.name}</strong> <span className="sub">{t('common.lv', { n: me.level })} {PATH_INDEX[hud.asc.path] && me.level >= ASCENSION_LEVEL ? PATH_INDEX[hud.asc.path].title : jobTitle(me.job, me.level)}</span>
             <div className="vbar hp" role="meter" aria-label={t('stat.hp')} aria-valuenow={hud.hp} aria-valuemax={s.maxHp}><i style={{ width: `${(hud.hp / s.maxHp) * 100}%` }} /><span>{hud.hp} / {s.maxHp}</span></div>
             <div className={'vbar ' + JOB_DEFS[me.job].resource} role="meter" aria-label={JOB_DEFS[me.job].resource === 'rage' ? t('stat.rage') : t('stat.mana')} aria-valuenow={hud.res} aria-valuemax={s.maxRes}><i style={{ width: `${(hud.res / s.maxRes) * 100}%` }} /><span>{hud.res} / {s.maxRes}</span></div>
             <div className="vbar exp" role="meter" aria-label={t('stat.exp')} aria-valuenow={hud.exp} aria-valuemax={hud.next}><i style={{ width: `${(hud.exp / hud.next) * 100}%` }} /><span>{t('stat.exp')} {hud.exp} / {hud.next}</span></div>
             <div className="sub">{hud.zone}{hud.dungeon ? '' : ` · ${t('hud.channel', { n: hud.channel })}`} · {t('common.lvRange', { a: hud.level[0], b: hud.level[1] })}</div>
-            {hud.statuses.length > 0 && <div className="chips" aria-label={t('hud.statuses')}>{hud.statuses.map((n, i) => { const st = STATUS.find((x) => x.name === n); return <span key={i} className={'chip ' + n.toLowerCase().replace(/ /g, '-')}>{st && <img className="chipicon" src={statusIcon(st.id, 32)} alt="" />}{n}</span>; })}</div>}
+
           </div>
         </div>
       )}
@@ -721,7 +723,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       <Guard><DuelStatus hud={hud} game={game} /></Guard>
       <Guard><PvpZoneBadge hud={hud} game={game} /></Guard>
       <Guard><TraitBadge hud={hud} /></Guard>
-      <Guard><RhythmMeter hud={hud} /></Guard>
+      <Guard><StatusBar hud={hud} /></Guard>
       <Guard><LootFeed hud={hud} /></Guard>
       <Guard><BossBar hud={hud} /></Guard>
       <Guard><Banner hud={hud} /></Guard>

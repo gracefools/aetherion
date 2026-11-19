@@ -90,7 +90,6 @@ export function AutoPanel({ hud, game, onClose }: { hud: Hud; game: Game; onClos
         <button className="link" onClick={onClose} aria-label={t('auto.close')}>{t('common.close')}</button>
       </div>
       <div className="autostatus" aria-live="polite">{tm(a.status)}</div>
-      {a.on && a.xp !== undefined && <div className={'sub autoxp' + (a.xp < 0.8 ? ' err' : '')}>{t('auto.xp', { pct: Math.round(a.xp * 100) })}{a.xp < 0.8 ? ` ${t('auto.weary')}` : ''}</div>}
       <div className="autogrid">
         <span>{t('auto.target')}</span><b>{a.target || '—'}</b>
         <span>{t('auto.hpRes', { res })}</span><b>{hpPct}% / {resPct}%</b>

@@ -9,6 +9,9 @@ export const FUSION_LEVEL = 90;
 export const FUSION_RUNE_LEVEL = 5;
 /** What an awakening costs: Awakening Essence (Armageddon bosses, high Rift floors) and gold. */
 export const awakenCost = (level: number) => ({ essence: 3, gold: 50_000 + level * 500 });
+/** An awakening costs skill points, kept in the build under this key so a respec returns them. */
+export const AWAKEN_POINTS = 10;
+export const awakeKey = (id: string) => `awake.${id}`;
 
 /** How an awakening changes a skill, in words (for the tooltip and the panel). */
 export function awakenKind(def: AbilityDef): string {

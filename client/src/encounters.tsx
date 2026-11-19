@@ -1,5 +1,5 @@
 // Boss bar, zone banner, dungeon entrance dialog and dungeon tracker.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ARMAGEDDON_BOSS_LEVEL, ARMAGEDDON_LEVEL, DIFFICULTY, difficultiesOf, DUNGEONS, type Difficulty } from '../../shared/src/dungeons';
 import { BOSS_RARITY, BOSS_UNIQUES, ITEMS, RARITY_COLOR } from '../../shared/src/items';
 import { MONSTERS } from '../../shared/src/monsters';
@@ -96,6 +96,8 @@ export function GateDialog({ hud, game }: { hud: Hud; game: Game }) {
   useT();
   const [diff, setDiff] = useState('normal' as Difficulty) as [Difficulty, (d: Difficulty) => void];
   const [hidden, setHidden] = useState('');
+  // walking away from the gate forgets that the dialog was closed, so it opens again next time
+  useEffect(() => { if (!hud.gate && hidden) setHidden(''); }, [hud.gate]);
   if (!hud.gate || hud.dungeon || hidden === hud.gate) return null;
   const def = DUNGEONS[hud.gate], me = hud.self!, boss = MONSTERS[def.boss], w = BOSS_RARITY[diff];
   const leader = !hud.party || hud.party.leader === me.id, low = me.level < def.minLevel;

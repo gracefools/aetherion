@@ -25,7 +25,7 @@ import { Lives } from './Life';
 import { AURA_SKINS, emptyLife, type Life } from '../../../shared/src/life';
 import { applyMastery, applyPath, cleanAscension, emptyAscension, MASTERY_STATS, masteryCap, masteryEarned, masterySpent, PATH_INDEX, ASCENSION_LEVEL, LOADOUTS, ULT_PER_HIT, ULT_PER_HURT, ULT_PER_KILL, type Ascension } from '../../../shared/src/ascension';
 import { chargeUlt } from './Abilities';
-import { AWAKEN_LEVEL, awakenCost } from '../../../shared/src/awakening';
+import { AWAKEN_LEVEL, AWAKEN_POINTS, awakeKey } from '../../../shared/src/awakening';
 import { applyJournal, emptyJournal, type Journal } from '../../../shared/src/journal';
 import { cleanDiscoveries, discoverWaystones, objOp } from './Places';
 import { computeStats, JOB_DEFS, MAX_LEVEL, type Stats } from '../../../shared/src/jobs';
@@ -58,7 +58,9 @@ import { Monster, type CombatCtx, type MonsterScale } from './Monster';
 import { Parties, type Party } from './Party';
 import { SpatialGrid } from './SpatialGrid';
 import { Traits } from './Traits';
-import { AUTO_EXP, AUTO_REST_MS, AUTO_WEARY_EXP, AUTO_WEARY_MS, RHYTHM_EXP, RHYTHM_MAX, RHYTHM_WINDOW_MS, talentsOf } from '../../../shared/src/talents';
+import { talentsOf } from '../../../shared/src/talents';
+import { freePoints } from '../../../shared/src/abilities';
+import { buildChanged } from './Abilities';
 
 export interface Conn {
   send(data: string): void;
@@ -170,12 +172,9 @@ export class Player implements Ent {
   momTarget = 0;
   momStacks = 0;
   bulwarkAt = 0;
-  /** Battle Rhythm (G5): kills made by hand in quick succession, and when the last one was. */
-  rhythm = 0;
-  rhythmAt = 0;
-  /** Auto hunting: when the current stretch began and when it was last switched off (ms). */
-  autoSince = 0;
-  autoOffAt = 0;
+  /** Talents: Second Wind and Avatar. */
+  secondWindAt = 0;
+  avatarHits = 0;
   /** Whether this character has chosen a talent. */
   hasTalent(id: string) {
     return talentsOf(this.build.skills).some((t) => t.id === id);
@@ -401,6 +400,13 @@ export class World implements CombatCtx {
   });
   readonly quests = new Quests(this);
   readonly traits = new Traits(this);
+  /** Sends items by system mail (rewards that did not fit in the bag). */
+  mailItems(p: Player, subject: string, items: ItemSpec[]) {
+    const list = items.map((s) => ({ ...s }));
+    this.repo.systemMail(p.id, subject, 'Your bag was full, so the Aetherion Post brought the rest of your reward.', list, 0)
+      .then(() => this.mail.notify(p))
+      .catch((e: unknown) => console.error('reward mail failed', e));
+  }
   /** A monster's blow landed: the region trait reacts (CombatCtx). */
   traitHit(m: Monster, p: Player, dealt: number) {
     this.traits.onHit(m, p, dealt);
@@ -618,34 +624,15 @@ export class World implements CombatCtx {
     }
     if (msg.on === true && !p.autoOn) {
       if (p.dead) return this.sendAuto(p, 'You cannot hunt while dead');
-      // a long enough break clears the weariness; a short one carries the session on
-      const now = this.tick * TICK_MS;
-      if (!p.autoSince || now - p.autoOffAt >= AUTO_REST_MS) p.autoSince = now;
       p.autoOn = true;
       p.autoStats = emptyAutoStats();
       p.autoStart = this.tick;
-    } else if (msg.on !== true) {
-      if (p.autoOn) p.autoOffAt = this.tick * TICK_MS;
-      p.autoOn = false;
-    }
+    } else if (msg.on !== true) p.autoOn = false;
     this.sendAuto(p);
   }
-  // ---------- G5: active play beats idling ----------
-  /** Experience multiplier for a kill: Battle Rhythm for hand-made kills, less while auto hunting. */
-  grindFactor(p: Player): number {
-    const now = this.tick * TICK_MS;
-    if (p.autoOn) return now - p.autoSince >= AUTO_WEARY_MS ? AUTO_WEARY_EXP : AUTO_EXP;
-    return 1 + RHYTHM_EXP * p.rhythm;
-  }
-  /** After a kill this player is rewarded for: the streak, and kill talents. */
+  /** After a kill this player is rewarded for: kill talents. */
   afterKill(p: Player) {
-    const now = this.tick * TICK_MS;
-    if (!p.autoOn) {
-      // the streak grows with kills made by hand within the window; experience for this kill used the old value
-      p.rhythm = now - p.rhythmAt <= RHYTHM_WINDOW_MS ? Math.min(RHYTHM_MAX, p.rhythm + 1) : 1;
-      p.rhythmAt = now;
-      this.send(p, { t: 'rhythm', n: p.rhythm, ms: RHYTHM_WINDOW_MS });
-    }
+    if (p.hasTalent('swiftness') && !p.dead) applyStatus(p, STATUS_INDEX.swift, this.tick, 0, p.id);
     if (p.hasTalent('bloodthirst') && !p.dead) this.heal(p, Math.max(1, Math.round(p.maxHp * 0.06)));
     if (p.hasTalent('arcane_flow') && !p.dead) {
       p.res = Math.min(p.stats.maxRes, Math.round(p.res + p.stats.maxRes * 0.08));
@@ -657,12 +644,11 @@ export class World implements CombatCtx {
   stopAuto(p: Player, why: string) {
     if (!p.autoOn) return;
     p.autoOn = false;
-    p.autoOffAt = this.tick * TICK_MS;
     this.sendAuto(p, why);
   }
   sendAuto(p: Player, why?: string) {
     if (p.autoOn) p.autoStats.secs = Math.round(((this.tick - p.autoStart) * TICK_MS) / 1000);
-    this.send(p, { t: 'auto', on: p.autoOn, cfg: p.autoCfg, stats: p.autoStats, why, xp: p.autoOn ? this.grindFactor(p) : 1 });
+    this.send(p, { t: 'auto', on: p.autoOn, cfg: p.autoCfg, stats: p.autoStats, why });
   }
   /** Quests and faction shops. */
   /** Journal commands: wear a title, claim a mission or the login reward. */
@@ -764,14 +750,11 @@ export class World implements CombatCtx {
         if (p.level < AWAKEN_LEVEL) return `Awakening opens at level ${AWAKEN_LEVEL}`;
         if (a.awake.includes(id)) return 'That skill is already awakened';
         if ((p.build.skills[id] ?? 0) < node.maxRank) return 'Train the skill to its full rank first';
-        const c = awakenCost(p.level);
         if (!town) return 'Awaken skills in a village';
-        if (p.gold < c.gold) return `Awakening costs ${c.gold} gold`;
-        if (count(p, 'awakening_essence') < c.essence) return `Requires ${c.essence} Awakening Essence`;
-        p.gold -= c.gold;
-        consume(p, 'awakening_essence', c.essence);
-        p.invDirty = true;
-        this.syncInv(p);
+        // an awakening costs skill points, kept in the build so a respec gives them back
+        if (freePoints(p.level, p.build) < AWAKEN_POINTS) return `Awakening costs ${AWAKEN_POINTS} skill points`;
+        p.build.skills[awakeKey(id)] = AWAKEN_POINTS;
+        buildChanged(this, p);
         a.awake.push(id);
         p.progDirty = true;
         this.announce(p.room, `${p.name} has awakened ${node.name}!`, 'rep');
@@ -1184,6 +1167,10 @@ export class World implements CombatCtx {
       target.bulwarkAt = this.tick + Math.round(20_000 / TICK_MS);
       applyStatus(target, STATUS_INDEX.barrier, this.tick, Math.round(target.maxHp * 0.15), target.id);
     }
+    if (target instanceof Player && amount > 0 && src && src !== target && !(flags & Dmg.Heal)) {
+      if (target.hasTalent('glass_cannon')) amount = Math.round(amount * 1.15);
+      if (target.hasTalent('iron_skin')) amount = Math.max(1, Math.round(amount * 0.85));
+    }
     if (target instanceof Player && amount > 0) {
       const m = target.mods;
       if (m.invuln) {
@@ -1205,6 +1192,12 @@ export class World implements CombatCtx {
           if (soak) flags |= Dmg.Absorb;
         }
         if (m.cantDie && amount >= target.hp) amount = target.hp - 1;
+        if (amount >= target.hp && target.hp > 1 && this.tick >= target.secondWindAt && target.hasTalent('second_wind')) {
+          // Second Wind (talent): the killing blow leaves 1 health and a moment that cannot end you
+          amount = target.hp - 1;
+          target.secondWindAt = this.tick + Math.round(90_000 / TICK_MS);
+          applyStatus(target, STATUS_INDEX.last_stand, this.tick, 0, target.id);
+        }
       }
       if (src instanceof Monster) src.credit(target.id, amount); // soaking a monster's hits is contribution
       if (src instanceof Player && src !== target) {
@@ -1300,7 +1293,7 @@ export class World implements CombatCtx {
       const who = this.parties.sharers(p.party, m.room, m.x, m.y, (id) => m.dmgBy.has(id));
       const pool = exp * (0.5 + 0.5 * share) * (1 + PARTY_EXP_BONUS * (who.length - 1));
       for (const e of who) {
-        const f = expLevelFactor(e.level, m.level) * this.conquest.expBonus(e) * this.grindFactor(e);
+        const f = expLevelFactor(e.level, m.level) * this.conquest.expBonus(e);
         if (f > 0 && exp > 0) this.grantExp(e, Math.max(1, Math.round((pool / who.length) * f * this.guilds.bonus(e, 'barracks'))));
         looters.push(e);
       }
@@ -1369,7 +1362,7 @@ export class World implements CombatCtx {
       // world bosses of level 120+ rarely give a flying mount's reins
       if (world && m.def.level >= 160 && this.rnd() < 0.015) items.push({ base: 'mount_star_drake', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
       else if (world && m.def.level >= 120 && this.rnd() < 0.03) items.push({ base: 'mount_sky_griffin', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
-      award(this, p, Math.round((world ? 120 : 60) * m.level * this.goldRate), items);
+      award(this, p, Math.round((world ? 120 : 60) * m.level * this.goldRate), items, false, `Reward: ${m.def.name}`);
       this.quests.onKill(p, m);
       this.journals.onBoss(p, world);
       if (items.some((i) => ITEMS[i.base]?.kind === 'sigil')) this.journals.add(p, 'sigil');
@@ -1501,15 +1494,19 @@ export class World implements CombatCtx {
     }
     if (p.hasTalent('opportunist') && m.hp > m.maxHp * 0.9) mul *= 1.4;
     if (p.hasTalent('executioner_eye') && m.hp < m.maxHp * 0.35) mul *= 1.3;
+    if (p.hasTalent('predator') && (m.def.elite || m.def.boss)) mul *= 1.25;
+    if (p.hasTalent('glass_cannon')) mul *= 1.2;
+    if (p.hasTalent('iron_skin')) mul *= 0.9;
+    const precise = p.hasTalent('precision');
     let dmg = mitigate(power * mul * (0.9 + this.rnd() * 0.2), def), flags = 0;
-    if (this.rnd() * 100 < s.crit + critAdd) {
-      dmg *= s.critDmg;
+    if (this.rnd() * 100 < s.crit + critAdd + (precise ? 10 : 0)) {
+      dmg *= s.critDmg + (precise ? 0.2 : 0);
       flags |= Dmg.Crit;
       this.lastCrit = true;
     }
     const dealt = Math.max(1, Math.round(dmg));
     this.hurt(m, dealt, flags, p);
-    const ls = s.lifesteal + p.mods.lifesteal;
+    const ls = s.lifesteal + p.mods.lifesteal + (p.hasTalent('vampiric_mastery') ? 5 : 0);
     if (ls > 0) this.heal(p, Math.max(1, Math.round((dealt * ls) / 100)));
     if (basic && JOB_DEFS[p.job].resource === 'rage') {
       p.res = Math.min(s.maxRes, Math.round(p.res + RAGE_PER_HIT * (rule.rageMul ?? 1)));
@@ -1522,6 +1519,25 @@ export class World implements CombatCtx {
       if (!basic && p.hasTalent('echo') && !m.dead && this.rnd() < 0.2) {
         this.echoing = true;
         try { this.strike(p, m, mul * 0.5, magic, critAdd, false); } finally { this.echoing = false; }
+      }
+      if (!basic && p.hasTalent('storm_caller') && this.rnd() < 0.15) {
+        let near: Monster | null = null, best = 1e9;
+        for (const o of m.room.monsters.values()) {
+          const d = Math.hypot(o.x - m.x, o.y - m.y);
+          if (o !== m && !o.dead && d < 180 && d < best) { best = d; near = o; }
+        }
+        const t = near ?? (m.dead ? null : m);
+        if (t) {
+          emit(p, this.evt, [p.id, Act.Telegraph, Math.round(t.x), Math.round(t.y), 26, 150, 1]);
+          this.echoing = true;
+          try { this.strike(p, t, 1, true, 0, false); } finally { this.echoing = false; }
+        }
+      }
+      if (p.hasTalent('avatar') && ++p.avatarHits >= 15) {
+        p.avatarHits = 0;
+        emit(p, this.evt, [p.id, Act.Telegraph, Math.round(m.x), Math.round(m.y), 120, 200, 1]);
+        this.echoing = true;
+        try { for (const o of [...m.room.monsters.values()]) if (!o.dead && Math.hypot(o.x - m.x, o.y - m.y) <= 120) this.strike(p, o, mul * 1.5, magic, 0, false); } finally { this.echoing = false; }
       }
       if (basic && p.hasTalent('cleaving_blows')) {
         this.echoing = true;

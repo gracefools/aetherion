@@ -411,7 +411,8 @@ export function sortInventory(p: Player, by: SortKey) {
  * gold always arrives. `hunted` marks loot from an ordinary monster kill: while the player is
  * auto hunting, their loot rules decide which of those items are collected at all.
  */
-export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunted = false) {
+/** `mailOverflow`: items that do not fit are sent by mail with this subject instead of being left behind. */
+export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunted = false, mailOverflow = '') {
   gold = Math.round(gold * w.guilds.bonus(p, 'treasury'));
   const got: ItemSpec[] = [];
   let full = false;
@@ -420,7 +421,8 @@ export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunt
     p.autoStats.skipped += items.length - keep.length;
     items = keep;
   }
-  for (const s of items) (give(p, s) ? got : ((full = true), [])).push(s);
+  const left: ItemSpec[] = [];
+  for (const s of items) (give(p, s) ? got : ((full = true), left)).push(s);
   if (hunted && p.autoOn) {
     p.autoStats.gold += gold;
     for (const s of got) p.autoStats.items += s.qty;
@@ -431,6 +433,9 @@ export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunt
   p.gold += gold;
   p.invDirty = true;
   w.send(p, { t: 'loot', gold, items: got.map((s) => ({ base: s.base, rar: s.rar, qty: s.qty })) });
-  if (full) w.send(p, { t: 'sys', text: 'Your inventory is full. Some loot was left behind.' });
+  if (full && mailOverflow) {
+    w.mailItems(p, mailOverflow, left);
+    w.send(p, { t: 'sys', text: 'Your inventory is full: the rest of your reward was sent to you by mail.' });
+  } else if (full) w.send(p, { t: 'sys', text: 'Your inventory is full. Some loot was left behind.' });
   sendInv(w, p);
 }

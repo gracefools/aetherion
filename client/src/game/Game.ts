@@ -34,7 +34,7 @@ import type { WorldEventState } from '../../../shared/src/events';
 import type { RiftScore } from '../../../shared/src/rift';
 import type { RaidLobby, RaidState, SiegeState, TerritoryState } from '../../../shared/src/conquest';
 import { AURA_SKINS, FURNITURE, GROW_MS, type Life } from '../../../shared/src/life';
-import { emptyAscension, PATH_INDEX, type Ascension } from '../../../shared/src/ascension';
+import { ASCENSION_LEVEL, emptyAscension, PATH_INDEX, ULT_MAX, type Ascension } from '../../../shared/src/ascension';
 import { awaken, AWAKEN_LEVEL, fusionsFor } from '../../../shared/src/awakening';
 import { Sky } from './sky';
 import type { MailEntry } from '../../../shared/src/mail';
@@ -95,6 +95,8 @@ export interface Hud {
   exp: number;
   next: number;
   statuses: string[];
+  /** Your statuses: index and the time each runs out (performance.now ms). */
+  statusUntil: [number, number][];
   target: TargetInfo | null;
   attacking: boolean;
   /** Seconds until automatic respawn; 0 when alive. */
@@ -134,9 +136,7 @@ export interface Hud {
   disc: string[];
   zoneId: string;
   /** Auto hunting: whether it is running, what it is doing, its configuration and the session's figures. */
-  auto: { on: boolean; status: string; target: string; cfg: AutoConfig; stats: AutoStats; /** experience multiplier while hunting */ xp?: number };
-  /** G5 Battle Rhythm: the current streak and when it runs out (performance.now ms). */
-  rhythm: { n: number; until: number } | null;
+  auto: { on: boolean; status: string; target: string; cfg: AutoConfig; stats: AutoStats };
   /** The trade in progress, if any, and a pending trade request. */
   trade: TradeState | null;
   tradeInvite: { from: string; id: number; until: number } | null;
@@ -196,6 +196,8 @@ export interface LootLine {
 interface Remote {
   meta: EntityMeta;
   mt: string; // monster type, '' for players
+  /** Last left/right facing (players): mounts and pets keep it when moving up or down. */
+  hflip?: boolean;
   sheet: HTMLCanvasElement;
   buf: number[]; // interpolation samples: packed [t, x, y]
   d: number;
@@ -224,6 +226,10 @@ interface Drawable {
   title?: string;
   /** Quest marker (U5): '!' quests on offer, '?' a quest to hand in, 'mob' a monster a quest still needs. */
   mark?: string;
+  /** The pet's own position (it trails its owner) and its hop. */
+  petX?: number;
+  petY?: number;
+  petHop?: number;
   y: number;
   x: number;
   sheet: HTMLCanvasElement;
@@ -296,8 +302,8 @@ const PROJ: Record<string, string> = { mage: '#7fd6ff', cleric: '#ffe89a', range
 export class Game {
   hud: Hud = {
     status: 'connecting', reason: '', zone: '', channel: 1, ping: 0, fps: 0, nearby: 0, chat: [], self: null, stats: null,
-    hp: 0, res: 0, exp: 0, next: 1, statuses: [], target: null, attacking: false, dead: 0, canRespawn: false, toast: '',
-    build: null, points: 0, cds: {}, cast: null, ally: null, notice: '', party: null, invite: null, rhythm: null,
+    hp: 0, res: 0, exp: 0, next: 1, statuses: [], statusUntil: [], target: null, attacking: false, dead: 0, canRespawn: false, toast: '',
+    build: null, points: 0, cds: {}, cast: null, ally: null, notice: '', party: null, invite: null,
     inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, talk: null, disc: [], zoneId: '',
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
@@ -404,6 +410,7 @@ export class Game {
     abilityReady: (id) => this.abilityReady(id),
     abilityCost: (id) => this.abilityCost(id),
     useAbility: (id) => this.useAbility(id, true),
+    ultReady: () => { const u = PATH_INDEX[this.hud.asc.path]?.ult; return u && this.hud.ult >= ULT_MAX && (this.hud.self?.level ?? 0) >= ASCENSION_LEVEL ? u : null; },
     potions: (base) => this.hud.inv.reduce((n, i) => n + (i.base === base ? i.qty : 0), 0),
     potionReady: () => !this.hud.potionAt || performance.now() - this.hud.potionAt >= POTION_CD_MS,
     quaff: (base) => this.quaff(base),
@@ -1079,7 +1086,7 @@ export class Game {
         // the server's view of the session: its figures, and its decision when it ends one
         if (!m.on && this.hunter.on) this.hunter.stop(m.why ? `Stopped: ${m.why}` : 'Stopped');
         const cfg = this.me && this.hud.build ? withSkills(m.cfg, this.me.job, this.hud.build) : m.cfg;
-        this.setAuto({ on: this.hunter.on, stats: m.stats, status: this.hunter.status, xp: m.xp ?? 1, ...(this.hunter.on ? {} : { cfg }) });
+        this.setAuto({ on: this.hunter.on, stats: m.stats, status: this.hunter.status, ...(this.hunter.on ? {} : { cfg }) });
         if (m.why) this.pushChat({ text: `Auto hunting stopped: ${m.why}.` });
         return;
       }
@@ -1179,7 +1186,6 @@ export class Game {
         this.dbgMobs = m.mobs;
         return;
       case 'pong': return this.setHud({ ping: Math.round(performance.now() - m.c) });
-      case 'rhythm': return this.setHud({ rhythm: { n: m.n, until: performance.now() + m.ms } });
       case 'cdcut': {
         // a talent took time off every cooldown: the local timers follow
         const now = performance.now(), cds = { ...this.hud.cds };
@@ -1252,7 +1258,7 @@ export class Game {
     this.hp = me.hp;
     if (me.tgt !== this.targetId && performance.now() - this.tgtAt > 600 && (me.tgt || !this.remotes.get(this.targetId) || this.remotes.get(this.targetId)!.hp <= 0)) this.targetId = me.tgt;
     if (me.xp) this.float(this.cur.x, this.cur.y - 36, tr('float.exp', { n: me.xp }), 'exp', FLOAT_STYLE.exp.color, now);
-    this.setHud({ hp: me.hp, res: me.res, exp: me.exp, attacking: me.atk === 1, statuses: me.st.map(([i]) => STATUS[i].name) });
+    this.setHud({ hp: me.hp, res: me.res, exp: me.exp, attacking: me.atk === 1, statuses: me.st.map(([i]) => STATUS[i].name), statusUntil: this.statusUntil });
     this.refreshTarget();
   }
   private recalcStatus(now: number) {
@@ -1837,8 +1843,12 @@ export class Game {
       } else {
         const ap = r.meta.ap!;
         const hs = hdChar(ap, r.meta.job!);
-        if (hs) { o.sheet = hs; o.sx = hcol(r.act, r.actAt, move, r.hitAt, r.deadAt, r.castUntil) * HD; o.sy = r.d * HD; o.sw = HD; o.ox = HD_OX; o.oy = HD_OY; }
-        else { o.sx = pcol(r.act, r.actAt, move, r.hitAt, r.deadAt, r.castUntil) * FRAME_W; o.sy = r.d * FRAME_H; o.sw = FRAME_W; o.ox = SPRITE_OX; o.oy = SPRITE_OY; }
+        // left and right are remembered, so a mount and a pet keep facing that way when moving up or down
+        r.hflip = r.d === 1 ? true : r.d === 2 ? false : r.hflip ?? false;
+        // on a mount the rider sits still and looks the way the mount goes
+        const rideMove = r.meta.mnt ? Move.Idle : move, rideRow = r.meta.mnt ? (r.hflip ? 1 : 2) : r.d;
+        if (hs) { o.sheet = hs; o.sx = hcol(r.act, r.actAt, rideMove, r.hitAt, r.deadAt, r.castUntil) * HD; o.sy = rideRow * HD; o.sw = HD; o.ox = HD_OX; o.oy = HD_OY; }
+        else { o.sx = pcol(r.act, r.actAt, rideMove, r.hitAt, r.deadAt, r.castUntil) * FRAME_W; o.sy = rideRow * FRAME_H; o.sw = FRAME_W; o.ox = SPRITE_OX; o.oy = SPRITE_OY; }
         o.aura = r.hp > 0 ? ap.aura : 0;
         o.alpha = r.st & STEALTH_BIT ? 0.4 : 1;
         o.label = `${r.meta.gt ? `[${r.meta.gt}] ` : ''}${r.meta.name}  Lv.${r.meta.level}`;
@@ -1851,7 +1861,8 @@ export class Game {
         o.petStage = r.meta.pet ? petStage(r.meta.pet[2]) : 0;
         o.flying = !!(r.meta.mnt && MOUNTS[r.meta.mnt]?.fly);
         o.mount = r.meta.mnt && r.hp > 0 ? (hd ? hdMountSprite : mountSprite)(r.meta.mnt) : null;
-        o.flip = r.d === 1;
+        o.flip = !!r.hflip;
+        if (o.pet) this.trailPet(r.meta.id, o, r.rx, r.ry, !!r.hflip, now);
         o.wa = r.hp > 0 ? r.meta.wa ?? 0 : 0;
         o.wk = r.meta.wk ?? '';
         o.bar = r.hp < r.mhp ? frac : -1;
@@ -1864,8 +1875,10 @@ export class Game {
       o.mark = '';
       o.x = px; o.y = py; o.sheet = this.sheet!; o.id = me.id;
       o.alpha = this.stealthed ? 0.5 : 1;
-      if (hd) { o.sheet = getHDSheet(me.ap, me.job); o.sx = hcol(this.act, this.actAt, this.moving, this.selfHitAt, this.isDead ? this.diedAt : 0, this.castUntil) * HD; o.sy = this.dir * HD; o.sw = HD; o.ox = HD_OX; o.oy = HD_OY; }
-      else { o.sx = pcol(this.act, this.actAt, this.moving, this.selfHitAt, this.isDead ? this.diedAt : 0, this.castUntil) * FRAME_W; o.sy = this.dir * FRAME_H; o.sw = FRAME_W; o.ox = SPRITE_OX; o.oy = SPRITE_OY; }
+      this.hflip = this.dir === 1 ? true : this.dir === 2 ? false : this.hflip;
+      const riding = !!this.hud.comp.riding && !this.isDead, selfMove = riding ? Move.Idle : this.moving, selfRow = riding ? (this.hflip ? 1 : 2) : this.dir;
+      if (hd) { o.sheet = getHDSheet(me.ap, me.job); o.sx = hcol(this.act, this.actAt, selfMove, this.selfHitAt, this.isDead ? this.diedAt : 0, this.castUntil) * HD; o.sy = selfRow * HD; o.sw = HD; o.ox = HD_OX; o.oy = HD_OY; }
+      else { o.sx = pcol(this.act, this.actAt, selfMove, this.selfHitAt, this.isDead ? this.diedAt : 0, this.castUntil) * FRAME_W; o.sy = selfRow * FRAME_H; o.sw = FRAME_W; o.ox = SPRITE_OX; o.oy = SPRITE_OY; }
       o.aura = this.isDead ? 0 : me.ap.aura;
       const comp = this.hud.comp, pet = comp.pet ? comp.pets.find((x) => x.uid === comp.pet) : undefined;
       o.label = `${this.hud.guild ? `[${this.hud.guild.tag}] ` : ''}${me.name}  Lv.${me.level}`;
@@ -1876,7 +1889,8 @@ export class Game {
       o.petStage = pet ? petStage(pet.level) : 0;
       o.flying = isFlying(comp);
       o.mount = comp.riding && !this.isDead ? (hd ? hdMountSprite : mountSprite)(comp.riding) : null;
-      o.flip = this.dir === 1;
+      o.flip = this.hflip;
+      if (o.pet) this.trailPet(me.id, o, px, py, this.hflip, now);
       o.wa = !this.isDead && this.hud.eq.weapon && me.level >= ARMAMENT_LEVEL ? weaponAura(this.hud.gear.arm.weapon ?? 0) : 0;
       o.wk = this.hud.life?.aura ?? '';
       o.bar = this.hp < mhp ? this.hp / mhp : -1;
@@ -1932,8 +1946,8 @@ export class Game {
       if (st) { // billboards with real shadows instead of drawn ones
         const PW = o.pet ? o.pet.width / 2 : 0;
         if (o.pet) {
-          const stg = o.petStage ?? 0, pw = Math.round(PW * (1 + 0.15 * stg)), hx = sx + (o.flip ? 18 : -18) - pw / 2;
-          st.sprite(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, hx, sy - pw + 8, pw, pw, sy, order++, o.alpha, o.flip && PW !== PET_W);
+          const stg = o.petStage ?? 0, pw = Math.round(PW * (1 + 0.15 * stg)), hx = Math.round(o.petX ?? sx) - pw / 2, py0 = Math.round(o.petY ?? sy);
+          st.sprite(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, hx, py0 - pw + 8 - Math.round(o.petHop ?? 0), pw, pw, py0, order++, o.alpha, o.flip && PW !== PET_W);
         }
         let lift = 0;
         if (o.mount) {
@@ -1956,14 +1970,14 @@ export class Game {
       if (o.alpha < 1) g.globalAlpha = o.alpha;
       if (o.pet) { // the pet keeps to its owner's side, a little behind, hopping
         // evolved pets (levels 20, 40, 60) are larger and glow white, blue and gold
-        const PW = o.pet.width / 2, st = o.petStage ?? 0, k = 1 + 0.15 * st, pw = Math.round(PW * k), hx = sx + (o.flip ? 18 : -18) - pw / 2;
+        const PW = o.pet.width / 2, st = o.petStage ?? 0, k = 1 + 0.15 * st, pw = Math.round(PW * k), hx = Math.round(o.petX ?? sx) - pw / 2, petY = Math.round((o.petY ?? sy) - (o.petHop ?? 0));
         if (st) {
           g.save();
           g.shadowColor = ['', '#ffffff', '#7fe8ff', '#ffd24a'][st];
           g.shadowBlur = 4 + st * 2;
         }
-        if (o.flip && PW !== PET_W) { g.save(); g.translate(hx + pw, 0); g.scale(-1, 1); g.drawImage(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, 0, sy - pw + 8, pw, pw); g.restore(); }
-        else g.drawImage(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, hx, sy - pw + 8, pw, pw);
+        if (o.flip && PW !== PET_W) { g.save(); g.translate(hx + pw, 0); g.scale(-1, 1); g.drawImage(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, 0, petY - pw + 8, pw, pw); g.restore(); }
+        else g.drawImage(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, hx, petY - pw + 8, pw, pw);
         if (st) g.restore();
       }
       let lift = 0;
@@ -2130,6 +2144,24 @@ export class Game {
       this.miniAt = now;
       this.drawMinimap(map, px, py);
     }
+  }
+
+  /** Pets follow their owner: they trail a little behind, catch up with a hop, and settle beside them. */
+  private pets = new Map<number, { x: number; y: number; at: number }>();
+  private hflip = false;
+  private trailPet(owner: number, o: Drawable, x: number, y: number, facingLeft: boolean, now: number) {
+    const want = { x: x + (facingLeft ? 24 : -24), y: y + 4 };
+    let p = this.pets.get(owner);
+    if (!p || Math.hypot(p.x - want.x, p.y - want.y) > 300) p = { x: want.x, y: want.y, at: now }; // a teleport: no long chase
+    const dt = Math.min(0.1, (now - p.at) / 1000), k = 1 - Math.exp(-dt * 5);
+    p.x += (want.x - p.x) * k;
+    p.y += (want.y - p.y) * k;
+    p.at = now;
+    this.pets.set(owner, p);
+    const far = Math.hypot(want.x - p.x, want.y - p.y);
+    o.petX = p.x;
+    o.petY = p.y;
+    o.petHop = far > 3 ? Math.abs(Math.sin(now / 95)) * 4 : 0;
   }
 
   /** The world clock for light and weather (visual checks may shift it with window.__clockShift). */

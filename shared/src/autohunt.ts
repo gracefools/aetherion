@@ -59,10 +59,14 @@ export const AUTO_RADIUS = { min: 4, max: 30, def: 12 };
 export const COSTLY = 20, NEARLY_DEAD = 0.2;
 
 export function autoKind(def: AbilityDef): AutoKind | null {
-  if (def.move || def.special === 'revive' || def.target === 'deadAlly' || def.taunt) return null;
-  if (def.status?.some((s) => s.id === 'stealth')) return null; // stealth ends the fight the hunter wants
-  if (def.heal || def.field?.heal || def.special === 'cleanse') return def.special === 'cleanse' ? null : 'heal';
-  if (def.target === 'enemy') return 'enemy';
+  // only raising a fallen ally needs someone the hunter cannot choose; everything else has a use
+  if (def.special === 'revive' || def.target === 'deadAlly') return null;
+  if (def.target === 'enemy') return 'enemy'; // strikes, and gap closers such as Charge and Shadow Step
+  if (def.taunt || def.hit?.aoeSelf || def.field?.hit || (def.field?.kind as string | undefined) === 'trap' || def.status?.some((s) => s.on === 'enemy')) return 'area';
+  if (def.heal || def.field?.heal) return 'heal';
+  if (def.special === 'cleanse') return 'buff';
+  if (def.move) return 'buff'; // a self move (Blink, Fleet Step): off by default, the player can turn it on
+  if (def.status?.some((s) => s.id === 'stealth')) return 'buff'; // an opener: the next attack reveals and strikes first
   if (def.hit?.aoeSelf || def.field?.hit || def.field?.kind === 'trap') return 'area';
   if (def.status?.some((s) => s.on === 'self' || s.on === 'ally' || s.on === 'allies') || def.barrier) return 'buff';
   return null;
@@ -77,7 +81,7 @@ export function autoAbilities(job: Job, build: Build): AbilityDef[] {
 }
 export function defaultAutoSkill(def: AbilityDef, pri: number): AutoSkill {
   const kind = autoKind(def)!;
-  return { id: def.id, on: kind === 'enemy' || kind === 'area', pri, minMp: kind === 'heal' ? 0 : 20, minEnemies: kind === 'area' ? (def.field?.kind === 'trap' ? 1 : 3) : 1, hpBelow: kind === 'heal' ? 60 : kind === 'buff' ? 100 : 100 };
+  return { id: def.id, on: (kind === 'enemy' || kind === 'area') && !def.move, pri, minMp: kind === 'heal' ? 0 : 20, minEnemies: kind === 'area' ? (def.field?.kind === 'trap' ? 1 : 3) : 1, hpBelow: kind === 'heal' ? 60 : kind === 'buff' ? 100 : 100 };
 }
 export const DEFAULT_AUTO: AutoConfig = {
   attack: true, skills: true, potions: true, loot: true, target: true, elites: false, bosses: false, hpPct: 60, mpPct: 30, radius: AUTO_RADIUS.def,

@@ -195,6 +195,7 @@ export const freePoints = (level: number, b: Build) => level - spentPoints(b);
 /** Why a skill cannot be learned right now, or '' if it can. */
 export function learnBlock(job: Job, level: number, b: Build, id: string): string {
   if (isTalentKey(id)) return talentBlock(level, b.skills, id);
+  if (id.startsWith('awake.')) return 'Awaken skills at the Ascension panel';
   const sub = SUBSKILLS[id];
   if (sub) {
     if (sub.job !== job) return 'Not a skill of this job';
@@ -224,6 +225,10 @@ export function cleanBuild(job: Job, level: number, raw: unknown): Build {
     if (sb.job === job && Number.isInteger(r) && r > 0 && b.skills[sb.parent] > 0) b.skills[sb.id] = Math.min(sb.maxRank, r);
   }
   if (spentPoints(b) > level) b.skills = {};
+  // awakenings: 10 points each, only for a fully trained active skill from level 80
+  for (const n of JOB_DEFS[job].skills) {
+    if (n.type === 'active' && src.skills?.['awake.' + n.id] === 10 && level >= 80 && b.skills[n.id] === n.maxRank && spentPoints(b) + 10 <= level) b.skills['awake.' + n.id] = 10;
+  }
   // talents: one choice per tier the character has reached
   TALENT_TIERS.forEach((t, i) => {
     const c = src.skills?.[talentKey(i + 1)];

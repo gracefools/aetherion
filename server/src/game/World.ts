@@ -174,6 +174,9 @@ export class Player implements Ent {
   bulwarkAt = 0;
   /** Talents: Second Wind and Avatar. */
   secondWindAt = 0;
+  /** Unique passives (G6): Null Ward's and Wildgrowth's next ready ticks. */
+  nullWardAt = 0;
+  wildgrowthAt = 0;
   avatarHits = 0;
   /** Whether this character has chosen a talent. */
   hasTalent(id: string) {
@@ -632,6 +635,11 @@ export class World implements CombatCtx {
   }
   /** After a kill this player is rewarded for: kill talents. */
   afterKill(p: Player) {
+    if (p.passives.includes('soulreap') && !p.dead) {
+      this.heal(p, Math.max(1, Math.round(p.maxHp * 0.04)));
+      p.res = Math.min(p.stats.maxRes, Math.round(p.res + p.stats.maxRes * 0.04));
+      p.selfDirty = true;
+    }
     if (p.hasTalent('swiftness') && !p.dead) applyStatus(p, STATUS_INDEX.swift, this.tick, 0, p.id);
     if (p.hasTalent('bloodthirst') && !p.dead) this.heal(p, Math.max(1, Math.round(p.maxHp * 0.06)));
     if (p.hasTalent('arcane_flow') && !p.dead) {
@@ -1168,6 +1176,17 @@ export class World implements CombatCtx {
       applyStatus(target, STATUS_INDEX.barrier, this.tick, Math.round(target.maxHp * 0.15), target.id);
     }
     if (target instanceof Player && amount > 0 && src && src !== target && !(flags & Dmg.Heal)) {
+      if (target.passives.includes('nullward') && this.tick >= target.nullWardAt) {
+        // Null Ward (unique): one blow turned aside completely, then 30 seconds to recover
+        target.nullWardAt = this.tick + Math.round(30_000 / TICK_MS);
+        amount = 0;
+        flags |= Dmg.Absorb;
+      }
+      if (amount > 0 && target.passives.includes('warbanner')) {
+        let n = 0;
+        for (const o of target.room.monsters.values()) if (!o.dead && Math.hypot(o.x - target.x, o.y - target.y) <= 140 && ++n >= 3) break;
+        if (n >= 3) amount = Math.max(1, Math.round(amount * 0.85));
+      }
       if (target.hasTalent('glass_cannon')) amount = Math.round(amount * 1.15);
       if (target.hasTalent('iron_skin')) amount = Math.max(1, Math.round(amount * 0.85));
     }
@@ -1513,6 +1532,30 @@ export class World implements CombatCtx {
       p.selfDirty = true;
     }
     if (basic && rule.poison && !m.dead && this.rnd() * 100 < rule.poison) applyStatus(m, STATUS_INDEX.poison, this.tick, power, p.id);
+    // unique passives (G6): what a hit sets off
+    const pv = p.passives;
+    if (pv.length && !m.dead) {
+      if (pv.includes('ignite') && this.rnd() < 0.12) applyStatus(m, STATUS_INDEX.burn, this.tick, power, p.id);
+      if (pv.includes('frostbite') && this.rnd() < 0.15) applyStatus(m, STATUS_INDEX.slow, this.tick, 0, p.id);
+    }
+    if (pv.includes('wildgrowth') && this.tick >= p.wildgrowthAt) {
+      p.wildgrowthAt = this.tick + Math.round(1000 / TICK_MS);
+      this.heal(p, Math.max(1, Math.round(p.maxHp * 0.01)));
+    }
+    if (!this.echoing && (pv.includes('stormlash') || (pv.includes('eruption') && flags & Dmg.Crit))) {
+      this.echoing = true;
+      try {
+        if (pv.includes('eruption') && flags & Dmg.Crit) {
+          emit(p, this.evt, [p.id, Act.Telegraph, Math.round(m.x), Math.round(m.y), 70, 150, 1]);
+          for (const o of [...m.room.monsters.values()]) if (o !== m && !o.dead && Math.hypot(o.x - m.x, o.y - m.y) <= 70) this.strike(p, o, mul * 0.4, magic, 0, false);
+        }
+        if (pv.includes('stormlash') && this.rnd() < 0.1) {
+          let near: Monster | null = null, best = 1e9;
+          for (const o of m.room.monsters.values()) { const d = Math.hypot(o.x - m.x, o.y - m.y); if (o !== m && !o.dead && d < 160 && d < best) { best = d; near = o; } }
+          if (near) this.strike(p, near, 0.6, true, 0, false);
+        }
+      } finally { this.echoing = false; }
+    }
     // talents (G2): what happens after a hit lands
     if (!this.echoing) {
       if (!basic && flags & Dmg.Crit && p.hasTalent('overload')) this.cutCooldowns(p, 500);

@@ -547,6 +547,8 @@ export class Monster implements Ent {
     const dealt = Math.max(1, Math.round(dmg));
     c.hurt(p, dealt, flags, this);
     c.traitHit(this, p, dealt);
+    // Bramble Guard (unique passive): a chance to root whoever struck
+    if (p.passives.includes('bramble') && !this.dead && c.rnd() < 0.2) applyStatus(this, STATUS_INDEX.root, c.tick, 0, p.id);
     // Thorns (unique passive): melee attackers take part of the blow back.
     if (!atk.ranged && !atk.magic && p.passives.includes('thorns') && !this.dead) c.hurt(this, Math.max(1, Math.round(dealt * 0.2)), 0, p);
     if (atk.status && !p.dead && c.rnd() * 100 < atk.status.chance) applyStatus(p, STATUS_INDEX[atk.status.id], c.tick, power, this.id);

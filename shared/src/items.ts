@@ -409,6 +409,17 @@ export const SETS: Record<string, SetDef> = {
   dragonscale: { id: 'dragonscale', name: 'Dragonscale Panoply', bonus: [{ text: '+10% maximum HP', pct: { maxHp: 0.1 } }, { text: '+10% attack and magic attack, +5% critical chance', pct: { atk: 0.1, matk: 0.1 }, flat: { crit: 5 } }] },
   frostbound: { id: 'frostbound', name: 'Frostbound Vestige', bonus: [{ text: '+15% defense and magic defense', pct: { def: 0.15, mdef: 0.15 } }, { text: '+6% critical chance, +15% critical damage', flat: { crit: 6, critDmg: 0.15 } }] },
   abyssal: { id: 'abyssal', name: 'Abyssal Covenant', bonus: [{ text: '3% of damage dealt returns as health', flat: { lifesteal: 3 } }, { text: '+12% attack and magic attack', pct: { atk: 0.12, matk: 0.12 } }] },
+  // G6: a set from every dungeon past level 45, in the spirit of its region
+  forgeborn: { id: 'forgeborn', name: 'Forgeborn Plate', bonus: [{ text: '+12% defense, +8% maximum HP', pct: { def: 0.12, maxHp: 0.08 } }, { text: '+14% attack and magic attack', pct: { atk: 0.14, matk: 0.14 } }] },
+  briarwoven: { id: 'briarwoven', name: 'Briarwoven Garb', bonus: [{ text: '+6% dodge', flat: { dodge: 6 } }, { text: '+12% attack, +6% critical chance', pct: { atk: 0.12 }, flat: { crit: 6 } }] },
+  rimecrown: { id: 'rimecrown', name: 'Rime Empress Regalia', bonus: [{ text: '+18% magic defense', pct: { mdef: 0.18 } }, { text: '+15% magic attack, +15% critical damage', pct: { matk: 0.15 }, flat: { critDmg: 0.15 } }] },
+  drowned: { id: 'drowned', name: 'Drowned Leviathan Mail', bonus: [{ text: '+15% maximum HP', pct: { maxHp: 0.15 } }, { text: '4% of damage dealt returns as health, +10% defense', flat: { lifesteal: 4 }, pct: { def: 0.1 } }] },
+  spirewarden: { id: 'spirewarden', name: 'Spirewarden Vestments', bonus: [{ text: '+15% maximum mana or rage', pct: { maxRes: 0.15 } }, { text: '+15% magic attack and attack', pct: { matk: 0.15, atk: 0.15 } }] },
+  hollowking: { id: 'hollowking', name: 'Hollow King Panoply', bonus: [{ text: '+15% defense and magic defense', pct: { def: 0.15, mdef: 0.15 } }, { text: '+16% attack, +5% critical chance', pct: { atk: 0.16 }, flat: { crit: 5 } }] },
+  wyrmforged: { id: 'wyrmforged', name: 'Elder Wyrmforged', bonus: [{ text: '+12% attack and magic attack', pct: { atk: 0.12, matk: 0.12 } }, { text: '+8% critical chance, +20% critical damage', flat: { crit: 8, critDmg: 0.2 } }] },
+  heartroot: { id: 'heartroot', name: 'Heartroot Raiment', bonus: [{ text: '+18% maximum HP', pct: { maxHp: 0.18 } }, { text: '5% of damage dealt returns as health, +12% magic attack', flat: { lifesteal: 5 }, pct: { matk: 0.12 } }] },
+  sovereign: { id: 'sovereign', name: 'Storm Sovereign Regalia', bonus: [{ text: '+8% dodge, +6% critical chance', flat: { dodge: 8, crit: 6 } }, { text: '+18% attack and magic attack', pct: { atk: 0.18, matk: 0.18 } }] },
+  starfallen: { id: 'starfallen', name: 'Starfallen Raiment', bonus: [{ text: '+15% to every defense and +12% maximum HP', pct: { def: 0.15, mdef: 0.15, maxHp: 0.12 } }, { text: '+20% attack and magic attack, +8% critical chance', pct: { atk: 0.2, matk: 0.2 }, flat: { crit: 8 } }] },
 };
 export interface PassiveDef {
   id: string;
@@ -423,6 +434,17 @@ export const PASSIVES: Record<string, PassiveDef> = {
   thorns: { id: 'thorns', name: 'Thorns', text: 'Enemies that strike you take 20% of the damage back.' },
   giantslayer: { id: 'giantslayer', name: 'Giantslayer', text: 'Deal 15% more damage to elites and bosses.' },
   swift: { id: 'swift', name: 'Windstride', text: 'Move 8% faster.' },
+  // G6
+  ignite: { id: 'ignite', name: 'Ignite', text: 'Your hits have a 12% chance to set the enemy burning.' },
+  bramble: { id: 'bramble', name: 'Bramble Guard', text: 'Enemies that strike you have a 20% chance to be rooted.' },
+  frostbite: { id: 'frostbite', name: 'Frostbite', text: 'Your hits have a 15% chance to slow the enemy.' },
+  soulreap: { id: 'soulreap', name: 'Soulreap', text: 'Every kill restores 4% of your health and of your mana or rage.' },
+  riftstep: { id: 'riftstep', name: 'Riftstep', text: 'Move 10% faster and dodge 5% more often.' },
+  warbanner: { id: 'warbanner', name: 'War Banner', text: 'Take 15% less damage while three or more enemies are close to you.' },
+  eruption: { id: 'eruption', name: 'Eruption', text: 'Critical hits burst, striking enemies around the target for 40% of the blow.' },
+  wildgrowth: { id: 'wildgrowth', name: 'Wildgrowth', text: 'Your hits heal you for 1% of your maximum health (at most once a second).' },
+  stormlash: { id: 'stormlash', name: 'Stormlash', text: 'Your hits have a 10% chance to arc lightning to another enemy for 60% magic damage.' },
+  nullward: { id: 'nullward', name: 'Null Ward', text: 'Once every 30 seconds, a blow against you is turned aside completely.' },
 };
 export const SECOND_WIND_CD_MS = 90000;
 const J = (id: string, name: string, slot: Slot, rar: number, stats: Partial<Record<GearStat, Curve>>, desc: string, u: { set?: string; passive?: string }, look?: ItemBase['look']): ItemBase =>
@@ -454,6 +476,48 @@ registerItems([
   J('demon_crown', 'Crown of the Throne-Breaker', 'helmet', 5, { atk: [4, 0.9], matk: [4, 0.9], crit: [4, 0], critDmg: [0.1, 0] }, 'No king has worn it and stayed a king.', { passive: 'executioner' }, { helmet: 4, color: 1 }),
   J('heart_of_aetherion', 'Heart of Aetherion', 'amulet', 5, { maxHp: [20, 9], maxRes: [14, 5], atk: [3, 0.7], matk: [3, 0.7] }, 'A sliver of the fallen star itself.', { passive: 'secondwind' }),
   J('stormstride', 'Stormstride Band', 'ring', 5, { atk: [3, 0.7], matk: [3, 0.7], dodge: [3, 0], crit: [3, 0] }, 'The wind remembers who wore it.', { passive: 'swift' }),
+  // ---------- G6: sets and signatures past level 45 ----------
+  J('fg_helm', 'Forgeborn Visor', 'helmet', 3, { def: [5, 1.2], maxHp: [16, 6] }, 'Still glowing from the crucible.', { set: 'forgeborn' }, { helmet: 3, color: 10 }),
+  J('fg_amulet', 'Forgeborn Cinder', 'amulet', 3, { atk: [3, 0.7], matk: [3, 0.7], maxHp: [10, 4] }, 'A coal that will not go out.', { set: 'forgeborn' }),
+  J('fg_ring', 'Forgeborn Rivet', 'ring', 3, { def: [3, 0.8], atk: [2, 0.5] }, 'Pulled from the Titan\'s knee.', { set: 'forgeborn' }),
+  J('bw_hood', 'Briarwoven Hood', 'helmet', 3, { def: [3, 0.8], dodge: [2, 0], atk: [2, 0.5] }, 'Thorns that only point outward.', { set: 'briarwoven' }, { helmet: 2, color: 2 }),
+  J('bw_amulet', 'Briarwoven Seed', 'amulet', 3, { atk: [3, 0.7], crit: [2, 0] }, 'It is trying to grow.', { set: 'briarwoven' }),
+  J('bw_ring', 'Briarwoven Loop', 'ring', 3, { dodge: [2, 0], atk: [2, 0.5] }, 'A living vine, wound once.', { set: 'briarwoven' }),
+  J('rc_crown', 'Rime Empress Crown', 'helmet', 3, { mdef: [5, 1.2], matk: [3, 0.6] }, 'The first winter wore it.', { set: 'rimecrown' }, { helmet: 4, color: 6 }),
+  J('rc_amulet', 'Rime Empress Brooch', 'amulet', 3, { matk: [4, 0.8], maxRes: [10, 4] }, 'Frost forms on whoever holds it.', { set: 'rimecrown' }),
+  J('rc_ring', 'Rime Empress Ring', 'ring', 3, { matk: [2, 0.5], critDmg: [0.06, 0] }, 'Cold enough to burn.', { set: 'rimecrown' }),
+  J('dl_helm', 'Leviathan Helm', 'helmet', 3, { def: [4, 1], maxHp: [18, 7] }, 'It still smells of the deep.', { set: 'drowned' }, { helmet: 3, color: 5 }),
+  J('dl_amulet', 'Leviathan Pearl', 'amulet', 3, { maxHp: [16, 7], mdef: [3, 0.7] }, 'It glows when the tide turns.', { set: 'drowned' }),
+  J('dl_ring', 'Leviathan Scale Ring', 'ring', 3, { maxHp: [10, 4], lifesteal: [1, 0] }, 'A scale the size of a coin.', { set: 'drowned' }),
+  J('sw_circlet', 'Spirewarden Circlet', 'helmet', 3, { mdef: [4, 1], maxRes: [12, 4] }, 'Inscribed with the first sentence, half erased.', { set: 'spirewarden' }, { helmet: 4, color: 3 }),
+  J('sw_amulet', 'Spirewarden Lens', 'amulet', 3, { matk: [3, 0.8], atk: [3, 0.8] }, 'Through it, the rift looks closer.', { set: 'spirewarden' }),
+  J('sw_ring', 'Spirewarden Seal', 'ring', 3, { maxRes: [8, 3], crit: [2, 0] }, 'A stone from the shattered spire.', { set: 'spirewarden' }),
+  J('hk_crown', 'Hollow Crown', 'helmet', 3, { def: [4, 1.1], mdef: [4, 1.1] }, 'Nobody abdicates while wearing it.', { set: 'hollowking' }, { helmet: 4, color: 4 }),
+  J('hk_amulet', 'Hollow King Medal', 'amulet', 3, { atk: [4, 0.9], def: [2, 0.5] }, 'For service to a kingdom that is gone.', { set: 'hollowking' }),
+  J('hk_ring', 'Hollow King Signet', 'ring', 3, { atk: [2, 0.6], crit: [2, 0] }, 'It seals letters no one will read.', { set: 'hollowking' }),
+  J('ew_helm', 'Wyrmforged Helm', 'helmet', 3, { def: [4, 1], atk: [3, 0.6], matk: [3, 0.6] }, 'Hammered on the wyrm mother\'s heat.', { set: 'wyrmforged' }, { helmet: 3, color: 0 }),
+  J('ew_amulet', 'Wyrmforged Fang', 'amulet', 3, { atk: [3, 0.8], matk: [3, 0.8], critDmg: [0.06, 0] }, 'Older than the dragon it came from.', { set: 'wyrmforged' }),
+  J('ew_ring', 'Wyrmforged Coil', 'ring', 3, { crit: [3, 0], atk: [2, 0.5] }, 'It tightens before you strike.', { set: 'wyrmforged' }),
+  J('hr_circlet', 'Heartroot Circlet', 'helmet', 3, { maxHp: [16, 7], mdef: [3, 0.8] }, 'A ring of living wood.', { set: 'heartroot' }, { helmet: 4, color: 2 }),
+  J('hr_amulet', 'Heartroot Acorn', 'amulet', 3, { maxHp: [14, 6], matk: [3, 0.7] }, 'It counts the years for you.', { set: 'heartroot' }),
+  J('hr_ring', 'Heartroot Band', 'ring', 3, { maxHp: [10, 4], lifesteal: [1, 0] }, 'Sap still runs in it.', { set: 'heartroot' }),
+  J('ss_helm', 'Sovereign Stormhelm', 'helmet', 3, { def: [3, 0.8], dodge: [2, 0], atk: [2, 0.5] }, 'Lightning comes to it like a dog to a whistle.', { set: 'sovereign' }, { helmet: 3, color: 1 }),
+  J('ss_amulet', 'Sovereign Stormglass', 'amulet', 3, { atk: [3, 0.8], matk: [3, 0.8], crit: [2, 0] }, 'A storm in a bottle, still turning.', { set: 'sovereign' }),
+  J('ss_ring', 'Sovereign Gale Ring', 'ring', 3, { dodge: [2, 0], crit: [2, 0] }, 'It hums in the wind.', { set: 'sovereign' }),
+  J('sf_crown', 'Starfallen Crown', 'helmet', 3, { def: [4, 1.1], mdef: [4, 1.1], maxHp: [12, 5] }, 'Made from what the star left behind.', { set: 'starfallen' }, { helmet: 4, color: 7 }),
+  J('sf_amulet', 'Starfallen Shard', 'amulet', 3, { atk: [4, 0.9], matk: [4, 0.9] }, 'Warm, and very old.', { set: 'starfallen' }),
+  J('sf_ring', 'Starfallen Halo', 'ring', 3, { crit: [3, 0], maxHp: [10, 4] }, 'A ring of light that does not fade.', { set: 'starfallen' }),
+  // signatures (legendary) and relics (mythic)
+  J('titans_ember', "Titan's Ember", 'amulet', 4, { atk: [4, 0.9], matk: [4, 0.9], maxHp: [12, 5] }, 'The forge burned for a hundred years on this.', { passive: 'ignite' }),
+  J('thorn_crown', 'Crown of Thorns', 'helmet', 5, { def: [5, 1.3], maxHp: [16, 7], atk: [3, 0.7] }, 'The Thorn King did not take it off. You will see why.', { passive: 'bramble' }, { helmet: 4, color: 2 }),
+  J('rime_tear', 'Rime Tear', 'ring', 4, { matk: [4, 0.9], critDmg: [0.08, 0] }, 'The first winter wept once, too.', { passive: 'frostbite' }),
+  J('lich_phylactery', "Lich's Phylactery", 'amulet', 5, { maxHp: [18, 8], matk: [4, 0.9], atk: [4, 0.9] }, 'It holds a life. Not yours.', { passive: 'soulreap' }),
+  J('spire_shard', 'Spire Shard', 'ring', 4, { atk: [3, 0.8], matk: [3, 0.8], dodge: [3, 0] }, 'Where the Runewrights first called the star from.', { passive: 'riftstep' }),
+  J('tyrant_banner', "Tyrant's Banner", 'amulet', 5, { def: [5, 1.3], atk: [4, 0.9], maxHp: [14, 6] }, 'The Dragon Tyrant flew it over every burned city.', { passive: 'warbanner' }),
+  J('wyrm_heart', 'Wyrm Mother\'s Heart', 'amulet', 4, { atk: [4, 1], matk: [4, 1], crit: [3, 0] }, 'It never slept. It never will.', { passive: 'eruption' }),
+  J('wild_god_antler', "Wild God's Antler", 'helmet', 5, { maxHp: [20, 9], matk: [4, 0.9], mdef: [4, 1] }, 'The forest kept count of everything. This was the tally.', { passive: 'wildgrowth' }, { helmet: 5, color: 2 }),
+  J('sovereign_eye', "Sovereign's Eye", 'ring', 4, { atk: [3, 0.8], matk: [3, 0.8], crit: [3, 0] }, 'The calm at the centre of the storm.', { passive: 'stormlash' }),
+  J('unmade_star', 'The Unmade Star', 'amulet', 5, { maxHp: [22, 10], atk: [5, 1.1], matk: [5, 1.1], def: [4, 1] }, 'What the Unmaker could not unmake.', { passive: 'nullward' }),
 ]);
 /** What each boss can drop besides ordinary gear. */
 export const BOSS_UNIQUES: Record<string, string[]> = {
@@ -463,6 +527,22 @@ export const BOSS_UNIQUES: Record<string, string[]> = {
   abyssal_golem: ['ab_hood', 'ab_amulet', 'ab_ring', 'golem_core', 'heart_of_aetherion'],
   shadow_knight: ['ab_hood', 'ab_amulet', 'ab_ring', 'queens_tear', 'golem_core', 'shadowmantle', 'stormstride'],
   demon_lord: ['ds_helm', 'ds_amulet', 'ds_ring', 'rb_circlet', 'rb_amulet', 'rb_ring', 'wyrmfang', 'guardian_sigil', 'demon_crown', 'heart_of_aetherion'],
+  // G6: the dungeon bosses and world bosses past level 45
+  forgeborn_titan: ['fg_helm', 'fg_amulet', 'fg_ring', 'titans_ember'],
+  verdant_colossus: ['bw_hood', 'bw_amulet', 'bw_ring', 'titans_ember'],
+  thorn_king: ['bw_hood', 'bw_amulet', 'bw_ring', 'thorn_crown'],
+  rime_empress: ['rc_crown', 'rc_amulet', 'rc_ring', 'rime_tear'],
+  bog_leviathan: ['dl_helm', 'dl_amulet', 'dl_ring', 'rime_tear'],
+  lich_regent: ['dl_helm', 'dl_amulet', 'dl_ring', 'lich_phylactery'],
+  spire_warden: ['sw_circlet', 'sw_amulet', 'sw_ring', 'spire_shard'],
+  hollow_king: ['hk_crown', 'hk_amulet', 'hk_ring', 'spire_shard'],
+  dragon_tyrant: ['hk_crown', 'hk_amulet', 'hk_ring', 'tyrant_banner'],
+  elder_wyrm: ['ew_helm', 'ew_amulet', 'ew_ring', 'wyrm_heart'],
+  heartroot_guardian: ['hr_circlet', 'hr_amulet', 'hr_ring', 'wyrm_heart'],
+  wild_god: ['hr_circlet', 'hr_amulet', 'hr_ring', 'wild_god_antler'],
+  storm_sovereign: ['ss_helm', 'ss_amulet', 'ss_ring', 'sovereign_eye'],
+  star_devourer: ['sf_crown', 'sf_amulet', 'sf_ring', 'sovereign_eye', 'unmade_star'],
+  the_unmaker: ['sf_crown', 'sf_amulet', 'sf_ring', 'unmade_star'],
 };
 /** Rarity weights [Epic, Legendary, Mythic] of a boss drop. Mythic is always possible and never certain. */
 export const BOSS_RARITY: Record<'normal' | 'hard' | 'nightmare' | 'armageddon' | 'world' | 'raid', [number, number, number]> = {
@@ -501,5 +581,6 @@ export function applyGear(s: Stats, eq: Equipment, boost: Partial<Record<Slot, n
     }
   if (passives.includes('runesurge')) s.runeCost = Math.round(s.runeCost * 0.8 * 100) / 100;
   if (passives.includes('swift')) s.moveMul = Math.round(s.moveMul * 1.08 * 1000) / 1000;
+  if (passives.includes('riftstep')) { s.moveMul = Math.round(s.moveMul * 1.1 * 1000) / 1000; s.dodge += 5; }
   return { sets, passives };
 }

@@ -4511,6 +4511,27 @@ test('G2 talents, tiers 4 to 6; awakening costs skill points; auto hunting uses 
   for (const j of JOBS) for (const d of jobActives(j)) assert.ok(!!autoKind(d) === !(d.special === 'revive' || d.target === 'deadAlly'), `${j}: ${d.id}`);
 });
 
+test('G6 chase items: every boss past level 45 drops its own set and signature, and every new passive works', () => {
+  for (const e of EXPANSION) for (const b of [e.dungeon.boss.id, e.world?.id].filter(Boolean) as string[]) {
+    const list = BOSS_UNIQUES[b] ?? [];
+    assert.ok(list.some((id) => ITEMS[id].unique!.set) && list.some((id) => ITEMS[id].unique!.passive), `${b} drops a set piece and a signature`);
+  }
+  for (const set of Object.keys(SETS)) assert.equal(ITEM_LIST.filter((i) => i.unique?.set === set).length, 3, `${set} has three pieces`);
+  for (const pid of Object.keys(PASSIVES)) assert.ok(ITEM_LIST.some((i) => i.unique?.passive === pid), `${pid} is on an item`);
+  const h = harness({ rng: () => 0.05, capacity: 10 }), { world } = h, p = h.join(0, 0, 'knight', 120).p;
+  const mob = (dx = 30, dy = 0) => { const m = world.spawn(p.room, 'boar', p.x + dx, p.y + dy); m.noRespawn = true; m.maxHp = m.hp = 1e7; return m; };
+  const wear = (...ids: string[]) => { p.passives = ids; };
+  wear('ignite'); const a = mob(); world.strike(p, a, 1); assert.ok(statusNames(a.mask).includes('Burning'), 'Ignite');
+  wear('frostbite'); const b = mob(); world.strike(p, b, 1); assert.ok(statusNames(b.mask).includes('Slowed'), 'Frostbite');
+  wear('stormlash'); const c = mob(600), c2 = mob(630); world.strike(p, c, 1); assert.ok(c2.hp < c2.maxHp, 'Stormlash arcs');
+  wear('eruption'); const d = mob(-600), d2 = mob(-640); world.strike(p, d, 1, false, 100); assert.ok(d2.hp < d2.maxHp, 'Eruption bursts on a critical hit');
+  wear('wildgrowth'); p.hp = 100; world.strike(p, mob(), 1); assert.ok(p.hp > 100, 'Wildgrowth heals');
+  wear('soulreap'); p.hp = 100; kill(world, p, 'boar'); assert.ok(p.hp > 100, 'Soulreap');
+  wear('nullward'); p.hp = p.maxHp; world.hurt(p, 500, 0, mob()); assert.equal(p.hp, p.maxHp, 'Null Ward turns a blow aside');
+  world.hurt(p, 500, 0, mob()); assert.equal(p.hp, p.maxHp - 500, 'once every 30 seconds');
+  wear('warbanner'); p.hp = p.maxHp; world.hurt(p, 1000, 0, mob(0, -20)); assert.equal(p.hp, p.maxHp - 850, 'War Banner: less damage when surrounded');
+});
+
 test('M13 accepting: level, prerequisites, reputation, once, daily reset at midnight UTC, and the active limit', () => {
   const s = emptyQuests(), now = Date.UTC(2026, 10, 17, 15), main2 = QUESTS.main_verdant;
   assert.equal(acceptBlock(QUESTS.main_eldoria, s, 1, {}, now), '');

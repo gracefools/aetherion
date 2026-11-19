@@ -126,7 +126,7 @@ export class Matches {
       const out: QueueEntry[] = [];
       for (const [id, q] of this.queue) {
         const p = this.w.online.get(id);
-        if (q.mode === mode && p && !this.unfit(p)) out.push({ id, rating: this.pvp.rating.get(id) ?? 1000, since: q.since, group: q.group });
+        if (q.mode === mode && p && !this.unfit(p)) out.push({ id, rating: this.pvp.rating.get(id) ?? 1000, since: q.since, group: q.group, level: p.level });
       }
       // a party goes only when all of it can
       const short = new Set<number>();

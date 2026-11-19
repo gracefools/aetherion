@@ -49,15 +49,23 @@ export const RANKED_HALL = { tx: CHAMBERS[BOSS_ROOM].cx, ty: DUNGEON_MID };
 /** How far apart in rating two players may be matched after waiting this long: it widens with time. */
 export const ratingWindow = (waitMs: number) => Math.min(1000, 100 + 50 * Math.floor(Math.max(0, waitMs) / 10_000));
 
+/** How far apart in level two sides may be after waiting this long; after three minutes, any gap (a quiet server still finds matches). */
+export const levelWindow = (waitMs: number) => (waitMs >= 180_000 ? Infinity : 10 + 10 * Math.floor(Math.max(0, waitMs) / 20_000));
+
 /** One player in line; `group` (a party) goes in together, on the same team. */
-export interface QueueEntry { id: number; rating: number; since: number; group?: number }
+export interface QueueEntry { id: number; rating: number; since: number; group?: number; level?: number }
+/** Whether two sides are close enough in (average) level for everyone's wait. */
+function levelsFit(a: QueueEntry[], b: QueueEntry[], now: number) {
+  const avg = (s: QueueEntry[]) => s.reduce((t, e) => t + (e.level ?? 1), 0) / Math.max(1, s.length);
+  return Math.abs(avg(a) - avg(b)) <= Math.min(...[...a, ...b].map((e) => levelWindow(now - e.since)));
+}
 
 /** Pairs rated-duel players: closest ratings first, within both players' windows. Returns id pairs. */
 export function pairRanked(q: QueueEntry[], now: number): [number, number][] {
   const s = [...q].sort((a, b) => a.rating - b.rating || a.since - b.since), out: [number, number][] = [];
   for (let i = 0; i + 1 < s.length; ) {
     const a = s[i], b = s[i + 1], gap = Math.abs(a.rating - b.rating);
-    if (gap <= Math.min(ratingWindow(now - a.since), ratingWindow(now - b.since))) {
+    if (gap <= Math.min(ratingWindow(now - a.since), ratingWindow(now - b.since)) && levelsFit([a], [b], now)) {
       out.push([a.id, b.id]);
       i += 2;
     } else i++;
@@ -79,17 +87,18 @@ function groupsOf(q: QueueEntry[]): Group[] {
   }
   return [...by.values()].sort((x, y) => x.since - y.since || x.ids[0] - y.ids[0]);
 }
-/** The fairest split of whole groups into two teams of exactly k players each (null if none). */
-function split(gs: Group[], k: number): [number[], number[]] | null {
+/** The fairest split of whole groups into two teams of exactly k players each that `ok` accepts (null if none). */
+function split(gs: Group[], k: number, ok: (t: [number[], number[]]) => boolean = () => true): [number[], number[]] | null {
   let best: [number[], number[]] | null = null, bestGap = Infinity;
   for (let mask = 0; mask < 1 << gs.length; mask++) {
     let n = 0, ra = 0, rb = 0;
     gs.forEach((g, i) => (mask & (1 << i) ? ((n += g.ids.length), (ra += g.rating)) : (rb += g.rating)));
     if (n !== k || !(mask & 1)) continue; // the first group always on the first team: each split is counted once
-    if (Math.abs(ra - rb) < bestGap) {
-      bestGap = Math.abs(ra - rb);
-      best = [gs.filter((_, i) => mask & (1 << i)).flatMap((g) => g.ids), gs.filter((_, i) => !(mask & (1 << i))).flatMap((g) => g.ids)];
-    }
+    if (Math.abs(ra - rb) >= bestGap) continue;
+    const t: [number[], number[]] = [gs.filter((_, i) => mask & (1 << i)).flatMap((g) => g.ids), gs.filter((_, i) => !(mask & (1 << i))).flatMap((g) => g.ids)];
+    if (!ok(t)) continue;
+    bestGap = Math.abs(ra - rb);
+    best = t;
   }
   return best;
 }
@@ -98,8 +107,7 @@ function choose(gs: Group[], k: number, ok: (t: [number[], number[]]) => boolean
   const pick: Group[] = [];
   const go = (i: number, n: number): [number[], number[]] | null => {
     if (n === 2 * k) {
-      const t = split(pick, k);
-      return t && ok(t) ? t : null;
+      return split(pick, k, ok);
     }
     if (i >= gs.length) return null;
     if (gs[i].ids.length <= k && n + gs[i].ids.length <= 2 * k) {
@@ -125,15 +133,16 @@ export function pickRanked2(q: QueueEntry[], now: number): [number[], number[]] 
   const by = new Map(q.map((e) => [e.id, e]));
   const avg = (ids: number[]) => ids.reduce((s, id) => s + by.get(id)!.rating, 0) / ids.length;
   return choose(groupsOf(q).filter((g) => g.ids.length <= 2).slice(0, 12), 2, (t) =>
-    Math.abs(avg(t[0]) - avg(t[1])) <= Math.min(...[...t[0], ...t[1]].map((id) => ratingWindow(now - by.get(id)!.since))));
+    Math.abs(avg(t[0]) - avg(t[1])) <= Math.min(...[...t[0], ...t[1]].map((id) => ratingWindow(now - by.get(id)!.since))) && levelsFit(t[0].map((id) => by.get(id)!), t[1].map((id) => by.get(id)!), now));
 }
 
 export function pickBattleground(q: QueueEntry[], now: number): [number[], number[]] | null {
-  const gs = groupsOf(q).slice(0, 12);
+  const gs = groupsOf(q).slice(0, 12), by = new Map(q.map((e) => [e.id, e]));
   if (!gs.length) return null;
+  const fair = (t: [number[], number[]]) => levelsFit(t[0].map((id) => by.get(id)!), t[1].map((id) => by.get(id)!), now);
   for (let k = BG.maxPerTeam; k >= BG.minPerTeam; k--) {
     if (k < BG.maxPerTeam && now - gs[0].since < BG.fillWaitMs) break;
-    const t = choose(gs, k);
+    const t = choose(gs, k, fair);
     if (t) return t;
   }
   return null;

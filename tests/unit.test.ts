@@ -4989,7 +4989,7 @@ test('M15 arena: entered at the Arena Master, everyone fights everyone (teams by
   assert.equal(world.pvpOp(A.p, { op: 'leave' }), 'You are not in the arena');
 });
 
-import { BG, BG_SHRINE, MATCH_END_MS, pairRanked, pickBattleground, pickRanked2, RANKED, ratingWindow } from '../shared/src/matches';
+import { BG, BG_SHRINE, levelWindow, MATCH_END_MS, pairRanked, pickBattleground, pickRanked2, RANKED, ratingWindow } from '../shared/src/matches';
 
 test('G8 matchmaking rules: rating windows widen with waiting, teams are balanced, a battleground fills or waits', () => {
   assert.equal(ratingWindow(0), 100);
@@ -5110,6 +5110,15 @@ test('G8 rated 2v2: a party of two or two alone, close ratings, the fallen stay 
   assert.equal(pickRanked2([{ ...solo(1, 1600), group: 9 }, { ...solo(2, 1600), group: 9 }, solo(3, 1000), solo(4, 1000)], now), null, 'a strong party does not meet weak players at once');
   assert.ok(pickRanked2([{ ...solo(1, 1600, 120_000), group: 9 }, { ...solo(2, 1600, 120_000), group: 9 }, solo(3, 1000, 120_000), solo(4, 1000, 120_000)], now), 'but does after a long wait');
   assert.equal(pickRanked2([solo(1, 1000), solo(2, 1000), solo(3, 1000)], now), null, 'three is not enough');
+  // level fairness: far-apart levels wait, and are matched anyway once the wait is long
+  const lv = (id: number, level: number, wait = 0): { id: number; rating: number; since: number; level: number; group?: number } => ({ id, rating: 1000, since: now - wait, level });
+  assert.equal(levelWindow(0), 10);
+  assert.equal(pairRanked([lv(1, 30), lv(2, 150)], now).length, 0, 'level 30 does not meet level 150 at once');
+  assert.equal(pairRanked([lv(1, 30), lv(2, 35)], now).length, 1, 'close levels meet at once');
+  assert.equal(pairRanked([lv(1, 30, 200_000), lv(2, 150, 200_000)], now).length, 1, 'after three minutes any gap will do');
+  assert.equal(pickRanked2([lv(1, 30), lv(2, 30), lv(3, 150), lv(4, 150)], now)!.flat().length, 4, 'a 2v2 mixes levels so the teams match');
+  assert.equal(pickBattleground([...[lv(1, 20), lv(2, 200)].map((e) => ({ ...e, group: 5 })), ...[lv(3, 110), lv(4, 110)].map((e) => ({ ...e, since: now - BG.fillWaitMs }))], now)!.flat().length, 4, 'team averages are what count');
+  assert.equal(pickBattleground([lv(1, 20, BG.fillWaitMs), lv(2, 200, BG.fillWaitMs)], now), null, 'a 1v1 Shrine Clash far apart waits');
 
   const h = harness({ capacity: 10 }), { world } = h, mm = world.pvp.matches as any;
   const ps = [h.join(0, 0, 'knight', 30), h.join(30, 0, 'mage', 30), h.join(60, 0, 'cleric', 30), h.join(90, 0, 'ranger', 30)].map((x) => x.p);

@@ -321,6 +321,7 @@ export async function createApp(cfg: Config) {
         case 'guild': return void world.guild(player, m);
         case 'eco': return void world.eco(player, m);
         case 'pvp': return void world.pvpOp(player, m);
+        case 'finder': return void world.finderOp(player, m);
         case 'comp': return void world.companion(player, m);
         case 'trade': return void world.trade(player, m);
         case 'party': return void world.party(player, m.op, m.op === 'loot' ? m.mode : m.id, m.name);

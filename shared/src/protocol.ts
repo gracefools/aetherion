@@ -9,6 +9,7 @@ import type { QuestState, FactionDef } from './quests';
 import type { Companions } from './companions';
 import type { Gear } from './gear';
 import type { AuctionRates, Bank, GuildView, Listing } from './economy';
+import type { FinderState } from './social';
 export type { Appearance };
 
 export const TICK_RATE = 20;
@@ -89,11 +90,12 @@ export type ClientMsg =
   | { t: 'quest'; op: 'accept' | 'abandon' | 'turnin' | 'shop'; id?: string; faction?: string; base?: string }
   | { t: 'guild'; op: string; [k: string]: unknown }
   | { t: 'eco'; op: string; [k: string]: unknown }
-  | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank'; id?: number; by?: string }
+  | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy'; id?: number; by?: string; base?: string }
+  | { t: 'finder'; op: 'join' | 'leave' | 'state'; dungeon?: string; diff?: string }
   | { t: 'comp'; op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount'; uid?: string; id?: string; name?: string }
   | { t: 'ping'; c: number };
 
-export type ChatChannel = 'zone' | 'party' | 'whisper' | 'guild';
+export type ChatChannel = 'zone' | 'party' | 'whisper' | 'guild' | 'world' | 'lfg';
 /** How a party shares drops from ordinary monsters. Boss rewards are always personal. */
 export const LOOT_MODES = ['personal', 'roundrobin', 'contribution'] as const;
 export type LootMode = (typeof LOOT_MODES)[number];
@@ -293,4 +295,6 @@ export type ServerMsg =
   | { t: 'pong'; c: number }
   /** G2 talents: time taken off every skill cooldown. */
   | { t: 'cdcut'; ms: number }
+  /** G9: the dungeon finder as this player sees it. */
+  | ({ t: 'finder' } & FinderState)
   | { t: 'kick'; reason: string };

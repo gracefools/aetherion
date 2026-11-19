@@ -92,6 +92,8 @@ export interface GuildView {
   /** Guild points not yet spent on buildings. */
   points: number;
   log: { at: number; text: string }[];
+  /** G9: this week's goals and progress. */
+  goals?: { id: string; text: string; n: number; p: number }[];
 }
 
 // ---------------------------------------------------------------------------------------------

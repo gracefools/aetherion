@@ -86,6 +86,17 @@ function GuildView({ hud, game }: { hud: Hud; game: Game }) {
   const members = [...g.members].sort((a, b) => a.rank - b.rank || Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
   return (
     <>
+      {g.goals && (
+        <section className="goals" aria-label={t('goals.title')}>
+          <h3>{t('goals.title')} <small className="sub">{t('goals.help')}</small></h3>
+          {g.goals.map((x) => (
+            <div key={x.id} className={'goal' + (x.p >= x.n ? ' done' : '')}>
+              <span>{x.text}</span>
+              <div className="vbar exp" role="meter" aria-label={x.text} aria-valuenow={x.p} aria-valuemax={x.n}><i style={{ width: `${(x.p / x.n) * 100}%` }} /><span>{x.p.toLocaleString()} / {x.n.toLocaleString()}</span></div>
+            </div>
+          ))}
+        </section>
+      )}
       <p className="sub">{t('guild.summary', { lv: g.level, n: g.members.length, cap: g.capacity, exp: g.exp, next: g.next })} <b>{rankName(rank)}</b></p>
       <div className="motd">
         {motd === null

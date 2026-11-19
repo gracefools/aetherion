@@ -100,6 +100,7 @@ export class Quests {
         for (const [f, n] of q.reward.rep) this.addRep(p, f, n);
         this.w.send(p, { t: 'sys', text: `Quest complete: ${q.name}. ${q.reward.exp} EXP, ${Math.round(q.reward.gold * this.w.goldRate)} gold.`, cue: 'questdone' });
         this.w.journals.onQuest(p);
+        this.w.guilds.goal(p, 'quests');
         this.changed(p);
         sendInv(this.w, p);
         return '';
@@ -184,6 +185,7 @@ export class Quests {
   }
   /** A dungeon run this player was inside was cleared. */
   onClear(p: Player, dungeon: string) {
+    this.w.guilds.goal(p, 'dungeons');
     let hit = false;
     for (const [id, a] of Object.entries(p.quests.active))
       QUESTS[id].objectives.forEach((o, i) => {

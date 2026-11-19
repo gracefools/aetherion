@@ -10,6 +10,8 @@ import { PgError } from '../db/pgwire';
 import type { Repo } from '../db/repo';
 import { sendInv } from './Inventory';
 import type { Player, World } from './World';
+import { cleanGoals, emptyGoals, GOAL_REWARD, weeklyGoals, weekOf, type GoalKind, type GuildGoals } from '../../../shared/src/social';
+import { award } from './Inventory';
 
 interface Member {
   id: number;
@@ -32,6 +34,9 @@ export interface Guild {
   buildings: GuildBuildings;
   /** Experience earned since the last write (written in batches). */
   pendingExp: number;
+  /** G9: this week's goals and their progress; dirty when not yet written. */
+  goals: GuildGoals;
+  goalsDirty?: boolean;
 }
 
 export class Guilds {
@@ -45,7 +50,7 @@ export class Guilds {
   async load() {
     const { guilds, members } = await this.repo.loadGuilds();
     for (const g of guilds)
-      this.byId.set(Number(g.id), { id: Number(g.id), name: g.name, tag: g.tag, emblem: cleanEmblem(g.emblem) ?? { shape: 0, color: 0, bg: 7 }, leader: Number(g.leader_id), level: g.level, exp: Number(g.exp), motd: g.motd, bank: Number(g.bank_gold), buildings: cleanBuildings(g.buildings), members: new Map(), pendingExp: 0 });
+      this.byId.set(Number(g.id), { id: Number(g.id), name: g.name, tag: g.tag, emblem: cleanEmblem(g.emblem) ?? { shape: 0, color: 0, bg: 7 }, leader: Number(g.leader_id), level: g.level, exp: Number(g.exp), motd: g.motd, bank: Number(g.bank_gold), buildings: cleanBuildings(g.buildings), members: new Map(), pendingExp: 0, goals: cleanGoals(g.goals, weekOf(Date.now())) });
     for (const m of members) {
       const g = this.byId.get(Number(m.guild_id));
       if (!g) continue;
@@ -75,6 +80,7 @@ export class Guilds {
       id: g.id, name: g.name, tag: g.tag, emblem: g.emblem, level: g.level, exp: g.exp, next: guildExpToNext(g.level), motd: g.motd, bank: g.bank, capacity: guildCapacity(g.level), buildings: g.buildings, points: guildPointsLeft(g.level, g.buildings),
       members: [...g.members.values()].map((m) => ({ ...m, level: this.w.online.get(m.id)?.level ?? m.level, online: !!this.w.online.get(m.id)?.conn })).sort((a, b) => a.rank - b.rank || Number(b.online) - Number(a.online) || a.name.localeCompare(b.name)),
       log: log.map((l) => ({ at: new Date(l.at).getTime(), text: l.text })),
+      goals: this.goalsOf(g).map((d, i) => ({ id: d.id, text: d.text, n: d.n, p: Math.min(d.n, g.goals.p[i]) })),
     };
   }
   /** Sends the guild to every online member (or the given player). */
@@ -132,7 +138,7 @@ export class Guilds {
           throw e;
         }
         p.invDirty = false;
-        const g: Guild = { id, name, tag, emblem, leader: p.id, level: 1, exp: 0, motd: '', bank: 0, buildings: emptyBuildings(), members: new Map([[p.id, { id: p.id, name: p.name, job: p.job, level: p.level, rank: 0 }]]), pendingExp: 0 };
+        const g: Guild = { id, name, tag, emblem, leader: p.id, level: 1, exp: 0, motd: '', bank: 0, buildings: emptyBuildings(), members: new Map([[p.id, { id: p.id, name: p.name, job: p.job, level: p.level, rank: 0 }]]), pendingExp: 0, goals: emptyGoals(weekOf(Date.now())) };
         this.byId.set(id, g);
         this.of.set(p.id, id);
         sendInv(this.w, p);
@@ -323,11 +329,45 @@ export class Guilds {
   bonus(p: Player, k: GuildBuilding) {
     return guildBonus(this.buildingsOf(p.id), k);
   }
+  /** This week's goals of a guild (a new week starts them over). */
+  goalsOf(g: Guild) {
+    const week = weekOf(Date.now());
+    if (g.goals.week !== week) { g.goals = emptyGoals(week); g.goalsDirty = true; }
+    return weeklyGoals(g.id, week);
+  }
+  /** G9: a member did something a weekly goal counts. Reaching a goal rewards the guild and everyone online in it. */
+  goal(p: Player, kind: GoalKind) {
+    const g = this.guildOf(p);
+    if (!g) return;
+    const defs = this.goalsOf(g);
+    defs.forEach((d, i) => {
+      if (d.kind !== kind || g.goals.p[i] >= d.n) return;
+      g.goals.p[i]++;
+      g.goalsDirty = true;
+      if (g.goals.p[i] < d.n) return;
+      this.tell(g, `Guild goal complete: ${d.text}! Every member online receives ${GOAL_REWARD.gold} gold and ${GOAL_REWARD.stones} upgrade stones.`);
+      void this.log(g, `Weekly goal complete: ${d.text}.`);
+      this.addExp(g, GOAL_REWARD.guildExp);
+      for (const id of g.members.keys()) {
+        const o = this.w.online.get(id);
+        if (o?.conn) award(this.w, o, GOAL_REWARD.gold, [{ base: 'upgrade_stone', rar: 0, ilvl: 1, aff: [], up: 0, qty: GOAL_REWARD.stones }], false, `Guild goal: ${d.text}`);
+      }
+      void this.saveGoals(g).then(() => this.sync(g));
+    });
+  }
+  private saveGoals(g: Guild) {
+    g.goalsDirty = false;
+    return this.repo.setGuildGoals(g.id, g.goals).catch((e) => console.error('guild goals save failed', e));
+  }
   /** Members' kills feed the guild: points by the kind of monster, written in batches. */
   onKill(p: Player, kind: keyof typeof GUILD_KILL_POINTS) {
     const g = this.guildOf(p);
-    if (!g || g.level >= GUILD_MAX_LEVEL) return;
-    g.exp += GUILD_KILL_POINTS[kind];
+    if (!g) return;
+    this.addExp(g, GUILD_KILL_POINTS[kind]);
+  }
+  private addExp(g: Guild, n: number) {
+    if (g.level >= GUILD_MAX_LEVEL) return;
+    g.exp += n;
     g.pendingExp++;
     let up = false;
     while (g.level < GUILD_MAX_LEVEL && g.exp >= guildExpToNext(g.level)) {
@@ -348,6 +388,7 @@ export class Guilds {
   /** Called with the autosave. */
   async save() {
     await Promise.all([...this.byId.values()].filter((g) => g.pendingExp).map((g) => this.flush(g)));
+    await Promise.all([...this.byId.values()].filter((g) => g.goalsDirty).map((g) => this.saveGoals(g)));
   }
   /** Guild chat: to every online member. */
   chat(p: Player, text: string) {

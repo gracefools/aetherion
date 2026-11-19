@@ -86,6 +86,16 @@ export class Parties {
     return '';
   }
 
+  /** A party formed by the dungeon finder: the first player leads. Players must not be in a party. */
+  form(players: Player[]) {
+    const party: Party = { id: this.nextId++, leader: players[0].id, members: players.map((p) => p.id), last: '', loot: 'personal', rr: 0 };
+    this.list.set(party.id, party);
+    for (const p of players) p.party = party;
+    this.tell(party, `${players.map((p) => p.name).join(', ')} formed a party.`);
+    this.sync(party);
+    return party;
+  }
+
   /** Leave voluntarily, be kicked, or drop out on logout. */
   remove(p: Player, why: 'left' | 'kicked' | 'offline') {
     const party = p.party;

@@ -62,6 +62,8 @@ import { talentsOf } from '../../../shared/src/talents';
 import { freePoints } from '../../../shared/src/abilities';
 import { buildChanged } from './Abilities';
 import { AFFIX_DIFFS } from '../../../shared/src/traits';
+import { Finder } from './Finder';
+import { LFG_CHAT_MS, WORLD_CHAT_MS } from '../../../shared/src/social';
 
 export interface Conn {
   send(data: string): void;
@@ -173,6 +175,9 @@ export class Player implements Ent {
   momTarget = 0;
   momStacks = 0;
   bulwarkAt = 0;
+  /** G9: when this player last spoke in world and LFG chat (ms). */
+  worldChatAt = 0;
+  lfgChatAt = 0;
   /** Talents: Second Wind and Avatar. */
   secondWindAt = 0;
   /** Unique passives (G6): Null Ward's and Wildgrowth's next ready ticks. */
@@ -392,6 +397,7 @@ export class World implements CombatCtx {
   goldRate: number;
   readonly parties = new Parties(this);
   readonly dungeons = new Dungeons(this);
+  readonly finder = new Finder(this);
   readonly journals = new Journals(this);
   readonly events = new WorldEvents(this);
   /** Trades are stored the moment they complete: both inventories and the audit row in one transaction. */
@@ -819,6 +825,12 @@ export class World implements CombatCtx {
     if (why) this.send(p, { t: 'no', a: 'eco', why });
     return why;
   }
+  /** G9: the dungeon finder. */
+  finderOp(p: Player, m: unknown) {
+    const why = this.finder.op(p, m);
+    if (why) this.send(p, { t: 'no', a: 'finder', why });
+    return why;
+  }
   pvpOp(p: Player, m: unknown) {
     const why = this.pvp.op(p, m);
     if (why) this.send(p, { t: 'no', a: 'pvp', why });
@@ -1113,6 +1125,16 @@ export class World implements CombatCtx {
       p.chatTokens--;
       return this.guilds.chat(p, clean);
     }
+    if (ch === 'world' || ch === 'lfg') {
+      // world and looking-for-group chat reach everyone online, so each has its own pace
+      const wait = (ch === 'world' ? WORLD_CHAT_MS : LFG_CHAT_MS) - (Date.now() - (ch === 'world' ? p.worldChatAt : p.lfgChatAt));
+      if (wait > 0) return this.send(p, { t: 'sys', text: `You can speak in that channel again in ${Math.ceil(wait / 1000)} seconds.` });
+      if (ch === 'world') p.worldChatAt = Date.now(); else p.lfgChatAt = Date.now();
+      p.chatTokens--;
+      const data = JSON.stringify({ t: 'chat', from: p.name, text: clean, ch } satisfies ServerMsg);
+      for (const o of this.online.values()) if (o.conn) this.sendRaw(o, data);
+      return;
+    }
     if (ch === 'party') {
       if (!p.party) return this.send(p, { t: 'sys', text: 'You are not in a party.' });
       p.chatTokens--;
@@ -1323,6 +1345,7 @@ export class World implements CombatCtx {
     // auto hunting sessions: the kill counts for everyone rewarded for it
     if (!m.def.boss) for (const p of looters) this.quests.onKill(p, m);
     for (const p of looters) this.afterKill(p);
+    for (const p of looters) this.guilds.goal(p, m.def.boss ? 'bosses' : 'kills');
     for (const p of looters) {
       this.journals.onKill(p, m);
       chargeUlt(this, p, ULT_PER_KILL);
@@ -1829,6 +1852,7 @@ export class World implements CombatCtx {
   private bountyRooms = new Set<ZoneRoom>();
   /** The Depths: players carrying a bounty are shown to everyone there; boss timers go to everyone. */
   private depthTick() {
+    if (this.tick % 20 === 11) this.finder.tick(Date.now());
     // story quests: "go to" objectives are checked about once a second
     if (this.tick % 20 === 7) for (const p of this.online.values()) if (!p.dead && Object.keys(p.quests.active).some((id) => id.startsWith('story_'))) this.quests.onMove(p);
     if (this.tick % 40 === 0)

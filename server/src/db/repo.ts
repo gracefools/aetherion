@@ -264,7 +264,7 @@ export class Repo {
 
   // ---------- guilds ----------
   async loadGuilds() {
-    const guilds = (await this.db.query<any>('SELECT id, name, tag, emblem, leader_id, level, exp, motd, bank_gold, buildings FROM guilds ORDER BY id')).rows;
+    const guilds = (await this.db.query<any>('SELECT id, name, tag, emblem, leader_id, level, exp, motd, bank_gold, buildings, goals FROM guilds ORDER BY id')).rows;
     const members = (await this.db.query<any>('SELECT m.guild_id, m.character_id, m.rank, c.name, c.job, c.level FROM guild_members m JOIN characters c ON c.id = m.character_id')).rows;
     return { guilds, members };
   }
@@ -300,6 +300,9 @@ export class Repo {
   }
   setGuildBuildings(guildId: number, buildings: unknown) {
     return this.db.query('UPDATE guilds SET buildings=$2::jsonb WHERE id=$1', [guildId, JSON.stringify(buildings)]);
+  }
+  setGuildGoals(guildId: number, goals: unknown) {
+    return this.db.query('UPDATE guilds SET goals=$2::jsonb WHERE id=$1', [guildId, JSON.stringify(goals)]);
   }
   setGuildProgress(guildId: number, level: number, exp: number) {
     return this.db.query('UPDATE guilds SET level=$2, exp=$3 WHERE id=$1', [guildId, level, exp]);

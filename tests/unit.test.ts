@@ -7,6 +7,7 @@ import { allDiscoveries, isNpc, NODE_RESPAWN_MS, objById, RECIPES, REGION_RES, t
 import { speakerName, STORY, STORY_REGIONS } from '../shared/src/story';
 import { affixEndsAt, traitIn, traitOf, TRAITS, weeklyAffix } from '../shared/src/traits';
 import { statusNames } from '../shared/src/combat';
+import { emptyGoals, FINDER_WAIT_MS, weeklyGoals, weekOf } from '../shared/src/social';
 import { talentsOf, TALENT_TIERS } from '../shared/src/talents';
 import { FACTIONS, LORE } from '../shared/src/lore';
 import { validateDir, validateSheet, type SheetEntry } from '../scripts/assets';
@@ -2304,6 +2305,41 @@ test('G7 weekly dungeon affix: rotates every week, applies on Hard and above, an
     return a.p.inv.filter((i) => ITEMS[i.base].kind === 'equip').length - before;
   };
   assert.ok(equips('hard') > equips('normal'), 'one more boss item on Hard');
+});
+
+test('G9 social: world chat reaches everyone at its own pace; the dungeon finder forms a group and opens the dungeon; guild goals', () => {
+  const { world, join } = harness({ capacity: 20 });
+  const a = join(0, 0, 'knight', 20), b = join(0, 0, 'mage', 20, -1, 'verdant');
+  world.chat(a.p, 'hello world', 'world');
+  assert.ok(b.out.some((m) => m.t === 'chat' && m.ch === 'world' && m.text === 'hello world'), 'world chat reaches another zone');
+  world.chat(a.p, 'again', 'world');
+  assert.ok(a.out.some((m) => m.t === 'sys' && /again in \d+ seconds/.test(m.text)), 'and has its own pace');
+  world.chat(a.p, 'lfg ruins', 'lfg');
+  assert.ok(b.out.some((m) => m.t === 'chat' && m.ch === 'lfg'));
+  // the finder
+  assert.equal(world.finderOp(a.p, { op: 'join', dungeon: 'ruins', diff: 'hard' }), '');
+  assert.equal(world.finderOp(b.p, { op: 'join', dungeon: 'ruins', diff: 'hard' }), '');
+  assert.ok(b.out.some((m) => m.t === 'finder' && m.counts['ruins:hard'] === 2));
+  world.finder.tick(Date.now());
+  assert.ok(!a.p.party, 'two players wait a little for more');
+  world.finder.tick(Date.now() + FINDER_WAIT_MS + 1);
+  assert.ok(a.p.party && a.p.party === b.p.party, 'a party is formed');
+  const run = world.dungeons.runs.get(a.p.room);
+  assert.ok(run && a.p.room === b.p.room && run.diff === 'hard', 'and the dungeon opens with everyone inside');
+  assert.equal(world.finderOp(join(0, 0, 'knight', 3).p, { op: 'join', dungeon: 'ruins', diff: 'normal' }), 'Requires level 10');
+  // guild goals
+  const g: any = { id: 7, name: 'G', tag: 'GG', emblem: { shape: 0, color: 0, bg: 7 }, leader: a.p.id, level: 1, exp: 0, motd: '', bank: 0, buildings: { barracks: 0, treasury: 0, weaponry: 0, kitchen: 0, fortress: 0 }, members: new Map([[a.p.id, { id: a.p.id, name: a.p.name, job: 'knight', level: 20, rank: 0 }]]), pendingExp: 0, goals: emptyGoals(weekOf(Date.now())) };
+  (world.guilds as any).byId.set(7, g);
+  (world.guilds as any).of.set(a.p.id, 7);
+  const defs = weeklyGoals(7, weekOf(Date.now())), i = defs.findIndex((d) => d.kind === 'quests' || d.kind === 'kills');
+  g.goals.p[i] = defs[i].n - 1;
+  const gold = a.p.gold, exp = g.exp + g.level * 1e6;
+  world.guilds.goal(a.p, defs[i].kind);
+  assert.equal(g.goals.p[i], defs[i].n);
+  assert.ok(a.p.gold > gold && a.p.inv.some((x) => x.base === 'upgrade_stone'), 'every member online is rewarded');
+  assert.ok(g.exp + g.level * 1e6 > exp, 'and the guild grows');
+  world.guilds.goal(a.p, defs[i].kind);
+  assert.equal(g.goals.p[i], defs[i].n, 'a goal completes once');
 });
 
 test('M7 dungeon run: waves, elite, boss with phases, completion rewards, closing, and immediate re-entry', () => {

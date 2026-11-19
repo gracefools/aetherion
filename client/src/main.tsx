@@ -62,6 +62,7 @@ import { toRail } from './rail';
 import { TraitBadge } from './traitsUi';
 import { TalentPicker } from './talentsUi';
 import { StatusBar } from './statusUi';
+import { FinderPanel } from './finderUi';
 
 interface Character {
   id: number;
@@ -322,8 +323,9 @@ function Play({ token, character, onExit }: { token: string; character: Characte
   const [friendsP, setFriendsP] = useState(false);
   const [ascp, setAscp] = useState(false);
   const [lifep, setLifep] = useState(false);
+  const [finderP, setFinderP] = useState(false);
   // Wide screens keep several windows open (see windows.tsx); on a phone opening one closes the others.
-  const wins: [boolean, (b: boolean) => void][] = [[sheet, setSheet], [book, setBook], [bag, setBag], [opts, setOpts], [qlog, setQlog], [guild, setGuild], [comps, setComps], [map, setMap], [tut, setTut], [journal, setJournal], [mail, setMail], [friendsP, setFriendsP], [ascp, setAscp], [lifep, setLifep]];
+  const wins: [boolean, (b: boolean) => void][] = [[sheet, setSheet], [book, setBook], [bag, setBag], [opts, setOpts], [qlog, setQlog], [guild, setGuild], [comps, setComps], [map, setMap], [tut, setTut], [journal, setJournal], [mail, setMail], [friendsP, setFriendsP], [ascp, setAscp], [lifep, setLifep], [finderP, setFinderP]];
   const wasOpen = useRef(wins.map((w) => w[0]));
   useEffect(() => {
     const opened = wins.findIndex((w, i) => w[0] && !wasOpen.current[i]);
@@ -381,6 +383,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
         setFriendsP(false);
         setAscp(false);
         setLifep(false);
+        setFinderP(false);
         g.closeTalk();
       }
     };
@@ -420,11 +423,12 @@ function Play({ token, character, onExit }: { token: string; character: Characte
       {game && mail && <Win id="mail" title={'mail.title'} onClose={() => setMail(false)}><Guard><MailPanel game={game} onClose={() => setMail(false)} /></Guard></Win>}
       {game && friendsP && <Win id="friends" title={'fr.title'} onClose={() => setFriendsP(false)}><Guard><FriendsPanel game={game} onClose={() => setFriendsP(false)} whisper={(name) => { const el = input.current; if (el) { el.value = `/w ${name} `; el.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(() => el.focus(), 0); } }} /></Guard></Win>}
       {game && ascp && <Win id="ascension" title={'asc.title'} width={780} onClose={() => setAscp(false)}><Guard><AscensionPanel game={game} onClose={() => setAscp(false)} /></Guard></Win>}
+      {game && finderP && <Win id="finder" title="finder.title" width={620} onClose={() => setFinderP(false)}><Guard><FinderPanel game={game} onClose={() => setFinderP(false)} /></Guard></Win>}
       {game && lifep && <Win id="life" title={'life.title'} onClose={() => setLifep(false)}><Guard><LifePanel game={game} onClose={() => setLifep(false)} /></Guard></Win>}
-      {game && <DockView game={game} open={{ character: sheet, skills: book, bag, companions: comps, quests: qlog, map, auto, guild, settings: opts, help: tut, journal, mail, friends: friendsP, ascension: ascp, life: lifep }} act={{
+      {game && <DockView game={game} open={{ character: sheet, skills: book, bag, companions: comps, quests: qlog, map, auto, guild, settings: opts, help: tut, journal, mail, friends: friendsP, ascension: ascp, life: lifep, finder: finderP }} act={{
         character: () => setSheet(!sheet), skills: () => setBook(!book), bag: () => { setBag(!bag); if (!bag) markTutorial('inventory'); }, companions: () => setComps(!comps),
         quests: () => setQlog(!qlog), map: () => setMap(!map), auto: () => setAuto(!auto), guild: () => setGuild(!guild),
-        settings: () => setOpts(!opts), help: () => setTut(!tut), exit: onExit, journal: () => setJournal(!journal), mail: () => setMail(!mail), friends: () => setFriendsP(!friendsP), ascension: () => setAscp(!ascp), life: () => setLifep(!lifep),
+        settings: () => setOpts(!opts), help: () => setTut(!tut), exit: onExit, journal: () => setJournal(!journal), mail: () => setMail(!mail), friends: () => setFriendsP(!friendsP), ascension: () => setAscp(!ascp), life: () => setLifep(!lifep), finder: () => setFinderP(!finderP),
       }} />}
     </div>
   );

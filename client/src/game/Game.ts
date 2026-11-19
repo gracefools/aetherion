@@ -58,6 +58,7 @@ import { Stage3D, stageSupported } from './stage3d';
 import { darkness } from '../../../shared/src/events';
 import { buildBuildings } from './buildings3d';
 import { traitOf } from '../../../shared/src/traits';
+import type { FinderState } from '../../../shared/src/social';
 
 export interface ChatLine {
   id: number;
@@ -177,6 +178,8 @@ export interface Hud {
   /** A dungeon ready check: who asked, which dungeon, who agreed and who has not yet. */
   dready: { id: string; diff: string; from: string; until: number; ok: string[]; wait: string[] } | null;
   pvprank: { rows: any[]; me: any } | null;
+  /** G9: the dungeon finder (null until the server has sent it). */
+  finder: FinderState | null;
   arena: boolean;
   pvpZone: 'safe' | 'duel' | 'open' | 'town' | 'arena';
   /** The warning before entering the Depths, waiting for an answer. */
@@ -308,7 +311,7 @@ export class Game {
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
     guild: null, grank: 3, ginv: null, bank: emptyBank(), ah: null, ahhist: [], banklog: [],
-    comp: emptyCompanions(), duel: null, dinv: null, dready: null, pvprank: null, arena: false, pvpZone: 'safe', depthAsk: null, depthBosses: [], bounty: [], gear: emptyGear(),
+    comp: emptyCompanions(), duel: null, dinv: null, dready: null, pvprank: null, finder: null, arena: false, pvpZone: 'safe', depthAsk: null, depthBosses: [], bounty: [], gear: emptyGear(),
   };
   private objs: WorldObj[] = [];
   /** Gathered nodes: object id -> local time it is ready again. */
@@ -790,6 +793,10 @@ export class Game {
     if (op === 'accept') this.tut('quest');
   }
   /** Guilds (M14); the server checks every permission. */
+  /** G9: the dungeon finder. */
+  finderOp(op: 'join' | 'leave' | 'state', a: { dungeon?: string; diff?: string } = {}) {
+    this.sendMsg({ t: 'finder', op, ...a });
+  }
   guildOp(op: string, a: Record<string, unknown> = {}) {
     if (op === 'accept' || op === 'decline') this.setHud({ ginv: null });
     this.sendMsg({ t: 'guild', op, ...a });
@@ -1155,6 +1162,7 @@ export class Game {
         this.pushChat({ text: `Duel with ${m.with}: it begins in ${Math.max(0, Math.round((m.starts - Date.now()) / 1000))} seconds. Stay close.` });
         return this.setHud({ duel: { with: m.with, id: m.id, starts: m.starts, ends: m.ends }, dinv: null });
       case 'pvprank': return this.setHud({ pvprank: { rows: m.rows, me: m.me } });
+      case 'finder': return this.setHud({ finder: { q: m.q, counts: m.counts } });
       case 'pinv':
         sound.notify();
         this.setHud({ invite: { from: m.from, id: m.id, until: performance.now() + m.ms } });

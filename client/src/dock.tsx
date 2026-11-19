@@ -29,6 +29,7 @@ export interface DockActions {
   friends: () => void;
   ascension: () => void;
   life: () => void;
+  finder: () => void;
 }
 interface Item {
   id: keyof DockActions;
@@ -46,7 +47,7 @@ interface Item {
  * pet bought early, a guild invitation accepted, a letter waiting).
  */
 export const MENU_LEVEL: Partial<Record<keyof DockActions, number>> = {
-  auto: 3, journal: 4, companions: 5, friends: 5, mail: 5, guild: GUILD_CREATE_LEVEL, life: 8, ascension: ASCENSION_LEVEL,
+  auto: 3, journal: 4, companions: 5, friends: 5, mail: 5, guild: GUILD_CREATE_LEVEL, life: 8, finder: 10, ascension: ASCENSION_LEVEL,
 };
 /** The level a menu opens at, or 0 when it is open for this character. */
 export function menuLock(id: keyof DockActions, hud: Hud): number {
@@ -136,6 +137,7 @@ export function Dock({ hud, act, open }: { hud: Hud; act: DockActions; open: Par
     ]],
     ['dock.social', [
       { id: 'guild', icon: 'guild', label: 'dock.guild', aria: 'guild.open', action: 'panel.guild', badge: hud.guild ? hud.guild.tag : undefined },
+      { id: 'finder', icon: 'finder', label: 'finder.short', aria: 'finder.open' },
       { id: 'friends', icon: 'friends', label: 'dock.friends', aria: 'fr.open', action: 'panel.friends', badge: hud.friends.some((f) => f.state === 'in') ? String(hud.friends.filter((f) => f.state === 'in').length) : undefined },
       { id: 'mail', icon: 'mail', label: 'dock.mail', aria: 'mail.open', action: 'panel.mail', badge: hud.mailUnread > 0 ? String(hud.mailUnread) : undefined },
     ]],

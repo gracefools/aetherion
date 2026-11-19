@@ -6,7 +6,7 @@ import { keyOf, type Game, type Hud } from './game/Game';
 import { t, tm, type Key } from './i18n';
 
 type Line = Hud['chat'][number];
-const TABS = ['all', 'zone', 'party', 'guild', 'whisper', 'sys'] as const;
+const TABS = ['all', 'zone', 'world', 'lfg', 'party', 'guild', 'whisper', 'sys'] as const;
 type Tab = (typeof TABS)[number];
 const inTab = (c: Line, tab: Tab) =>
   tab === 'all' ? true : tab === 'sys' ? !c.from : !!c.from && (tab === 'zone' ? !c.ch || c.ch === 'zone' : c.ch === tab);
@@ -30,11 +30,11 @@ export function ChatBox({ hud, game, input }: { hud: Hud; game: Game; input: { c
     setTab(k);
     if (k === 'party' && hud.party) setCh('party');
     else if (k === 'guild' && hud.guild) setCh('guild');
-    else if (k === 'zone') setCh('zone');
+    else if (k === 'zone' || k === 'world' || k === 'lfg') setCh(k);
   };
   const send = (e: any) => {
     e.preventDefault();
-    if (text.trim()) game.sendChat(text, ch === 'party' && hud.party ? 'party' : ch === 'guild' && hud.guild ? 'guild' : 'zone');
+    if (text.trim()) game.sendChat(text, ch === 'party' && hud.party ? 'party' : ch === 'guild' && hud.guild ? 'guild' : ch === 'world' || ch === 'lfg' ? ch : 'zone');
     setText('');
     input.current?.blur();
   };
@@ -57,6 +57,8 @@ export function ChatBox({ hud, game, input }: { hud: Hud; game: Game; input: { c
           <div key={c.id} className={c.from ? c.ch ?? '' : 'sys'}>
             {c.ch === 'party' && <i>[{t('chat.party')}] </i>}
             {c.ch === 'guild' && <i>[{t('chat.guild')}] </i>}
+            {c.ch === 'world' && <i>[{t('chat.tab.world')}] </i>}
+            {c.ch === 'lfg' && <i>[{t('chat.tab.lfg')}] </i>}
             {c.ch === 'whisper' && <i>{c.from === me?.name ? `[${t('chat.to', { name: c.to ?? '' })}] ` : `[${t('chat.whisper')}] `}</i>}
             {c.from && !(c.ch === 'whisper' && c.from === me?.name) && <b>{c.from}: </b>}{c.from ? c.text : tm(c.text)}
           </div>
@@ -64,7 +66,7 @@ export function ChatBox({ hud, game, input }: { hud: Hud; game: Game; input: { c
         {!shown.length && <div className="sys empty">{t('chat.emptyTab')}</div>}
       </div>
       <form onSubmit={send}>
-        <select aria-label={t('chat.channel')} value={ch} onChange={(e: any) => setCh(e.target.value)}><option value="zone">{t('chat.zone')}</option><option value="party" disabled={!hud.party}>{t('chat.party')}</option><option value="guild" disabled={!hud.guild}>{t('chat.guild')}</option></select>
+        <select aria-label={t('chat.channel')} value={ch} onChange={(e: any) => setCh(e.target.value)}><option value="zone">{t('chat.zone')}</option><option value="world">{t('chat.tab.world')}</option><option value="lfg">{t('chat.tab.lfg')}</option><option value="party" disabled={!hud.party}>{t('chat.party')}</option><option value="guild" disabled={!hud.guild}>{t('chat.guild')}</option></select>
         <input ref={input} name="chat" value={text} onChange={(e: any) => setText(e.target.value)} maxLength={MAX_CHAT_LEN} placeholder={t('chat.placeholder', { key: keyOf('chat') })} autoComplete="off" />
       </form>
     </div>

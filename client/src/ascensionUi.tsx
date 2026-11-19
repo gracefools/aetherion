@@ -10,6 +10,7 @@ import { JOB_DEFS } from '../../shared/src/jobs';
 import { AWAKEN_LEVEL, AWAKEN_POINTS, awakenKind } from '../../shared/src/awakening';
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
+import { skillIcon } from './game/skillicons';
 
 const STAT_KEY: Record<string, string> = { atk: 'stat.atk', matk: 'stat.matk', maxHp: 'stat.hp', def: 'stat.def', mdef: 'stat.mdef', crit: 'stat.crit', critDmg: 'stat.critDmg', healPower: 'stat.heal', maxRes: 'stat.mana', moveMul: 'stat.speed', atkIntervalMs: 'stat.atkTime', range: 'stat.range', dodge: 'stat.dodge', lifesteal: 'stat.lifesteal', runeCost: 'stat.runeCost' };
 /** A path's bonus per milestone, in words. */
@@ -26,97 +27,125 @@ export function pathBonusText(d: PathDef, n = 1): string {
   return parts.join(', ');
 }
 
+/** The panel's sections, as tabs. */
+type AscTab = 'path' | 'awaken' | 'mastery' | 'loadouts';
+const PATH_HUE = ['#c9a24a', '#7fb8ff', '#d07aff', '#7fe0a0', '#ff8a6a', '#7fe8ff'];
+
 export function AscensionPanel({ game, onClose }: { game: Game; onClose: () => void }) {
   useT();
   const hud = useSyncExternalStore(game.subscribe, game.getHud) as Hud;
   const [name, setName] = useState('');
+  const [tab, setTab] = useState('path' as AscTab);
   const me = hud.self, a = hud.asc;
   if (!me) return null;
   const n = milestonesAt(me.level), path = PATH_INDEX[a.path], combo = comboOf(me.job);
-  const earned = masteryEarned(me.level, a.extra), spent = masterySpent(a), cap = masteryCap(me.level);
+  const earned = masteryEarned(me.level, a.extra), spent = masterySpent(a), cap = masteryCap(me.level), free = earned - spent;
+  const paths = pathsOf(me.job), hue = path ? PATH_HUE[paths.findIndex((d) => d.id === path.id) % PATH_HUE.length] : '#8a8fa8';
+  const tabs: [AscTab, string, string][] = [
+    ['path', t('asc.paths'), ''], ['awaken', t('aw.title'), String(a.awake.length || '')],
+    ['mastery', t('asc.mastery'), free > 0 ? String(free) : ''], ['loadouts', t('asc.loadouts'), ''],
+  ];
   return (
     <div className="hud ascension panel" role="dialog" aria-label={t('asc.title')}>
       <div className="sheethead">
         <h2>{t('asc.title')}</h2>
         <button className="link panelx" onClick={onClose} aria-label={t('asc.close')}>{t('common.close')}</button>
       </div>
-      {me.level < ASCENSION_LEVEL && <p className="sub">{t('asc.locked', { n: ASCENSION_LEVEL })}</p>}
-      <section aria-label={t('asc.paths')}>
-        <h3>{t('asc.paths')} <small className="sub">{t('asc.milestones', { list: MILESTONES.join(' · '), n })}</small></h3>
-        <div className="paths">
-          {pathsOf(me.job).map((d) => {
-            const u = ABILITIES[d.ult], on = a.path === d.id;
-            return (
-              <div key={d.id} className={'pathcard' + (on ? ' on' : '')}>
-                <b>{d.title}</b>
-                <p className="sub">{d.desc}</p>
-                <p>{t('asc.bonusPer')}: {pathBonusText(d)}</p>
-                {on && n > 0 && <p className="better">{t('asc.bonusNow', { n })}: {pathBonusText(d, n)}</p>}
-                <p><b>{t('asc.ultimate')}: {u.name}</b> <small className="sub">{u.desc}</small></p>
-                <button className={on ? '' : 'primary'} disabled={on || me.level < ASCENSION_LEVEL} onClick={() => game.ascOp('path', { id: d.id })}>
-                  {on ? t('asc.chosen') : a.path ? t('asc.change') : t('asc.choose')}
-                </button>
-              </div>
-            );
-          })}
+      {/* who you are becoming: the path, and the milestones on the way */}
+      <div className="aschero" style={{ ['--hue' as any]: hue }}>
+        <div className="aschero-title">
+          <small className="sub">{path ? t('asc.chosen') : me.level < ASCENSION_LEVEL ? t('asc.locked', { n: ASCENSION_LEVEL }) : t('asc.pickOne')}</small>
+          <b>{path ? path.title : JOB_DEFS[me.job].name}</b>
+          {path && n > 0 && <span className="better">{pathBonusText(path, n)}</span>}
         </div>
-        {path && <p className="sub">{t('asc.ultHelp', { max: ULT_MAX, key: 'ultimate', pct: Math.round((ultScale(me.level) - 1) * 100) })}</p>}
-      </section>
-      {combo && (
-        <section aria-label={t('asc.combo')}>
-          <h3>{t('asc.combo')}: {combo.name}</h3>
-          <p className="sub">{t('asc.comboHelp', { steps: combo.steps.map((s) => JOB_DEFS[me.job].skills.find((x) => x.id === s)?.name ?? s).join(' → '), n: ASCENSION_LEVEL })}</p>
+        <ol className="milestones" aria-label={t('asc.milestones', { list: MILESTONES.join(' · '), n })}>
+          {MILESTONES.map((m) => <li key={m} className={me.level >= m ? 'on' : ''}><i /><small>{t('common.lv', { n: m })}</small></li>)}
+        </ol>
+      </div>
+      <div className="tabs" role="tablist" aria-label={t('asc.title')}>
+        {tabs.map(([k, l, badge]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}{badge && <span className="tabbadge">{badge}</span>}</button>)}
+      </div>
+      {tab === 'path' && (
+        <section aria-label={t('asc.paths')}>
+          <div className="paths">
+            {paths.map((d, i) => {
+              const u = ABILITIES[d.ult], on = a.path === d.id;
+              return (
+                <div key={d.id} className={'pathcard' + (on ? ' on' : '')} style={{ ['--hue' as any]: PATH_HUE[i % PATH_HUE.length] }}>
+                  <div className="pathtop">
+                    <img className="pathult" src={skillIcon(u.id)} alt="" />
+                    <div><b>{d.title}</b><p className="sub">{d.desc}</p></div>
+                  </div>
+                  <div className="chips"><span className="chip">{t('asc.bonusPer')}: {pathBonusText(d)}</span>{on && n > 0 && <span className="chip better">{t('asc.bonusNow', { n })}: {pathBonusText(d, n)}</span>}</div>
+                  <p className="ultline"><b>{t('asc.ultimate')}: {u.name}</b> <small className="sub">{u.desc}</small></p>
+                  <button className={on ? '' : 'primary'} disabled={on || me.level < ASCENSION_LEVEL} onClick={() => game.ascOp('path', { id: d.id })}>
+                    {on ? t('asc.chosen') : a.path ? t('asc.change') : t('asc.choose')}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {path && <p className="sub">{t('asc.ultHelp', { max: ULT_MAX, key: 'ultimate', pct: Math.round((ultScale(me.level) - 1) * 100) })}</p>}
+          {combo && <div className="combobox"><b>{t('asc.combo')}: {combo.name}</b><div className="combosteps">{combo.steps.map((s, i) => <React.Fragment key={s}>{i > 0 && <span className="arrow">→</span>}<span className="step"><img src={skillIcon(s)} alt="" />{JOB_DEFS[me.job].skills.find((x) => x.id === s)?.name ?? s}</span></React.Fragment>)}</div><p className="sub">{t('asc.comboHelp', { steps: combo.steps.map((s) => JOB_DEFS[me.job].skills.find((x) => x.id === s)?.name ?? s).join(' → '), n: ASCENSION_LEVEL })}</p></div>}
         </section>
       )}
-      <section aria-label={t('aw.title')}>
-        <h3>{t('aw.title')} <small className="sub">{t('aw.help', { n: AWAKEN_LEVEL, e: AWAKEN_POINTS, have: hud.points })}</small></h3>
-        <div className="mastery">
-          {JOB_DEFS[me.job].skills.filter((s) => s.type === 'active').map((s) => {
-            const on = a.awake.includes(s.id), full = (hud.build?.skills[s.id] ?? 0) >= s.maxRank;
-            return (
-              <div key={s.id} className="mrow" title={t(`aw.kind.${awakenKind(ABILITIES[s.id])}` as any)}>
-                <span>{on ? '✦ ' : ''}{s.name}</span>
-                <small className="sub">{on ? t('aw.done') : t(`aw.kind.${awakenKind(ABILITIES[s.id])}` as any)}</small>
-                <button className="small" disabled={on || !full || me.level < AWAKEN_LEVEL || hud.points < AWAKEN_POINTS} onClick={() => game.ascOp('awaken', { id: s.id })}>{on ? '✦' : t('aw.awaken')}</button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      <section aria-label={t('asc.mastery')}>
-        <h3>{t('asc.mastery')} <small className="sub">{t('asc.points', { n: earned - spent, of: earned, cap })}</small></h3>
-        <div className="mastery">
-          {MASTERY_STATS.map((k) => {
-            const v = a.mastery[k] ?? 0;
-            return (
-              <div key={k} className="mrow">
-                <span>{t(STAT_KEY[k] as any)}</span>
-                <small className="sub">{v} / {cap} · +{Math.round(v * MASTERY_VALUE[k] * 10) / 10}{k === 'crit' ? '' : '%'}</small>
-                <button className="small" disabled={earned - spent < 1 || v >= cap} onClick={() => game.ascOp('mastery', { stat: k })} aria-label={t('asc.add', { stat: t(STAT_KEY[k] as any) })}>+</button>
-              </div>
-            );
-          })}
-        </div>
-        <button className="small" disabled={!spent} onClick={() => game.ascOp('mreset')}>{t('asc.reset', { n: 5000 * Math.max(1, spent) })}</button>
-      </section>
-      <section aria-label={t('asc.loadouts')}>
-        <h3>{t('asc.loadouts')}</h3>
-        <p className="sub">{t('asc.loadoutHelp')}</p>
-        <input placeholder={t('asc.loadoutName')} value={name} maxLength={20} onChange={(e: any) => setName(e.target.value)} />
-        {Array.from({ length: LOADOUTS }, (_, i) => {
-          const l = a.loadouts[i];
-          return (
-            <div key={i} className="mrow">
-              <span>{l ? l.name : t('asc.empty', { n: i + 1 })}</span>
-              <small className="sub">{l ? t('asc.skillsN', { n: Object.keys(l.skills).length }) : ''}</small>
-              <span>
-                <button className="small" onClick={() => game.ascOp('save', { slot: i, name })}>{t('asc.save')}</button>
-                <button className="small" disabled={!l} onClick={() => game.ascOp('load', { slot: i })}>{t('asc.load')}</button>
-              </span>
-            </div>
-          );
-        })}
-      </section>
+      {tab === 'awaken' && (
+        <section aria-label={t('aw.title')}>
+          <p className="sub">{t('aw.help', { n: AWAKEN_LEVEL, e: AWAKEN_POINTS, have: hud.points })}</p>
+          <div className="awakengrid">
+            {JOB_DEFS[me.job].skills.filter((s) => s.type === 'active').map((s) => {
+              const on = a.awake.includes(s.id), full = (hud.build?.skills[s.id] ?? 0) >= s.maxRank;
+              return (
+                <div key={s.id} className={'awakecard' + (on ? ' on' : '')} title={t(`aw.kind.${awakenKind(ABILITIES[s.id])}` as any)}>
+                  <img src={skillIcon(s.id)} alt="" />
+                  <div><b>{s.name}</b><small className="sub">{on ? t('aw.done') : t(`aw.kind.${awakenKind(ABILITIES[s.id])}` as any)}</small></div>
+                  <button className="small" disabled={on || !full || me.level < AWAKEN_LEVEL || hud.points < AWAKEN_POINTS} onClick={() => game.ascOp('awaken', { id: s.id })}>{on ? '✦' : t('aw.awaken')}</button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {tab === 'mastery' && (
+        <section aria-label={t('asc.mastery')}>
+          <p className="sub">{t('asc.points', { n: free, of: earned, cap })}</p>
+          <div className="mastery">
+            {MASTERY_STATS.map((k) => {
+              const v = a.mastery[k] ?? 0;
+              return (
+                <div key={k} className="mrow mbar">
+                  <span>{t(STAT_KEY[k] as any)}</span>
+                  <small className="sub">+{Math.round(v * MASTERY_VALUE[k] * 10) / 10}{k === 'crit' ? '' : '%'}</small>
+                  <button className="small" disabled={free < 1 || v >= cap} onClick={() => game.ascOp('mastery', { stat: k })} aria-label={t('asc.add', { stat: t(STAT_KEY[k] as any) })}>+</button>
+                  <div className="meterbar" role="meter" aria-valuenow={v} aria-valuemin={0} aria-valuemax={cap} aria-label={`${v} / ${cap}`}><i style={{ width: `${cap ? (v / cap) * 100 : 0}%` }} /><small>{v} / {cap}</small></div>
+                </div>
+              );
+            })}
+          </div>
+          <button className="small" disabled={!spent} onClick={() => game.ascOp('mreset')}>{t('asc.reset', { n: 5000 * Math.max(1, spent) })}</button>
+        </section>
+      )}
+      {tab === 'loadouts' && (
+        <section aria-label={t('asc.loadouts')}>
+          <p className="sub">{t('asc.loadoutHelp')}</p>
+          <input placeholder={t('asc.loadoutName')} value={name} maxLength={20} onChange={(e: any) => setName(e.target.value)} />
+          <div className="loadouts">
+            {Array.from({ length: LOADOUTS }, (_, i) => {
+              const l = a.loadouts[i];
+              return (
+                <div key={i} className={'loadcard' + (l ? ' used' : '')}>
+                  <b>{l ? l.name : t('asc.empty', { n: i + 1 })}</b>
+                  <small className="sub">{l ? t('asc.skillsN', { n: Object.keys(l.skills).length }) : ''}</small>
+                  <span className="actions">
+                    <button className="small" onClick={() => game.ascOp('save', { slot: i, name })}>{t('asc.save')}</button>
+                    <button className="small primary" disabled={!l} onClick={() => game.ascOp('load', { slot: i })}>{t('asc.load')}</button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

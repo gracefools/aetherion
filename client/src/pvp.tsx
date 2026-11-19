@@ -233,6 +233,8 @@ function Portrait({ sheet, w, h, scale = 3 }: { sheet: HTMLCanvasElement | null;
   return <canvas ref={ref} width={w * scale} height={h * scale} className="portrait" aria-hidden="true" />;
 }
 
+/** The fastest mount's bonus, the full length of the speed bars. */
+const MAX_MOUNT_BONUS = Math.max(...Object.values(MOUNTS).map((m) => m.speed - 1));
 export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () => void }) {
   useT();
   const c = hud.comp, [renaming, setRenaming] = useState(''), [name, setName] = useState(''), [releasing, setReleasing] = useState('');
@@ -245,18 +247,27 @@ export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; 
         {c.pets.map((p) => {
           const d = PETS[p.kind], out = c.pet === p.uid;
           return (
-            <div key={p.uid} className={'comp' + (out ? ' on' : '')}>
-              {settings.get().graphics.art === 'hd' ? <Portrait sheet={hdPetSprite(p.kind)} w={HD_PET} h={HD_PET} scale={2} /> : <Portrait sheet={petSprite(p.kind)} w={PET_W} h={PET_W} />}
-              <div>
+            <div key={p.uid} className={'comp petcard' + (out ? ' on' : '')}>
+              {out && <span className="ribbon">{t('comp.out')}</span>}
+              <div className="pedestal">{settings.get().graphics.art === 'hd' ? <Portrait sheet={hdPetSprite(p.kind)} w={HD_PET} h={HD_PET} scale={2} /> : <Portrait sheet={petSprite(p.kind)} w={PET_W} h={PET_W} />}</div>
+              <div className="compbody">
                 {renaming === p.uid
                   ? <form onSubmit={(e: any) => { e.preventDefault(); game.compOp('rename', { uid: p.uid, name: name.trim() }); setRenaming(''); }}>
                     <input value={name} onChange={(e: any) => setName(e.target.value)} maxLength={14} aria-label={t('comp.petName')} style={{ width: 110 }} />
                     <button className="small primary" type="submit">{t('common.save')}</button>
                   </form>
                   : <b>{p.name}</b>}
-                <div className="sub">{PET_STAGE_NAMES[petStage(p.level)] ? `${PET_STAGE_NAMES[petStage(p.level)]} ` : ''}{d.name} · {t('common.lv', { n: p.level })}{p.level < PET_MAX_LEVEL ? ` · ${t('comp.exp', { a: p.exp, b: petExpToNext(p.level) })}` : ` · ${t('common.max')}`}</div>
-                <div className="sub">{t('comp.bonus', { v: `${petBonus(d, p.level)}${d.pct ? '%' : ''}`, stat: t(`comp.stat.${d.stat}` as Key) })}</div>
-                {PET_SKILLS[p.kind] && <div className="sub petskill"><b>{t(`pet.skill.${p.kind}` as Key)}</b> ({Math.round(PET_SKILLS[p.kind].cdMs / 1000)}s): {t(`pet.desc.${p.kind}` as Key, { n: Math.round(PET_SKILLS[p.kind].mul * petSkillPower(p.level) * 100) })}</div>}
+                <div className="chips">
+                  {PET_STAGE_NAMES[petStage(p.level)] && <span className="chip stage">{PET_STAGE_NAMES[petStage(p.level)]}</span>}
+                  <span className="chip">{d.name}</span>
+                  <span className="chip">{t('common.lv', { n: p.level })}</span>
+                </div>
+                <div className="meterbar exp" role="meter" aria-valuenow={p.level < PET_MAX_LEVEL ? p.exp : 1} aria-valuemin={0} aria-valuemax={p.level < PET_MAX_LEVEL ? petExpToNext(p.level) : 1} aria-label={t('comp.expBar')}>
+                  <i style={{ width: `${p.level < PET_MAX_LEVEL ? Math.min(100, (p.exp / petExpToNext(p.level)) * 100) : 100}%` }} />
+                  <small>{p.level < PET_MAX_LEVEL ? t('comp.exp', { a: p.exp, b: petExpToNext(p.level) }) : t('common.max')}</small>
+                </div>
+                <div className="sub bonusline">{t('comp.bonus', { v: `${petBonus(d, p.level)}${d.pct ? '%' : ''}`, stat: t(`comp.stat.${d.stat}` as Key) })}</div>
+                {PET_SKILLS[p.kind] && <div className="petskill"><b>✦ {t(`pet.skill.${p.kind}` as Key)}</b> <small className="sub">{Math.round(PET_SKILLS[p.kind].cdMs / 1000)}s</small><div className="sub">{t(`pet.desc.${p.kind}` as Key, { n: Math.round(PET_SKILLS[p.kind].mul * petSkillPower(p.level) * 100) })}</div></div>}
                 <div className="actions">
                   {out ? <button className="small" onClick={() => game.compOp('dismiss')}>{t('comp.dismiss')}</button> : <button className="small primary" onClick={() => game.compOp('summon', { uid: p.uid })}>{t('comp.summon')}</button>}
                   <button className="small" onClick={() => { setRenaming(p.uid); setName(p.name); }}>{t('comp.rename')}</button>
@@ -275,11 +286,13 @@ export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; 
         {c.mounts.map((id) => {
           const d = MOUNTS[id], on = c.riding === id, low = (hud.self?.level ?? 0) < d.level;
           return (
-            <div key={id} className={'comp' + (on ? ' on' : '')}>
-              {settings.get().graphics.art === 'hd' ? <Portrait sheet={hdMountSprite(id)} w={HD_MOUNT_W} h={HD_MOUNT_H} scale={1} /> : <Portrait sheet={mountSprite(id)} w={MOUNT_W} h={MOUNT_H} scale={2} />}
-              <div>
+            <div key={id} className={'comp mountcard' + (on ? ' on' : '') + (low ? ' low' : '')}>
+              {on && <span className="ribbon">{t('comp.riding')}</span>}
+              <div className="pedestal wide">{settings.get().graphics.art === 'hd' ? <Portrait sheet={hdMountSprite(id)} w={HD_MOUNT_W} h={HD_MOUNT_H} scale={1} /> : <Portrait sheet={mountSprite(id)} w={MOUNT_W} h={MOUNT_H} scale={2} />}</div>
+              <div className="compbody">
                 <b>{d.name}</b>
-                <div className="sub">{t('comp.speed', { n: Math.round((d.speed - 1) * 100), lv: d.level })}</div>
+                <div className="chips"><span className={'chip' + (low ? ' warn' : '')}>{t('common.lv', { n: d.level })}</span>{d.fly && <span className="chip">{t('comp.flies')}</span>}</div>
+                <div className="meterbar speed" role="meter" aria-valuenow={Math.round((d.speed - 1) * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={t('comp.speedBar')}><i style={{ width: `${Math.min(100, ((d.speed - 1) / MAX_MOUNT_BONUS) * 100)}%` }} /><small>{t('comp.speed', { n: Math.round((d.speed - 1) * 100), lv: d.level })}</small></div>
                 <div className="actions">
                   {on ? <button className="small" onClick={() => game.compOp('dismount')}>{t('comp.dismount')}</button>
                     : <button className="small primary" disabled={low} title={low ? t('err.needLevel', { n: d.level }) : undefined} onClick={() => game.compOp('mount', { id })}>{t('comp.ride')} <kbd>{keyOf('mount.toggle')}</kbd></button>}

@@ -66,6 +66,69 @@ Object.assign(RECIPE, {
   scroll_random: ['scroll', 's_random'], scroll_advanced: ['scroll', 's_advanced'], scroll_rare: ['scroll', 's_rare'],
 });
 const SLOT_GLYPH: Record<string, string> = { weapon: 'sword', armor: 'armor', helmet: 'helmet', amulet: 'amulet', ring: 'ring' };
+
+// ---- more glyphs: headwear, gems, gathering, furniture, companions (rows are padded to 16 when drawn)
+Object.assign(GLYPHS, {
+  crown: ['', '', '..o....o....o', '..o+..o+o..+o', '..#+..#+#..+#', '..##+.###.+##', '..###+###+###-', '..###########-', '..#o##o##o###-', '..###########-', '..+##########-', '...----------', '', '', '', ''],
+  circlet: ['', '', '', '', '.......oo', '......o++o', '..+###o++o###-', '.+#----oo----#-', '.#-..........-#', '.#-..........-#', '.-#..........#-', '..-##########-', '...----------', '', '', ''],
+  hood: ['', '......+##', '.....+####-', '....+######-', '...+###--###-', '...+##-..-##-', '..+##-....-##-', '..+#-......-#-', '..+#-......-#-', '.+##-......-##-', '.+###-....-###-', '.+####oooo####-', '..-##########-', '', '', ''],
+  gem: ['', '', '.....++++++', '....+######-', '...+##++####-', '..+##+######-', '..-##########-', '...-########-', '....-######-', '.....-####-', '......-##-', '.......--', '', '', '', ''],
+  ore: ['', '', '......+##-', '....+####o#-', '...+##o###o##-', '..+###oo######-', '..+#####o#####-', '.+##o#######o#-', '.+###o####oo##-', '..-###########-', '...---#####---', '......-----', '', '', '', ''],
+  herb: ['', '..........+##', '.........+###-', '........+####-', '.......+###o#-', '......+###o##-', '.....+###o##-', '....+###o##-', '....+##o##-', '....+#o##-', '.....oo--', '....oo', '...oo', '..oo', '', ''],
+  fish: ['', '', '', '.....++###', '...+######-..o', '..+##o#####-oo', '.+##########oo', '.+#########-.o', '..-#######-..o', '...-#####-', '.....---', '', '', '', '', ''],
+  seed: ['', '', '.......oo', '......o..o', '.......oo', '......+##-', '.....+####-', '....+######-', '....+##++##-', '....+#+##+#-', '....+######-', '.....-####-', '......----', '', '', ''],
+  whistle: ['', '', '', '...........oo', '..........o..o', '..+#######o..o', '.+###########-', '.+#o#########-', '.+###########-', '..-##########-', '...-------', '', '', '', '', ''],
+  horseshoe: ['', '....+##..##-', '...+##-..-##-', '..+##-....-##-', '..+#o-....-o#-', '..+##-....-##-', '..+#o-....-o#-', '..+##-....-##-', '...+##-..-##-', '....+##oo##-', '.....-####-', '', '', '', '', ''],
+  bed: ['', '', '', '..+#', '..+#', '..+#oooo', '..+#oooo+#####', '..+############-', '..+############-', '..+------------', '..+#.........+#', '..-#.........-#', '', '', '', ''],
+  chair: ['', '....+##-', '....+##-', '....+o#-', '....+##-', '....+o#-', '....+######-', '....+######-', '....-------#', '....+#....+#', '....+#....+#', '....-#....-#', '', '', '', ''],
+  lamp: ['', '.......oo', '......oooo', '.....oo++oo', '......oooo', '.......+#', '.......+#', '.......+#', '.......+#', '.....+####-', '....+######-', '....--------', '', '', '', ''],
+  banner: ['', '..+##########-', '...+o######-', '...+########', '...+##oo####', '...+#oooo###', '...+##oo####', '...+########', '...+########', '...+##-..+##', '...+#-....+#', '...+-......+', '', '', '', ''],
+  plant: ['', '.....o...o', '...o.oo.oo.o', '....ooooooo', '...oo.ooo.oo', '......ooo', '....+######-', '....+######-', '.....+####-', '.....+####-', '......----', '', '', '', '', ''],
+  trophy: ['', '...+########-', '.+#+########-#-', '.+#.+######-.#-', '..+#.+####-.#-', '....+#####-', '......+##-', '.......#', '.......#', '.....+####-', '....+######-', '....--------', '', '', '', ''],
+  chest: ['', '', '...+########-', '..+##########-', '..+o########o-', '..+----oo----', '..+####oo####-', '..+o########o-', '..+##########-', '..-##########-', '...----------', '', '', '', '', ''],
+  medal: ['', '...oo.....oo', '....oo...oo', '.....oo.oo', '......ooo', '.....+###-', '....+#++##-', '....+#+###-', '....+#####-', '.....-###-', '......---', '', '', '', '', ''],
+  eye: ['', '', '', '......+####', '....+##oooo#-', '...+#oo++ooo#-', '..+#oo+--+oo##-', '...-#oo--ooo#-', '....-##oooo#-', '......-####', '', '', '', '', '', ''],
+  star: ['', '.......+', '.......#-', '......+##-', '.+#####o####-', '..-#######-', '...+#####-', '...+##-##-', '..+#-...-#-', '..-.......-', '', '', '', '', '', ''],
+  heart: ['', '', '..+##-..+##-', '.+####-+####-', '.+#####o####-', '.+##########-', '..-########-', '...-######-', '....-####-', '.....-##-', '......--', '', '', '', '', ''],
+});
+Object.assign(PAL, {
+  emerald: ['#3aa86a', '#9af0b8', '#1e5a3a', '#e8c56a'], ruby: ['#c8304a', '#ff8aa0', '#6a1424', '#ffd36a'], sapphire: ['#3a62d0', '#9ab8ff', '#1a2a6a', '#e8e8ff'],
+  amethyst: ['#9a5ad8', '#d8b0ff', '#4a2478', '#ffd36a'], topaz: ['#e09a2a', '#ffd88a', '#8a5410', '#fff2c0'], obsidian: ['#3a3448', '#8a80a8', '#16121e', '#ff5a6a'],
+  rose: ['#e07aa8', '#ffc8e0', '#8a3a5c', '#ffffff'], teal: ['#2ab0b0', '#9af0f0', '#145a5a', '#ffe08a'], bronze: ['#b8783a', '#f0b878', '#6a3e18', '#7fe8ff'],
+  silver: ['#c8d0dc', '#ffffff', '#7a8494', '#7fe8ff'], nature: ['#6a9a3a', '#b8e07a', '#3a5a1e', '#e8c56a'], night: ['#2a3a6a', '#7a9ae0', '#121a36', '#fff2a8'],
+});
+/** Palettes handed out to item sets, so every set has colours of its own. */
+const SET_PALS = ['emerald', 'ruby', 'sapphire', 'amethyst', 'topaz', 'obsidian', 'rose', 'teal', 'bronze', 'silver', 'nature', 'night', 'ember', 'frost', 'holy', 'dark', 'crystal', 'venom'];
+const hashOf = (s: string) => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+Object.assign(RECIPE, {
+  // gathering and the garden
+  iron_ore: ['ore', 'steel'], mithril_ore: ['ore', 'silver'], ore_spore: ['seed', 'venom'], sunpetal: ['herb', 'topaz'], moonleaf: ['herb', 'frost'],
+  moonleaf_seed: ['seed', 'frost'], sunpetal_seed: ['seed', 'topaz'], river_fish: ['fish', 'blue'], moon_carp: ['fish', 'frost'], star_koi: ['fish', 'gold'], star_shard: ['star', 'holy'],
+  // furniture
+  furn_bed: ['bed', 'ruby'], furn_table: ['chair', 'wood'], furn_chair: ['chair', 'leather'], furn_lamp: ['lamp', 'holy'], furn_banner: ['banner', 'red'],
+  furn_plant: ['plant', 'nature'], furn_trophy: ['trophy', 'gold'], furn_chest: ['chest', 'wood'],
+  // companions: a whistle in the pet's colours, reins (a horseshoe) in the mount's
+  pet_ember_kit: ['whistle', 'ember'], pet_moss_sprout: ['whistle', 'nature'], pet_frost_owlet: ['whistle', 'frost'], pet_bog_toad: ['whistle', 'venom'],
+  pet_star_mote: ['whistle', 'holy'], pet_iron_pup: ['whistle', 'steel'],
+  mount_plains_strider: ['horseshoe', 'bronze'], mount_ashen_charger: ['horseshoe', 'ember'], mount_frost_elk: ['horseshoe', 'frost'], mount_void_skiff: ['horseshoe', 'dark'],
+  mount_sky_griffin: ['horseshoe', 'gold'], mount_star_drake: ['horseshoe', 'crystal'],
+  // the plain headwear and the boss uniques that read better as their own shape
+  cloth_hood: ['hood', 'cloth'], leather_cap: ['hood', 'leather'], rb_circlet: ['circlet', 'crystal'], fb_crown: ['crown', 'frost'], ab_hood: ['hood', 'dark'],
+  guardian_sigil: ['medal', 'stone'], queens_tear: ['gem', 'frost'], demon_crown: ['crown', 'red'], heart_of_aetherion: ['heart', 'holy'], stormstride: ['ring', 'blue'],
+  titans_ember: ['gem', 'ember'], thorn_crown: ['crown', 'nature'], rime_tear: ['gem', 'frost'], lich_phylactery: ['orb', 'night'], spire_shard: ['shard', 'amethyst'],
+  tyrant_banner: ['banner', 'ruby'], wyrm_heart: ['heart', 'ember'], wild_god_antler: ['crown', 'nature'], sovereign_eye: ['eye', 'topaz'], conquerors_medal: ['medal', 'gold'],
+  unmade_star: ['star', 'obsidian'],
+});
+/** An item with no recipe of its own: its shape from its name or slot, its colours from its set. */
+function guessRecipe(base: string): [string, string] {
+  const b = ITEMS[base], id = base.toLowerCase();
+  const shape = /crown|antler/.test(id) ? 'crown' : /circlet/.test(id) ? 'circlet' : /hood/.test(id) ? 'hood' : /medal|sigil/.test(id) ? 'medal'
+    : /eye/.test(id) ? 'eye' : /heart/.test(id) ? 'heart' : /star/.test(id) ? 'star' : /tear|gem|ember/.test(id) ? 'gem' : /banner/.test(id) ? 'banner'
+    : b?.kind === 'material' ? 'shard' : b?.kind === 'pet' ? 'whistle' : b?.kind === 'mount' ? 'horseshoe' : SLOT_GLYPH[b?.slot ?? ''] ?? 'stone';
+  const set = /^([a-z]{2})_/.exec(id)?.[1] ?? id;
+  return [shape, SET_PALS[hashOf(set) % SET_PALS.length]];
+}
+
 const cache = new Map<string, string>();
 
 /** Replaces an item's icon with imported art (asset pipeline). */
@@ -83,8 +146,9 @@ export function itemIcon(base: string): string {
   let url = cache.get(base);
   if (url) return url;
   const b = ITEMS[base];
-  const [glyph, pal] = RECIPE[base] ?? [b?.kind === 'material' ? 'shard' : SLOT_GLYPH[b?.slot ?? ''] ?? 'stone', 'steel'];
-  const rows = GLYPHS[glyph] ?? GLYPHS.stone, p = PAL[pal] ?? PAL.steel;
+  const [glyph, pal] = RECIPE[base] ?? guessRecipe(base);
+  // rows are padded to 16 x 16, so a glyph may be written without its trailing dots
+  const rows = Array.from({ length: 16 }, (_, y) => ((GLYPHS[glyph] ?? GLYPHS.stone)[y] ?? '').padEnd(16, '.').slice(0, 16)), p = PAL[pal] ?? PAL.steel;
   const c = document.createElement('canvas');
   c.width = c.height = 16;
   const g = c.getContext('2d')!;
@@ -103,6 +167,8 @@ export function itemIcon(base: string): string {
       g.fillStyle = ch === '#' ? p[0] : ch === '+' ? p[1] : ch === '-' ? p[2] : p[3];
       g.fillRect(x, y, 1, 1);
     }
+  // the rarest uniques (legendary and mythic) twinkle in a corner
+  if ((b?.unique?.rar ?? 0) >= 4) for (const [x, y, col] of [[13, 1, '#fff6c8'], [12, 2, '#ffe08a'], [14, 2, '#ffe08a'], [13, 3, '#ffe08a'], [13, 2, '#ffffff']] as const) { g.fillStyle = col; g.fillRect(x, y, 1, 1); }
   url = c.toDataURL();
   cache.set(base, url);
   return url;

@@ -1123,8 +1123,8 @@ export class World implements CombatCtx {
     return '';
   }
   // --- abilities and build: thin wrappers that report a refusal to the client ---
-  use(p: Player, id: unknown, tid: unknown) {
-    const why = useAbility(this, p, id, tid);
+  use(p: Player, id: unknown, tid: unknown, ax?: unknown, ay?: unknown) {
+    const why = useAbility(this, p, id, tid, ax, ay);
     if (why) this.send(p, { t: 'no', a: typeof id === 'string' ? id.slice(0, 24) : '', why });
     return why;
   }

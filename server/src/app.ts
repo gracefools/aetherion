@@ -300,7 +300,7 @@ export async function createApp(cfg: Config) {
         case 'act': return world.action(player, m.k);
         case 'tgt': return world.setTarget(player, m.id);
         case 'respawn': return world.requestRespawn(player);
-        case 'use': return void world.use(player, m.a, m.tid);
+        case 'use': return void world.use(player, m.a, m.tid, m.ax, m.ay);
         case 'inv': return void world.inventory(player, m);
         case 'dng': return void world.dungeon(player, m.op, m.id, m.op === 'ready' ? m.yes : m.diff);
         case 'obj': return void world.object(player, m);

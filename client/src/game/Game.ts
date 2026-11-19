@@ -5,7 +5,7 @@ import {
   Act, Move, TICK_MS, TILE,
   type ChatChannel, type EntityMeta, type LootMode, type PartyState, type PlayerMeta, type SelfState, type ServerMsg, type SnapMsg, type WelcomeMsg,
 } from '../../../shared/src/protocol';
-import { ABILITIES, ABILITY_LIST, freePoints, GCD_MS, jobActives, runeSpells, type AbilityDef, type Build } from '../../../shared/src/abilities';
+import { aimable, ABILITIES, ABILITY_LIST, freePoints, GCD_MS, jobActives, runeSpells, type AbilityDef, type Build } from '../../../shared/src/abilities';
 import { ANIM_COL, animDuration, animFrame, FRAME_H, FRAME_W, type Anim, type Appearance } from '../../../shared/src/appearance';
 import { Dmg, STATUS, STATUS_INDEX, statusNames } from '../../../shared/src/combat';
 import { ITEMS, POTION_CD_MS, RARITIES, SHOP_RANGE, type Equipment, type Item } from '../../../shared/src/items';
@@ -461,6 +461,8 @@ export class Game {
     window.addEventListener('blur', this.onBlur);
     window.addEventListener('resize', this.resize);
     this.canvas.addEventListener('mousedown', this.onClick);
+    this.canvas.addEventListener('mousemove', this.onMouse);
+    this.canvas.addEventListener('mouseleave', this.onMouse);
     this.unsubSettings = settings.subscribe(this.resize); // camera zoom
     this.resize();
     this.connect();
@@ -572,6 +574,16 @@ export class Game {
     this.keys.clear();
     this.walkHeld = false;
   };
+  /** G1: where the mouse points in the world (for aimed skills), or null when it is off the game. */
+  private mouseAt: { cx: number; cy: number } | null = null;
+  private onMouse = (e: MouseEvent) => {
+    this.mouseAt = e.type === 'mouseleave' ? null : { cx: e.clientX, cy: e.clientY };
+  };
+  private aimPoint(): { x: number; y: number } | null {
+    if (!this.mouseAt || !settings.get().movement.aimAtCursor) return null;
+    const r = this.canvas.getBoundingClientRect();
+    return { x: this.camX + (this.mouseAt.cx - r.left) / this.zoom, y: this.camY + (this.mouseAt.cy - r.top) / this.zoom };
+  }
   private onClick = (e: MouseEvent) => {
     const r = this.canvas.getBoundingClientRect();
     const wx = this.camX + (e.clientX - r.left) / this.zoom, wy = this.camY + (e.clientY - r.top) / this.zoom;
@@ -696,6 +708,13 @@ export class Game {
     const cost = def.kind === 'rune' ? Math.round(def.cost * stats.runeCost) : def.cost;
     if (this.hud.res < cost) return this.notice(JOB_DEFS[me.job].resource === 'rage' ? 'Not enough rage' : 'Not enough mana');
     let tid = 0;
+    const aim = !auto && aimable(def) ? this.aimPoint() : null;
+    if (aim) {
+      // aimed at the ground: no target needed; a little past the range lands at its edge
+      if (Math.hypot(aim.x - this.cur.x, aim.y - this.cur.y) > (def.range + 20) * 2) return this.notice('Out of range');
+      this.sendMsg({ t: 'use', a: id, tid: 0, ax: Math.round(aim.x), ay: Math.round(aim.y) });
+      return void this.tut(def.kind === 'rune' ? 'rune' : 'skill');
+    }
     if (def.target === 'enemy') {
       tid = this.targetId;
       if (!tid) {

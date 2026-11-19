@@ -5136,6 +5136,28 @@ test('G1 combos: every third basic blow in a row is a finisher with its class ef
   assert.ok(c.hp > Math.round(c.maxHp / 2));
 });
 
+import { aimable } from '../shared/src/abilities';
+
+test('G1 aimed skills: areas and cones land where the player aims, without a target; too far is pulled back or refused', () => {
+  assert.ok(aimable(ABILITIES.volley) && aimable(ABILITIES.meteor_strike) && !aimable(ABILITIES.arcane_bolt) && !aimable(ABILITIES.charge));
+  const { world, join } = harness({ capacity: 10 });
+  const a = join(0, 0, 'ranger', 30), p = a.p;
+  grant(p, ['volley'], []);
+  const r = ABILITIES.volley.range;
+  assert.equal(world.use(p, 'volley', 0, p.x + r * 3, p.y), 'Out of range');
+  assert.equal(world.use(p, 'volley', 0, p.x + 120, p.y + 40), '', 'no monster needed');
+  const f = p.room.fields[p.room.fields.length - 1];
+  assert.ok(Math.abs(f.x - (p.x + 120)) < 1 && Math.abs(f.y - (p.y + 40)) < 1, 'the volley falls where it was aimed');
+  p.cds.clear(); p.gcd = 0; p.res = 999;
+  assert.equal(world.use(p, 'volley', 0, p.x + (r + 20) * 1.5, p.y), '');
+  const g = p.room.fields[p.room.fields.length - 1];
+  assert.ok(Math.abs(g.x - (p.x + r + 20)) < 1, 'a little too far lands at the edge of the range');
+  // an unaimable skill ignores the aim and needs its target as before
+  grant(p, ['power_shot'], []);
+  p.cds.clear(); p.gcd = 0;
+  assert.equal(world.use(p, 'power_shot', 0, p.x + 50, p.y), 'No target');
+});
+
 test('M15 mounts: faster movement through the same collision rules, a level to ride, kept when struck, not in dungeons or the arena', () => {
   const h = harness({ capacity: 10 }), { world } = h;
   const a = h.join(0, 0, 'knight', 25), p = a.p;

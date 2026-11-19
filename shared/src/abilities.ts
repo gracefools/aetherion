@@ -92,6 +92,8 @@ const SK = (job: Job, a: Omit<AbilityDef, 'kind' | 'job' | 'name' | 'desc'>): Ab
   return { ...a, kind: 'skill', job, name: node.name, desc: node.desc };
 };
 
+/** G1: skills that can be aimed at a spot on the ground instead of a monster (areas at a point, and cones). */
+export const aimable = (d: AbilityDef) => d.target === 'enemy' && !d.move && (!!d.hit?.aoe || !!d.hit?.cone || d.field?.at === 'target');
 export const ABILITY_LIST: AbilityDef[] = [
   // ------------------------------ FIRE ------------------------------
   RUNE('fire', 1, { id: 'fireball', name: 'Fireball', desc: 'Hurl a ball of fire that splashes nearby enemies and may set them burning.', cost: 14, cdMs: 2500, range: 240, target: 'enemy',

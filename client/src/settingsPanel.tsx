@@ -197,7 +197,8 @@ function Camera() {
         </select>
       </div>
       <div className="switches">
-        <label className="switch"><input type="checkbox" checked={s.movement.walkToggle} onChange={(e: any) => settings.set({ movement: { walkToggle: e.target.checked } })} />{t('cam.walkToggle', { key: keyLabel(s.keys.walk[0] ?? '') })}</label>
+        <label className="switch"><input type="checkbox" checked={s.movement.walkToggle} onChange={(e: any) => settings.set({ movement: { ...s.movement, walkToggle: e.target.checked } })} />{t('cam.walkToggle', { key: keyLabel(s.keys.walk[0] ?? '') })}</label>
+        <label className="switch"><input type="checkbox" checked={s.movement.aimAtCursor} onChange={(e: any) => settings.set({ movement: { ...s.movement, aimAtCursor: e.target.checked } })} />{t('cam.aimAtCursor')}</label>
       </div>
       <p className="sub">{t('cam.note')}</p>
     </>

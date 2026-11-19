@@ -4,7 +4,7 @@ import { awaken, AWAKEN_LEVEL, FUSION_INDEX, FUSION_LEVEL, FUSION_RUNE_LEVEL } f
 import { ASCENSION_LEVEL, COMBO_LEVEL, COMBO_WINDOW_MS, comboOf, milestonesAt, PATH_INDEX, RESONANCE_MS, ULT_MAX, ultScale } from '../../../shared/src/ascension';
 import { enhance } from '../../../shared/src/subskills';
 import { sigilRanks } from '../../../shared/src/gear';
-import {
+import { aimable,
   ABILITIES, ABILITY_INDEX, ELEMENTS, freePoints, GCD_MS, learnBlock, RANK_SCALE, RUNE_LEVEL_SCALE, RUNE_MAX_LEVEL, RUNE_XP_PER_CAST,
   runeExpToNext, type AbilityDef, type Element, type FieldSpec, type Hit, type StatusApply,
 } from '../../../shared/src/abilities';
@@ -56,7 +56,7 @@ export function runeLevel(p: Player, el: Element): number {
 }
 
 /** Validates and starts an ability. Returns '' on success or a short reason for the client. */
-export function useAbility(w: World, p: Player, id: unknown, tid: unknown): string {
+export function useAbility(w: World, p: Player, id: unknown, tid: unknown, ax?: unknown, ay?: unknown): string {
   const base = typeof id === 'string' ? ABILITIES[id] : undefined;
   if (!base) return 'Unknown ability';
   // the skill as this character casts it: learned sub-skills change cost, cooldown, damage, area...
@@ -114,6 +114,14 @@ export function useAbility(w: World, p: Player, id: unknown, tid: unknown): stri
     target = v;
     x = v.x;
     y = v.y;
+  } else if (def.target === 'enemy' && aimable(def) && typeof ax === 'number' && typeof ay === 'number' && Number.isFinite(ax) && Number.isFinite(ay)) {
+    // G1: aimed at a spot on the ground; a little past the range is pulled back to its edge
+    const d = Math.hypot(ax - p.x, ay - p.y), reach = def.range + 20;
+    if (d > reach * 2) return 'Out of range';
+    const k = d > reach ? reach / d : 1;
+    x = Math.round((p.x + (ax - p.x) * k) * 100) / 100;
+    y = Math.round((p.y + (ay - p.y) * k) * 100) / 100;
+    p.lastCombat = tick;
   } else if (def.target === 'enemy') {
     let m = tnum < 0 ? room.monsters.get(tnum) ?? null : p.target;
     if (!m || m.dead) {

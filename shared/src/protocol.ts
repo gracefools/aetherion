@@ -70,7 +70,7 @@ export type ClientMsg =
   | { t: 'in'; s: number; x: number; y: number; r: number }
   | { t: 'act'; k: number }
   | { t: 'tgt'; id: number }
-  | { t: 'use'; a: string; tid?: number }
+  | { t: 'use'; a: string; tid?: number; ax?: number; ay?: number }
   | { t: 'learn'; id: string }
   | { t: 'respec' }
   | { t: 'inv'; op: 'equip' | 'unequip' | 'use' | 'sell' | 'sellall' | 'sort' | 'buy' | 'upgrade' | 'destroy' | 'scroll' | 'buyrune' | 'arm' | 'sigil' | 'unsigil'; el?: string; uid?: string; uids?: string[]; by?: SortKey; slot?: string | number; base?: string; qty?: number }

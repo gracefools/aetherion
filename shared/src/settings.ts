@@ -139,6 +139,8 @@ export interface GameSettings {
   movement: {
     /** The walk key toggles walking instead of being held. */
     walkToggle: boolean;
+    /** G1: area and cone skills land where the mouse points. */
+    aimAtCursor: boolean;
   };
   tutorial: {
     done: string[];
@@ -153,7 +155,7 @@ export const defaultGameSettings = (): GameSettings => ({
   uiScale: 1,
   graphics: { quality: 'high', shake: true, damageNumbers: true, nameplates: true, weather: true, questMarkers: true, art: 'hd', renderer: 'hd2d' },
   camera: { zoom: 0 },
-  movement: { walkToggle: false },
+  movement: { walkToggle: false, aimAtCursor: true },
   tutorial: { done: [], skipped: false },
   markers: [],
 });
@@ -187,7 +189,7 @@ export function cleanGameSettings(raw: unknown): GameSettings {
     renderer: g.renderer === '2d' ? '2d' : 'hd2d',
   };
   out.camera = { zoom: obj(r.camera).zoom === 1 ? 1 : 0 };
-  out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false) };
+  out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false), aimAtCursor: bool(obj(r.movement).aimAtCursor, true) };
   const t = obj(r.tutorial);
   out.tutorial = {
     done: Array.isArray(t.done) ? [...new Set(t.done.filter((s): s is string => (TUTORIAL_STEPS as readonly string[]).includes(s as string)))] : [],

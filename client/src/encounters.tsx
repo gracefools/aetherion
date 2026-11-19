@@ -9,13 +9,14 @@ import { rarName } from './inventory';
 import { t, tm, tv, useT } from './i18n';
 import { toRail } from './rail';
 import { AFFIX_DIFFS, affixEndsAt, weeklyAffix } from '../../shared/src/traits';
+import { toTop } from './rail';
 
 export function BossBar({ hud }: { hud: Hud }) {
   useT();
   const b = hud.boss;
   if (!b) return null;
   return (
-    <div className="hud bossbar" role="status" aria-label={t('boss.label', { name: b.name })}>
+    toTop('boss', <div className="hud bossbar" role="status" aria-label={t('boss.label', { name: b.name })}>
       <div className="bossname"><strong>{b.name}</strong> <span className="sub">{t('common.lv', { n: b.level })} · {b.title}</span></div>
       <div className="vbar hp boss" role="meter" aria-label={t('boss.health')} aria-valuenow={b.hp} aria-valuemax={b.mhp}>
         <i style={{ width: `${(b.hp / b.mhp) * 100}%` }} /><span>{b.hp.toLocaleString()} / {b.mhp.toLocaleString()}</span>
@@ -24,13 +25,13 @@ export function BossBar({ hud }: { hud: Hud }) {
         {Array.from({ length: b.phases }, (_, i) => <span key={i} className={i < b.phase ? 'done' : i === b.phase ? 'on' : ''} />)}
         <em>{t('boss.phase', { n: b.phase + 1, name: b.phaseName })}</em>
       </div>
-    </div>
+    </div>)
   );
 }
 
 export function Banner({ hud }: { hud: Hud }) {
   useT();
-  return hud.banner ? <div key={hud.banner.id} className="hud banner" role="alert">{tm(hud.banner.text)}</div> : null;
+  return hud.banner ? toTop('banner', <div key={hud.banner.id} className="hud banner" role="alert">{tm(hud.banner.text)}</div>) : null;
 }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -58,7 +59,7 @@ export function WorldEventTracker({ hud }: { hud: Hud }) {
   if (!ev) return null;
   const left = Math.max(0, Math.ceil((ev.endsAt - Date.now()) / 1000)), here = hud.zoneId === ev.zone, z = ZONES[ev.zone];
   return (
-    <div className={'hud weventbar panel ' + ev.state} role="status" aria-label={t('ev.label')}>
+    toTop('event', <div className={'hud weventbar panel ' + ev.state} role="status" aria-label={t('ev.label')}>
       <b>{t(`ev.${ev.kind}` as any)}</b> <small className="sub">{z?.name}{z?.town ? ` · ${z.town.name}` : ''}{here ? ` · ${t('ev.here')}` : ''}</small>
       {ev.state === 'active' ? (
         <>
@@ -66,7 +67,7 @@ export function WorldEventTracker({ hud }: { hud: Hud }) {
           <small>{t(`ev.${ev.kind}.goal` as any)} · {mmss(left)}</small>
         </>
       ) : <small className={ev.state === 'won' ? 'better' : 'worse'}>{ev.state === 'won' ? t('ev.won') : t('ev.lost')}</small>}
-    </div>
+    </div>)
   );
 }
 

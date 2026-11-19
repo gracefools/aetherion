@@ -8,3 +8,14 @@ export function toRail(node: React.ReactNode) {
   const el = document.querySelector('.play .rail');
   return el ? createPortal(node, el) : node;
 }
+
+/**
+ * The top-centre stack: boss bar, event and siege boxes, duel and match bars, toasts and banners
+ * stack here one under another, in a fixed order, so a boss fight with an event and a notice on
+ * screen never piles them on top of each other.
+ */
+export type TopSlot = 'boss' | 'event' | 'siege' | 'pvp' | 'toast' | 'banner';
+export function toTop(slot: TopSlot, node: React.ReactNode) {
+  const el = document.querySelector(`.play .topstack > .slot-${slot}`);
+  return el ? createPortal(node, el) : node;
+}

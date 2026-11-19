@@ -8,6 +8,7 @@ import { toRail } from './rail';
 import { Icon } from './ui/icons';
 import { raidOfWeek } from '../../shared/src/conquest';
 import { MONSTERS } from '../../shared/src/monsters';
+import { toTop } from './rail';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
@@ -60,11 +61,11 @@ export function SiegeTracker({ game }: { game: Game }) {
   if (!s || !hud.self) return null;
   const z = ZONES[s.zone], here = hud.zoneId === s.zone, left = Math.ceil((s.end - Date.now()) / 1000);
   return (
-    <div className={'hud siegebar panel' + (here ? ' here' : '')} role="status" aria-label={t('siege.label')}>
+    toTop('siege', <div className={'hud siegebar panel' + (here ? ' here' : '')} role="status" aria-label={t('siege.label')}>
       <b>{t('siege.title', { town: z.town!.name })}</b> <small className="sub">{z.name} · {mmss(left)}{s.holder ? ` · ${t('siege.holder', { tag: s.holder })}` : ''}</small>
       {s.scores.length ? (
         <ol>{s.scores.map((x) => <li key={x.guild}>[{x.tag}] <b>{x.points}</b></li>)}</ol>
       ) : <small className="sub">{t('siege.help', { n: SIEGE_LEVEL })}</small>}
-    </div>
+    </div>)
   );
 }

@@ -63,6 +63,7 @@ import { TraitBadge } from './traitsUi';
 import { TalentPicker } from './talentsUi';
 import { StatusBar } from './statusUi';
 import { FinderPanel } from './finderUi';
+import { toTop } from './rail';
 
 interface Character {
   id: number;
@@ -407,6 +408,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
       <canvas ref={canvas} className="world" />
       <div className="winlayer" />
       <div className="hud rail"><canvas ref={mini} width={144} height={144} className="minimap" /></div>
+      <div className="topstack">{(['boss', 'event', 'siege', 'pvp', 'toast', 'banner'] as const).map((s) => <div key={s} className={'slot-' + s} />)}</div>
       {game && <Guard><HudView game={game} onExit={onExit} input={input} sheet={sheet} setSheet={setSheet} book={book} setBook={setBook} bag={bag} setBag={(b) => { setBag(b); if (b) markTutorial('inventory'); }} setOpts={setOpts} auto={auto} setAuto={setAuto} setMap={setMap} /></Guard>}
       {opts && <Win id="settings" title={'settings.title'} width={520} onClose={() => setOpts(false)}><Guard><SettingsPanel onClose={() => setOpts(false)} signedIn inGame /></Guard></Win>}
       {game && map && <Win id="map" title={'map.title'} width={980} onClose={() => setMap(false)}><Guard><WorldMap game={game} onClose={() => setMap(false)} /></Guard></Win>}
@@ -700,7 +702,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       {hud.notice && <div className="hud notice" role="alert">{tm(hud.notice)}</div>}
       {book && me && s && hud.build && <Win id="skills" title={'book.title'} onClose={() => setBook(false)}><Guard><SkillBook hud={hud} game={game} onClose={() => setBook(false)} /></Guard></Win>}
       {me && hud.points > 0 && !book && <button className="hud pointsbtn" onClick={() => setBook(true)}>{t(hud.points > 1 ? 'hud.points' : 'hud.point', { n: hud.points })} · {keyOf('panel.skills')}</button>}
-      {hud.toast && <div className="hud toast" role="status">{tm(hud.toast)}</div>}
+      {hud.toast && toTop('toast', <div className="hud toast" role="status">{tm(hud.toast)}</div>)}
       {hud.dead > 0 && hud.status === 'playing' && (
         <div className="hud fallen panel" role="alertdialog" aria-label={t('dead.title')}>
           <h2>{t('dead.title')}</h2>

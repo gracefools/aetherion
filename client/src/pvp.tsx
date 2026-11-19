@@ -18,6 +18,7 @@ import { ITEMS, RARITY_COLOR } from '../../shared/src/items';
 import { Icon as ItemIcon } from './inventory';
 import { PET_SKILLS, petSkillPower } from '../../shared/src/companions';
 import { BG, RANKED } from '../../shared/src/matches';
+import { toTop } from './rail';
 
 const ZONE_LABEL: Record<Hud['pvpZone'], [Key, Key]> = {
   safe: ['pvp.zone.safe', 'pvp.zone.safeTip'],
@@ -107,7 +108,7 @@ export function MatchBar({ hud, game }: { hud: Hud; game: Game }) {
   const mine = m.teams[m.side], theirs = m.teams[1 - m.side];
   const clock = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
   return (
-    <div className="hud duelbar matchbar panel" role="status" aria-label={t(m.mode === 'ranked' ? 'mm.ranked' : m.mode === 'ranked2' ? 'mm.ranked2' : 'mm.bg')}>
+    toTop('pvp', <div className="hud duelbar matchbar panel" role="status" aria-label={t(m.mode === 'ranked' ? 'mm.ranked' : m.mode === 'ranked2' ? 'mm.ranked2' : 'mm.bg')}>
       {m.mode === 'bg' && <b className="score"><span className="us" title={mine.names.join(', ')}>{mine.score}</span> : <span className="them" title={theirs.names.join(', ')}>{theirs.score}</span></b>}
       {m.mode === 'ranked' && <b>{t('mm.vs', { name: theirs.names.join(', ') })}</b>}
       {m.mode === 'ranked2' && <b>{t('mm.vs2', { mates: mine.names.join(' & '), name: theirs.names.join(' & ') })}</b>}
@@ -125,7 +126,7 @@ export function MatchBar({ hud, game }: { hud: Hud; game: Game }) {
           </tbody>
         </table>
       )}
-    </div>
+    </div>)
   );
 }
 
@@ -140,10 +141,10 @@ export function DuelStatus({ hud, game }: { hud: Hud; game: Game }) {
   if (!d) return null;
   const now = Date.now(), starts = Math.ceil((d.starts - now) / 1000);
   return (
-    <div className="hud duelbar panel" role="status" aria-label={t('pvp.duel')}>
+    toTop('pvp', <div className="hud duelbar panel" role="status" aria-label={t('pvp.duel')}>
       {starts > 0 ? <b className="count">{t('pvp.duelIn', { name: d.with, n: starts })}</b> : <b>{t('pvp.duelLeft', { name: d.with, n: Math.max(0, Math.ceil((d.ends - now) / 1000)) })}</b>}
       <button className="small" onClick={() => game.pvpOp('forfeit')}>{t('pvp.forfeit')}</button>
-    </div>
+    </div>)
   );
 }
 

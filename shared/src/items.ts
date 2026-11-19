@@ -175,7 +175,7 @@ export interface Item {
 }
 export type Equipment = Partial<Record<Slot, Item>>;
 
-export const INVENTORY_SIZE = 40;
+export const INVENTORY_SIZE = 200;
 export const MAX_UPGRADE = 10;
 export const MAX_ILVL = 220;
 export const UPGRADE_STEP = 0.06; // +6% base stats per upgrade level

@@ -1648,7 +1648,7 @@ test('M6 stored inventories are sanitised: duplicates, forged values and illegal
   assert.deepEqual(it.aff.map((a) => a[0]), ['atk', 'crit'], 'duplicate, unknown and non-positive affixes are removed');
   assert.ok(it.aff[0][1] < 1000, 'an affix cannot exceed the best roll for its item level');
   assert.deepEqual(cleanInventory('knight', 1, 'garbage', 42), { inv: [], eq: {}, kit: false });
-  assert.equal(cleanInventory('knight', 1, Array.from({ length: 100 }, (_, i) => ({ uid: 'x' + i, base: 'ring' })), {}).inv.length, INVENTORY_SIZE);
+  assert.equal(cleanInventory('knight', 1, Array.from({ length: INVENTORY_SIZE + 60 }, (_, i) => ({ uid: 'x' + i, base: 'ring' })), {}).inv.length, INVENTORY_SIZE);
 });
 
 test('gear tiers: better armour and weapons make the character look grander, plain gear sends nothing', () => {

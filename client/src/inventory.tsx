@@ -6,7 +6,7 @@ import {
   equipBlock, INVENTORY_SIZE, ITEMS, itemName, itemStats, MAX_UPGRADE, POTION_CD_MS, RARITIES, RARITY_COLOR, reqLevel, sellValue,
   DAILY_STONES, PASSIVES, SETS, SHOP_BUY_MAX, SHOP_COMPANIONS, SHOP_ONCE, SHOP_STOCK, SLOT_NAMES, SLOTS, STAT_LABEL, UPGRADE_CHANCE, upgradeCost, type GearStat, type Item, type Slot,
 } from '../../shared/src/items';
-import { SORT_KEYS } from '../../shared/src/protocol';
+import { type SortKey, SORT_KEYS } from '../../shared/src/protocol';
 import type { Game, Hud } from './game/Game';
 import { keyOf } from './game/Game';
 import { itemIcon } from './game/icons';
@@ -24,6 +24,18 @@ export function Icon({ item, base, size = 32 }: { item?: Item; base?: string; si
   return <img className="icon" src={itemIcon(id)} width={size} height={size} alt="" style={{ imageRendering: 'pixelated' }} />;
 }
 
+type BagFilter = 'all' | 'equip' | 'use' | 'comp' | 'scroll' | 'mat';
+/** The bag's filters: what each shows. */
+const BAG_FILTERS: [BagFilter, Key, (i: Item) => boolean][] = [
+  ['all', 'bag.f.all', () => true],
+  ['equip', 'bag.f.equip', (i) => ITEMS[i.base].kind === 'equip'],
+  ['use', 'bag.f.use', (i) => ITEMS[i.base].kind === 'potion'],
+  ['comp', 'bag.f.comp', (i) => ITEMS[i.base].kind === 'pet' || ITEMS[i.base].kind === 'mount'],
+  ['scroll', 'bag.f.scroll', (i) => ITEMS[i.base].kind === 'scroll'],
+  ['mat', 'bag.f.mat', (i) => ITEMS[i.base].kind === 'material' || ITEMS[i.base].kind === 'sigil'],
+];
+/** One click on the sort icon sorts the way that suits what is shown: gear by rarity, the rest by type. */
+const sortFor = (f: BagFilter): SortKey => (f === 'equip' ? 'rarity' : f === 'mat' || f === 'scroll' ? 'name' : 'kind');
 function Cell({ item, sel, onClick, onUse, mark = false }: { item?: Item; sel: boolean; onClick: () => void; onUse: () => void; mark?: boolean }) {
   if (!item) return <span className="cell empty" />;
   const b = ITEMS[item.base];
@@ -153,10 +165,16 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
     }
   };
   const [tab, setTab] = useState('bag' as 'bag' | 'arm' | 'sigil');
+  // the bag's filter and name search (the order itself is the server's, set by sorting)
+  const [filter, setFilter] = useState('all' as BagFilter);
+  const [query, setQuery] = useState('');
+  const fit = BAG_FILTERS.find((f) => f[0] === filter)![2], words = query.trim().toLowerCase();
+  const shownItems = hud.inv.filter((i) => fit(i) && (!words || itemName(i).toLowerCase().includes(words)));
+  const filtering = filter !== 'all' || !!words;
   return (
     <div className="hud bag panel" role="dialog" aria-label={t('bag.title')}>
       <div className="sheethead">
-        <div><h2>{t('bag.title')}</h2><div className="sub">{t('bag.slots', { n: hud.inv.length, max: INVENTORY_SIZE })} · <b className="gold">{t('common.gold', { n: hud.gold })}</b></div></div>
+        <div><h2>{t('bag.title')}</h2><div className="sub"><b className="gold">{t('common.gold', { n: hud.gold })}</b></div></div>
         <div className="tabs" role="tablist" aria-label={t('bag.tabs')}>
           {([['bag', 'bag.tab.bag'], ['arm', 'bag.tab.arm'], ['sigil', 'bag.tab.sigil']] as const).map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t(label)}</button>
@@ -177,18 +195,33 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
               </div>
             ))}
           </div>
-          <h3>{t('bag.bag')}
-            <select className="sortsel" aria-label={t('bag.sort')} value="" onChange={(e: any) => e.target.value && game.invOp('sort', { by: e.target.value })}>
-              <option value="">{t('bag.sortBy')}</option>
-              {SORT_KEYS.map((k) => <option key={k} value={k}>{t(`sort.${k}` as Key)}</option>)}
-            </select>
+          <h3 className="baghead">{t('bag.bag')}
+            <span className="bagcap" role="meter" aria-valuenow={hud.inv.length} aria-valuemin={0} aria-valuemax={INVENTORY_SIZE} aria-label={t('bag.slots', { n: hud.inv.length, max: INVENTORY_SIZE })}>
+              <i style={{ width: `${(hud.inv.length / INVENTORY_SIZE) * 100}%` }} className={hud.inv.length >= INVENTORY_SIZE * 0.9 ? 'full' : ''} /><small>{t('bag.slots', { n: hud.inv.length, max: INVENTORY_SIZE })}</small>
+            </span>
           </h3>
-          <div className="grid" role="list">
-            {Array.from({ length: INVENTORY_SIZE }, (_, i) => {
-              const it = hud.inv[i];
-              return <Cell key={it?.uid ?? `e${i}`} item={it} sel={!!it && sel === it.uid} mark={!!it && !!marks?.has(it.uid)} onClick={() => (marks ? toggle(it!.uid) : (setSel(it!.uid), setAskRead('')))} onUse={() => !marks && quick(it!)} />;
-            })}
+          <div className="bagtools">
+            <div className="bagfilters" role="tablist" aria-label={t('bag.filter')}>
+              {BAG_FILTERS.map(([k, label, fit]) => {
+                const n = hud.inv.filter(fit).length;
+                return <button key={k} role="tab" aria-selected={filter === k} className={'chipbtn' + (filter === k ? ' on' : '')} onClick={() => setFilter(k)} disabled={!n && k !== 'all'}>{t(label)} <small>{n}</small></button>;
+              })}
+            </div>
+            <input className="bagsearch" type="search" placeholder={t('bag.search')} aria-label={t('bag.search')} value={query} onChange={(e: any) => setQuery(e.target.value)} />
+            <span className="sorttools">
+              <button className="iconbtn" title={t('bag.sortNow', { by: t(`sort.${sortFor(filter)}` as Key) })} aria-label={t('bag.sortNow', { by: t(`sort.${sortFor(filter)}` as Key) })} onClick={() => game.invOp('sort', { by: sortFor(filter) })}>⇅</button>
+              <select className="sortsel" aria-label={t('bag.sort')} value="" onChange={(e: any) => e.target.value && game.invOp('sort', { by: e.target.value })}>
+                <option value="">▾</option>
+                {SORT_KEYS.map((k) => <option key={k} value={k}>{t(`sort.${k}` as Key)}</option>)}
+              </select>
+            </span>
           </div>
+          <div className="grid baggrid" role="list">
+            {shownItems.map((it) => <Cell key={it.uid} item={it} sel={sel === it.uid} mark={!!marks?.has(it.uid)} onClick={() => (marks ? toggle(it.uid) : (setSel(it.uid), setAskRead('')))} onUse={() => !marks && quick(it)} />)}
+            {filtering ? !shownItems.length && <p className="sub">{t('bag.none')}</p>
+              : Array.from({ length: Math.min(INVENTORY_SIZE - hud.inv.length, Math.max(0, 48 - hud.inv.length) + ((8 - (hud.inv.length % 8)) % 8)) }, (_, i) => <span key={`e${i}`} className="cell empty" />)}
+          </div>
+          {!filtering && hud.inv.length < INVENTORY_SIZE && <p className="sub">{t('bag.free', { n: INVENTORY_SIZE - hud.inv.length })}</p>}
           <p className="sub">{marks ? t('bulk.help') : t('bag.help', { hp: keyOf('potion.hp'), mp: keyOf('potion.mp') })}</p>
         </div>
         <div>

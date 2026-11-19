@@ -806,7 +806,7 @@ export class Game {
     if (enter) this.sendMsg({ t: 'depth', op: 'enter' });
     else this.depthQuietUntil = performance.now() + 4000; // time to walk off the portal
   }
-  pvpOp(op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank', a: { id?: number; by?: string } = {}) {
+  pvpOp(op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy', a: { id?: number; by?: string; base?: string } = {}) {
     if (op === 'accept' || op === 'decline') this.setHud({ dinv: null });
     this.sendMsg({ t: 'pvp', op, ...a });
   }

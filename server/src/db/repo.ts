@@ -410,6 +410,11 @@ export class Repo {
 
   // ---------- PvP ----------
   /** Adds to a character's PvP record (creating it on first use). */
+  /** Spends honour if there is enough: the new spendable amount, or null when there is not. */
+  async pvpSpend(id: number, n: number): Promise<number | null> {
+    const r = await this.db.query<{ left: number }>('UPDATE pvp_stats SET honor_spent = honor_spent + $2 WHERE character_id = $1 AND honor - honor_spent >= $2 RETURNING honor - honor_spent AS left', [id, n]);
+    return r.rows[0] ? Number(r.rows[0].left) : null;
+  }
   pvpAdd(c: { id: number; name: string; job: string }, d: Partial<Record<'kills' | 'deaths' | 'duels_won' | 'duels_lost' | 'arena_kills' | 'arena_deaths' | 'honor' | 'rating', number>>) {
     const cols = Object.keys(d), vals = Object.values(d);
     return this.db.query(

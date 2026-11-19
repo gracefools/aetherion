@@ -194,6 +194,8 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   bagReward: m('Make room in your bag for the reward first', 'Kosongkan tempat di tasmu untuk hadiahnya terlebih dahulu'), notFaction: m('Not sold by this faction', 'Tidak dijual oleh faksi ini'),
   objDone: m('Objective complete: {a}.', 'Sasaran tercapai: {a}.'),
   awakenPoints: m('Awakening costs {a} skill points', 'Kebangkitan memerlukan {a} poin skill'), awakenPanel: m('Awaken skills at the Ascension panel', 'Bangkitkan skill di panel Ascension'),
+  honorShort: m('Not enough honour: {a} costs {b}.', 'Honour tidak cukup: {a} seharga {b}.'), honorBought: m('Bought {a} for {b} honour.', 'Membeli {a} seharga {b} honour.'),
+  notSoldHere: m('Not sold here', 'Tidak dijual di sini'), visitArena: m('Visit the Arena Master', 'Kunjungi Arena Master'),
   rewardMailed: m('Your inventory is full: the rest of your reward was sent to you by mail.', 'Inventarismu penuh: sisa hadiahmu dikirim lewat surat.'),
   abandoned: m('Quest abandoned: {a}.', 'Misi ditinggalkan: {a}.'), accepted: m('Quest accepted: {a}.', 'Misi diterima: {a}.'), questDone: m('Quest complete: {a}. {b} EXP, {c} gold.', 'Misi selesai: {a}. {b} EXP, {c} emas.'),
   repNeed: m('Requires {a} reputation with {b}', 'Butuh reputasi {a} dengan {b}'), returnGiver: m('Return to the quest giver to turn this quest in', 'Kembali ke pemberi misi untuk menyerahkan misi ini'),

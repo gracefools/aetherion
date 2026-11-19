@@ -1335,6 +1335,16 @@ test('M15 PvP over the network: the arena, a victory stored in PostgreSQL, and t
   assert.equal(A.last('pvprank').me.rating, 1012);
   assert.equal(await A.ask({ t: 'pvp', op: 'leave' }, 'welcome'), '');
   assert.equal(A.p.room.zoneId, 'eldoria');
+  // G8: honour is spent at the Arena Master; the database refuses what cannot be paid for
+  await app.db.query('UPDATE pvp_stats SET honor = 100 WHERE character_id = $1', [A.b.characterId]);
+  app.world.relocate(A.p, A.p.room, am.x + 20, am.y);
+  const stones = () => A.p.inv.filter((i) => i.base === 'upgrade_stone').reduce((n, i) => n + i.qty, 0), s0 = stones();
+  A.b.raw({ t: 'pvp', op: 'buy', base: 'upgrade_stone' });
+  await A.b.until(() => stones() === s0 + 1, 3000, 'bought with honour');
+  assert.equal(Number((await app.db.query<any>('SELECT honor_spent FROM pvp_stats WHERE character_id = $1', [A.b.characterId])).rows[0].honor_spent), 30);
+  A.b.raw({ t: 'pvp', op: 'buy', base: 'conquerors_medal' });
+  await A.b.until(() => A.seen.some((m) => m.t === 'sys' && /Not enough honour/.test(m.text)), 3000, 'refused');
+  assert.ok(!A.p.inv.some((i) => i.base === 'conquerors_medal'));
   // the rating comes back after logging in again
   A.b.close();
   await sleep(GRACE + 1300);

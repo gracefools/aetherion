@@ -419,6 +419,7 @@ export const SETS: Record<string, SetDef> = {
   wyrmforged: { id: 'wyrmforged', name: 'Elder Wyrmforged', bonus: [{ text: '+12% attack and magic attack', pct: { atk: 0.12, matk: 0.12 } }, { text: '+8% critical chance, +20% critical damage', flat: { crit: 8, critDmg: 0.2 } }] },
   heartroot: { id: 'heartroot', name: 'Heartroot Raiment', bonus: [{ text: '+18% maximum HP', pct: { maxHp: 0.18 } }, { text: '5% of damage dealt returns as health, +12% magic attack', flat: { lifesteal: 5 }, pct: { matk: 0.12 } }] },
   sovereign: { id: 'sovereign', name: 'Storm Sovereign Regalia', bonus: [{ text: '+8% dodge, +6% critical chance', flat: { dodge: 8, crit: 6 } }, { text: '+18% attack and magic attack', pct: { atk: 0.18, matk: 0.18 } }] },
+  gladiator: { id: 'gladiator', name: "Gladiator's Regalia", bonus: [{ text: '+10% defense and magic defense', pct: { def: 0.1, mdef: 0.1 } }, { text: '+10% attack and magic attack, +5% critical chance', pct: { atk: 0.1, matk: 0.1 }, flat: { crit: 5 } }] },
   starfallen: { id: 'starfallen', name: 'Starfallen Raiment', bonus: [{ text: '+15% to every defense and +12% maximum HP', pct: { def: 0.15, mdef: 0.15, maxHp: 0.12 } }, { text: '+20% attack and magic attack, +8% critical chance', pct: { atk: 0.2, matk: 0.2 }, flat: { crit: 8 } }] },
 };
 export interface PassiveDef {
@@ -517,6 +518,11 @@ registerItems([
   J('wyrm_heart', 'Wyrm Mother\'s Heart', 'amulet', 4, { atk: [4, 1], matk: [4, 1], crit: [3, 0] }, 'It never slept. It never will.', { passive: 'eruption' }),
   J('wild_god_antler', "Wild God's Antler", 'helmet', 5, { maxHp: [20, 9], matk: [4, 0.9], mdef: [4, 1] }, 'The forest kept count of everything. This was the tally.', { passive: 'wildgrowth' }, { helmet: 5, color: 2 }),
   J('sovereign_eye', "Sovereign's Eye", 'ring', 4, { atk: [3, 0.8], matk: [3, 0.8], crit: [3, 0] }, 'The calm at the centre of the storm.', { passive: 'stormlash' }),
+  // G8: bought with honour from the Arena Master
+  J('gl_helm', "Gladiator's Helm", 'helmet', 3, { def: [4, 1], atk: [2, 0.6], matk: [2, 0.6] }, 'Dented in a hundred bouts.', { set: 'gladiator' }, { helmet: 3, color: 4 }),
+  J('gl_amulet', "Gladiator's Token", 'amulet', 3, { atk: [3, 0.7], matk: [3, 0.7], maxHp: [8, 4] }, 'Given to whoever is still standing.', { set: 'gladiator' }),
+  J('gl_ring', "Gladiator's Band", 'ring', 3, { crit: [2, 0], dodge: [2, 0] }, 'The crowd remembers the name on it.', { set: 'gladiator' }),
+  J('conquerors_medal', "Conqueror's Medal", 'amulet', 4, { atk: [4, 0.9], matk: [4, 0.9], def: [3, 0.8] }, 'Earned, never bought. Well, almost never.', { passive: 'warbanner' }),
   J('unmade_star', 'The Unmade Star', 'amulet', 5, { maxHp: [22, 10], atk: [5, 1.1], matk: [5, 1.1], def: [4, 1] }, 'What the Unmaker could not unmake.', { passive: 'nullward' }),
 ]);
 /** What each boss can drop besides ordinary gear. */

@@ -24,6 +24,11 @@ export function pvpRuleAt(zone: string, x: number, y: number): PvpRule {
 }
 /** After dying to a player, nobody may attack you for this long. */
 export const PVP_RESPAWN_SHIELD_MS = 60_000;
+/** G8: what the Arena Master sells for honour (base id, honour). Gear comes at the buyer's level. */
+export const HONOR_SHOP: [string, number][] = [
+  ['upgrade_stone', 30], ['scroll_advanced', 60], ['scroll_rare', 150],
+  ['gl_helm', 400], ['gl_amulet', 400], ['gl_ring', 400], ['conquerors_medal', 1500], ['mount_sky_griffin', 3000],
+];
 /** Killing the same player again within this time gives no honour or rating. */
 export const PVP_REPEAT_MS = 10 * 60_000;
 /** Player-versus-player damage is scaled down: players have far less health than the monsters the game is balanced around. */

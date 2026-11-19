@@ -16,6 +16,10 @@ import type { Repo } from '../db/repo';
 import { clearStatuses } from './entity';
 import type { Player, World } from './World';
 import { ZoneRoom } from './World';
+import { HONOR_SHOP } from '../../../shared/src/pvp';
+import { INTERACT_RANGE } from '../../../shared/src/places';
+import { ITEMS } from '../../../shared/src/items';
+import { give, sendInv } from './Inventory';
 
 interface Duel {
   a: Player;
@@ -144,6 +148,24 @@ export class Pvp {
     if (!m || typeof m !== 'object') return 'Unknown command';
     const now = Date.now();
     switch (m.op) {
+      case 'buy': {
+        // the honour shop at the Arena Master: checked here, paid for in the database, then given
+        const line = HONOR_SHOP.find(([b]) => b === m.base);
+        if (!line) return 'Not sold here';
+        if (!objNear(p.room.zoneId, p.x, p.y, INTERACT_RANGE * 2.2, ['arenamaster'])) return 'Visit the Arena Master';
+        const [base, cost] = line, spec = { base, rar: ITEMS[base].unique?.rar ?? 0, ilvl: ITEMS[base].kind === 'equip' ? p.level : 1, aff: [], up: 0, qty: 1 };
+        const trial = { inv: p.inv.map((i) => ({ ...i })) } as unknown as Player;
+        if (!give(trial, spec)) return 'Inventory is full';
+        void this.repo.pvpSpend(p.id, cost).then((left) => {
+          if (left === null) return this.w.send(p, { t: 'sys', text: `Not enough honour: ${ITEMS[base].name} costs ${cost}.` });
+          if (!give(p, spec)) return this.w.mailItems(p, `Honour: ${ITEMS[base].name}`, [spec]);
+          p.invDirty = true;
+          sendInv(this.w, p);
+          this.w.send(p, { t: 'sys', text: `Bought ${ITEMS[base].name} for ${cost} honour.`, cue: 'loot' });
+          return this.op(p, { op: 'rank' });
+        }).catch((e) => console.error('honour purchase failed', e));
+        return '';
+      }
       case 'duel': {
         const t = Number.isInteger(m.id) ? this.w.online.get(m.id) : undefined;
         if (!t || t === p || !t.conn || t.room !== p.room) return 'That player is not here';

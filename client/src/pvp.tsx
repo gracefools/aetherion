@@ -13,6 +13,9 @@ import { keyOf } from './game/Game';
 import { t, useT, type Key } from './i18n';
 import { toRail } from './rail';
 import { Icon } from './ui/icons';
+import { HONOR_SHOP } from '../../shared/src/pvp';
+import { ITEMS, RARITY_COLOR } from '../../shared/src/items';
+import { Icon as ItemIcon } from './inventory';
 
 const ZONE_LABEL: Record<Hud['pvpZone'], [Key, Key]> = {
   safe: ['pvp.zone.safe', 'pvp.zone.safeTip'],
@@ -111,8 +114,31 @@ export function ArenaMaster({ hud, game }: { hud: Hud; game: Game }) {
       <div className="actions">
         {hud.arena ? <button className="primary" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveTheArena')}</button> : <button className="primary" onClick={() => game.pvpOp('arena')}>{t('pvp.enterArena')}</button>}
       </div>
+      <h3>{t('honor.shop')}</h3>
+      <HonorShop hud={hud} game={game} />
       <h3>{t('pvp.rankingsTitle')}</h3>
       <Rankings hud={hud} game={game} />
+    </>
+  );
+}
+
+/** G8: honour is spent here. What you have is earned honour minus what you have spent. */
+function HonorShop({ hud, game }: { hud: Hud; game: Game }) {
+  const me = hud.pvprank?.me, have = me ? Number(me.honor) - Number(me.honor_spent ?? 0) : null;
+  useEffect(() => { if (!hud.pvprank) game.pvpOp('rank'); }, []);
+  return (
+    <>
+      <p className="sub">{t('honor.have', { n: have ?? 0 })}</p>
+      {HONOR_SHOP.map(([base, cost]) => {
+        const it = ITEMS[base];
+        return (
+          <div key={base} className="shoprow">
+            <ItemIcon base={base} size={24} />
+            <span style={{ color: it.unique ? RARITY_COLOR[it.unique.rar] : undefined }}>{it.name}<small> {it.unique?.set ? t('honor.setPiece') : it.unique?.passive ? t('honor.legendary') : it.desc ?? ''}</small></span>
+            <button className="small" disabled={have === null || have < cost} onClick={() => game.pvpOp('buy', { base })} aria-label={t('honor.buy', { name: it.name, n: cost })}>{cost}</button>
+          </div>
+        );
+      })}
     </>
   );
 }

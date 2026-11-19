@@ -61,6 +61,7 @@ export const enum Act {
   FxEnd = 5, // [ownerId, 5, key, triggered]  a trap fired or expired
   PetSkill = 6, // [ownerId, 6, petIndex, targetId]  the owner's pet used its skill (G10)
   Dodge = 7, // [id, 7, fromX, fromY, toX, toY]  a dodge roll (G1); also sent by the client as { t: 'act', k: 7 }
+  Finisher = 8, // [id, 8, targetId]  the third basic blow of a chain landed (G1)
 }
 
 // ---- client -> server ----

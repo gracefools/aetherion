@@ -1368,6 +1368,13 @@ export class Game {
         else if (e[1] === Act.Fx) {
           this.onFx(e, now);
           if (mine) myFx = true;
+        } else if (e[1] === Act.Finisher) {
+          const v = this.posOf(e[2]), mine = e[0] === this.me?.id, at = now + (mine ? 60 : INTERP_DELAY + 60);
+          if (v) {
+            this.blasts.push({ x: v.x, y: v.y, r: 30, t0: at, tier: 1, color: CAST_COLOR[this.remotes.get(e[0])?.meta.job ?? this.me?.job ?? ''] ?? '#ffd36a', inner: 0, kind: 'area' });
+            this.blasts.push({ x: v.x, y: v.y, r: 0, t0: at, tier: 1, color: '#ffffff', inner: 0, kind: 'claw' });
+            if (mine) this.floaters.push({ x: v.x, y: v.y - 46, text: tr('float.finisher'), color: '#ffd36a', big: true, t0: now, kind: 'info' });
+          }
         } else if (e[1] === Act.Dodge) {
           this.onDodge(e, now);
         } else if (e[1] === Act.PetSkill) {

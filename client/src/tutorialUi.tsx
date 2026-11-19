@@ -15,7 +15,7 @@ function keysFor(): Record<string, string> {
   return {
     move: [k('move.up'), k('move.left'), k('move.down'), k('move.right')].join(' '), attack: k('attack'), target: k('target'), skill: k('skill.1'),
     rune: k('rune.1.1'), skills: k('panel.skills'), bag: k('panel.bag'), interact: k('interact'), quests: k('panel.quests'), hp: k('potion.hp'),
-    mp: k('potion.mp'), auto: k('panel.auto'), map: k('panel.map'), help: k('panel.tutorial'),
+    mp: k('potion.mp'), auto: k('panel.auto'), map: k('panel.map'), help: k('panel.tutorial'), dodge: k('dodge'),
   };
 }
 export const stepTitle = (s: TutorialStep) => t(`tut.${s}.title` as Key);

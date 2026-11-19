@@ -139,6 +139,19 @@ export const RESPAWN_MIN_MS = 3000; // earliest manual respawn
 export const RESPAWN_AUTO_MS = 12000;
 /** G1: the dodge roll: how far, how long nothing can hurt the roller, and how often. */
 export const DODGE = { dist: 72, iframeMs: 350, cdMs: 1500 };
+/**
+ * G1: basic attacks chain. Every third blow in a row (each within windowMs of the last) is a finisher
+ * that hits harder and does what the class does best; a skill used soon after a finisher hits harder too.
+ */
+export const BASIC_COMBO = { hits: 3, windowMs: 1800, mul: 1.6, weaveMs: 1500, weaveMul: 1.2 };
+export const FINISHERS: Record<string, string> = {
+  knight: 'stuns the target (not bosses)',
+  berserker: 'makes the target bleed',
+  assassin: 'always strikes critically',
+  ranger: 'pierces into a second monster behind',
+  mage: 'bursts over monsters around the target',
+  cleric: 'heals you for 3% of your health',
+};
 export const COMBAT_TIMEOUT_MS = 5000; // out-of-combat regeneration starts after this
 
 /** Weapon mechanics executed by the server on basic attacks. */

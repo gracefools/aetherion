@@ -8,7 +8,7 @@ import { BOUNTY_STREAK, DEPTH_MONSTER, SANCTUARY_LEAVE_SHIELD_MS, SANCTUARY_SHIE
 import { applySigilSets, ARMAMENT_LEVEL, armamentDrops, armMultipliers, cleanGear, effectiveRanks, emptyGear, rollSigil, SIGIL_DROP, sigilTierForBoss, weaponAura, worldBossArmament, type Gear } from '../../../shared/src/gear';
 import { performance } from 'node:perf_hooks';
 import {
-  COMBAT_TIMEOUT_MS, DODGE, Dmg, expLevelFactor, expToNext, missChance, mitigate, RAGE_PER_HIT, RAGE_PER_HIT_TAKEN,
+  BASIC_COMBO, COMBAT_TIMEOUT_MS, DODGE, Dmg, expLevelFactor, expToNext, missChance, mitigate, RAGE_PER_HIT, RAGE_PER_HIT_TAKEN,
   RESPAWN_AUTO_MS, RESPAWN_MIN_MS, STATUS, STATUS_INDEX, weaponRule, type WeaponRule,
 } from '../../../shared/src/combat';
 import { cleanBuild, type Build } from '../../../shared/src/abilities';
@@ -116,6 +116,10 @@ export class Player implements Ent {
   /** G1: the dodge roll: no damage until this tick; the next roll from dodgeAt. */
   evadeUntil = 0;
   dodgeAt = 0;
+  /** G1: the basic attack chain, and until when skills hit harder after a finisher (ticks). */
+  comboHits = 0;
+  comboAt = -1000;
+  weaveUntil = 0;
   /** Receiving developer overlay data (only possible when the server allows it). */
   debug = false;
   // auto hunting: the saved configuration, whether a session is running, and its figures
@@ -1595,6 +1599,8 @@ export class World implements CombatCtx {
     if (p.hasTalent('predator') && (m.def.elite || m.def.boss)) mul *= 1.25;
     if (p.hasTalent('glass_cannon')) mul *= 1.2;
     if (p.hasTalent('iron_skin')) mul *= 0.9;
+    // G1: a skill woven in right after a finisher
+    if (!basic && !this.echoing && this.tick < p.weaveUntil) mul *= BASIC_COMBO.weaveMul;
     const precise = p.hasTalent('precision');
     let dmg = mitigate(power * mul * (0.9 + this.rnd() * 0.2), def), flags = 0;
     if (this.rnd() * 100 < s.crit + critAdd + (precise ? 10 : 0)) {
@@ -1697,7 +1703,14 @@ export class World implements CombatCtx {
       if (p.job === 'assassin' && p.level >= 25) ambush = 100;
       removeStatus(p, STATUS_INDEX.stealth);
     }
-    this.strike(p, m, 1, !!rule.magic, ambush);
+    // G1: the chain of basic blows; every third is a finisher
+    const chained = (this.tick - p.comboAt) * TICK_MS <= BASIC_COMBO.windowMs;
+    const hit = chained ? p.comboHits + 1 : 1, finisher = hit >= BASIC_COMBO.hits;
+    p.comboHits = finisher ? 0 : hit;
+    p.comboAt = this.tick;
+    if (finisher && p.job === 'assassin') ambush = 100;
+    this.strike(p, m, finisher ? BASIC_COMBO.mul : 1, !!rule.magic, ambush);
+    if (finisher) this.finisher(p, m);
     if (rule.double) this.strike(p, m, rule.double);
     if (rule.cleave) {
       let extra = 0;
@@ -1708,6 +1721,28 @@ export class World implements CombatCtx {
         extra++;
       }
     }
+  }
+
+  /** G1: what each class's finisher adds to the blow. */
+  private finisher(p: Player, m: Monster) {
+    p.weaveUntil = this.tick + Math.round(BASIC_COMBO.weaveMs / TICK_MS);
+    emit(p, this.evt, [p.id, Act.Finisher, m.id]);
+    const was = this.echoing;
+    this.echoing = true;
+    try {
+      if (p.job === 'knight' && !m.dead) applyStatus(m, STATUS_INDEX.stun, this.tick, 0, p.id);
+      else if (p.job === 'berserker' && !m.dead) applyStatus(m, STATUS_INDEX.bleed, this.tick, p.stats.atk, p.id);
+      else if (p.job === 'cleric') this.heal(p, Math.max(1, Math.round(p.maxHp * 0.03)));
+      else if (p.job === 'ranger' || p.job === 'mage') {
+        const r = p.job === 'mage' ? 60 : 120;
+        let n = 0;
+        for (const o of [...p.room.monsters.values()]) {
+          if (o === m || o.dead || Math.hypot(o.x - m.x, o.y - m.y) > r) continue;
+          this.strike(p, o, p.job === 'mage' ? 0.5 : 0.6, !!p.rule.magic, 0, false);
+          if (p.job === 'ranger' && ++n >= 1) break;
+        }
+      }
+    } finally { this.echoing = was; }
   }
 
   // ---------- simulation ----------

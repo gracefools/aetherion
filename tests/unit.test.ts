@@ -503,7 +503,11 @@ test('M3 basic attack: server-computed damage, interval, kill, EXP, corpse remov
     n = dmOf(a.out).filter((d: any) => d[3] === a.p.id).length;
   }
   assert.equal(m.dead, true);
-  assert.equal(n, Math.ceil(60 / per), 'exactly as many hits as the HP requires');
+  // every third blow in a row is a finisher (G1)
+  const fin = Math.round(mitigate(a.p.stats.atk * BASIC_COMBO.mul, MONSTERS.mossling.def));
+  let need = 0;
+  for (let left = 60; left > 0; need++) left -= (need + 1) % BASIC_COMBO.hits === 0 ? fin : per;
+  assert.equal(n, need, 'exactly as many hits as the HP requires');
   const tickSpan = world.tick - 2;
   assert.ok(tickSpan >= (n - 1) * (a.p.stats.atkIntervalMs / 50) - 1, `attack interval respected (${n} hits in ${tickSpan} ticks)`);
   assert.equal(a.p.exp, MONSTERS.mossling.exp);
@@ -5102,6 +5106,34 @@ test('G1 dodge roll: a quick dash the way the player is moving, blows during it 
   p.dodgeAt = 0;
   p.mods = { ...p.mods, stun: true } as any;
   assert.equal(world.dodge(p), 'You cannot move');
+});
+
+import { BASIC_COMBO, FINISHERS } from '../shared/src/combat';
+
+test('G1 combos: every third basic blow in a row is a finisher with its class effect; a skill right after hits harder', () => {
+  assert.deepEqual(Object.keys(FINISHERS).sort(), Object.keys(JOB_DEFS).sort(), 'a finisher for every class');
+  const h = harness({ capacity: 10 }), { world } = h;
+  const a = h.join(0, 0, 'knight', 30), p = a.p;
+  const m = world.spawn(p.room, 'mossling', p.x + 30, p.y);
+  m.maxHp = m.hp = 1e7;
+  const blow = () => { const hp = m.hp; (world as any).playerAttack(p, m); return hp - m.hp; };
+  const d1 = blow(), d2 = blow(), d3 = blow();
+  assert.ok(Math.abs(d1 - d2) <= 1, 'the first two blows are alike');
+  assert.ok(d3 >= d1 * (BASIC_COMBO.mul - 0.1), 'the third is a finisher');
+  assert.ok(m.st.some((x) => x.i === STATUS_INDEX.stun), 'the knight\'s finisher stuns');
+  assert.ok(p.weaveUntil > world.tick, 'skills hit harder for a moment');
+  const d4 = blow();
+  assert.ok(Math.abs(d4 - d1) <= 1, 'and the chain starts again');
+  // a pause breaks the chain
+  p.comboAt = world.tick - Math.ceil(BASIC_COMBO.windowMs / 50) - 2;
+  blow(); blow();
+  assert.ok(Math.abs(blow() - d1) > 1, 'two blows after a pause, then the finisher');
+  // a cleric's finisher heals
+  const c = h.join(0, 30, 'cleric', 30).p, mc = world.spawn(c.room, 'mossling', c.x + 30, c.y);
+  mc.maxHp = mc.hp = 1e7;
+  c.hp = Math.round(c.maxHp / 2);
+  for (let i = 0; i < 3; i++) (world as any).playerAttack(c, mc);
+  assert.ok(c.hp > Math.round(c.maxHp / 2));
 });
 
 test('M15 mounts: faster movement through the same collision rules, a level to ride, kept when struck, not in dungeons or the arena', () => {

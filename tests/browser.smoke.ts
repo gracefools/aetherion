@@ -482,7 +482,8 @@ try {
       await p1.waitForFunction((n) => (window as any).__game.debug().hud.dungeon?.stage === n, st + 1, { timeout: 8000 });
     }
     const boss = [...run.alive][0];
-    (boss as any).def = { ...boss.def, aggro: 0 }; // hold still for the screenshot
+    (boss as any).def = { ...boss.def, aggro: 0, atk: 0 }; // hold still for the screenshot, and do no harm: a death here resets the boss
+    (boss as any).atkScale = 0;
     w.relocate(pl, pl.room, boss.x - 170, boss.y + 20);
     const bar = p1.getByRole('status', { name: 'Boss: Ancient Rune Guardian' });
     await bar.waitFor();

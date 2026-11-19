@@ -1963,7 +1963,9 @@ export class Game {
         o.labelY = (hs ? HD_NAME : NAME_OY) + (ap.helmet === 5 || ap.helmet === 3 ? 8 : 0) + (r.meta.mnt ? 6 : 0);
         const targeted = r.meta.id === this.targetId;
         if (targeted) targetPos = r;
-        o.color = targeted ? '#ff9a8a' : this.hud.party?.members.some((m) => m.id === r.meta.id) ? '#8fd0ff' : this.hud.guild && r.meta.gt === this.hud.guild.tag ? '#a8f0b0' : '#ffffff';
+        // in a match: team-mates blue, opponents red (G8)
+        const side = this.hud.match ? (this.hud.match.teams[this.hud.match.side].ids.includes(r.meta.id) ? 1 : this.hud.match.teams[1 - this.hud.match.side].ids.includes(r.meta.id) ? 2 : 0) : 0;
+        o.color = targeted ? '#ff9a8a' : side === 1 ? '#8fd0ff' : side === 2 ? '#ff6a5a' : this.hud.party?.members.some((m) => m.id === r.meta.id) ? '#8fd0ff' : this.hud.guild && r.meta.gt === this.hud.guild.tag ? '#a8f0b0' : '#ffffff';
         o.pet = r.meta.pet && r.hp > 0 ? (hd ? hdPetSprite : petSprite)(r.meta.pet[0]) : null;
         o.petStage = r.meta.pet ? petStage(r.meta.pet[2]) : 0;
         o.flying = !!(r.meta.mnt && MOUNTS[r.meta.mnt]?.fly);

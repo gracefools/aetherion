@@ -5016,6 +5016,68 @@ test('M15 pets: whistles join the collection, a summoned pet gives its bonus, fo
   assert.deepEqual(c, { pets: [{ uid: 'a', kind: 'ember_kit', name: 'Ember Kit', level: PET_MAX_LEVEL, exp: 0 }], pet: 'a', mounts: ['frost_elk'], riding: '' }, 'nobody logs in riding; bad entries are dropped');
 });
 
+import { PET_IDS, PET_SKILLS, petSkillPower } from '../shared/src/companions';
+import { petAct } from '../server/src/game/Companions';
+
+test('G10 pets fight: each pet has a skill on its own cooldown, used only in a fight, on monsters only; healers and shields wait until the owner is hurt', () => {
+  assert.deepEqual(Object.keys(PET_SKILLS).sort(), [...PET_IDS].sort(), 'every pet has a skill');
+  assert.ok(petSkillPower(60) > petSkillPower(20) && petSkillPower(20) > petSkillPower(1));
+  const h = harness({ capacity: 10 }), { world } = h;
+  const summon = (p: any, kind: string, level = 1) => {
+    p.comp.pets.push({ uid: 'u_' + kind + p.id, kind, name: 'Pal', level, exp: 0 });
+    assert.equal(world.companion(p, { op: 'summon', uid: 'u_' + kind + p.id }), '');
+  };
+  const a = h.join(0, 0, 'knight', 30), p = a.p;
+  summon(p, 'iron_pup');
+  const m = world.spawn(p.room, 'mossling', p.x + 60, p.y);
+  m.maxHp = m.hp = 1e7;
+  p.target = m;
+  petAct(world, p, world.tick);
+  assert.equal(m.hp, 1e7, 'no fight yet: the pet waits');
+  p.lastCombat = world.tick;
+  petAct(world, p, world.tick);
+  assert.ok(m.hp < 1e7, 'in a fight it pounces');
+  assert.ok(m.st.some((x) => x.i === STATUS_INDEX.stun), 'and stuns');
+  const hp1 = m.hp;
+  petAct(world, p, world.tick + 1);
+  assert.equal(m.hp, hp1, 'then waits for its cooldown');
+  assert.ok(p.petSkillAt > world.tick);
+  // a healer waits until its owner is hurt
+  const b = h.join(0, 20, 'mage', 30).p;
+  summon(b, 'moss_sprout', 40);
+  b.lastCombat = world.tick;
+  petAct(world, b, world.tick);
+  assert.equal(b.petSkillAt, 0, 'healthy owner: nothing to do');
+  b.hp = Math.round(b.maxHp * 0.5);
+  const hp0 = b.hp;
+  petAct(world, b, world.tick);
+  assert.ok(b.hp > hp0, 'heals the hurt owner');
+  // a shield
+  const c = h.join(0, 40, 'ranger', 30).p;
+  summon(c, 'bog_toad');
+  c.lastCombat = world.tick;
+  c.hp = Math.round(c.maxHp * 0.4);
+  petAct(world, c, world.tick);
+  assert.ok(c.st.some((x) => x.i === STATUS_INDEX.barrier), 'shields the owner');
+  // pets never attack players
+  const d = h.join(0, 60, 'assassin', 30).p, foe = h.join(30, 60, 'knight', 30).p;
+  summon(d, 'ember_kit');
+  d.lastCombat = world.tick;
+  (d as any).target = foe;
+  const fhp = foe.hp;
+  petAct(world, d, world.tick);
+  assert.equal(foe.hp, fhp);
+  // the area skill reaches the monsters around the target
+  const e = h.join(0, 80, 'cleric', 30).p;
+  summon(e, 'star_mote');
+  const m1 = world.spawn(e.room, 'mossling', e.x + 80, e.y), m2 = world.spawn(e.room, 'mossling', e.x + 110, e.y);
+  m1.maxHp = m1.hp = m2.maxHp = m2.hp = 1e7;
+  e.target = m1;
+  e.lastCombat = world.tick;
+  petAct(world, e, world.tick);
+  assert.ok(m1.hp < 1e7 && m2.hp < 1e7, 'both monsters are struck');
+});
+
 test('M15 mounts: faster movement through the same collision rules, a level to ride, kept when struck, not in dungeons or the arena', () => {
   const h = harness({ capacity: 10 }), { world } = h;
   const a = h.join(0, 0, 'knight', 25), p = a.p;

@@ -37,7 +37,7 @@ import { Quests } from './Quests';
 import { Guilds } from './Guilds';
 import { Economy } from './Economy';
 import { Pvp } from './Pvp';
-import { companionOp, dismount, petExp } from './Companions';
+import { companionOp, dismount, petAct, petExp } from './Companions';
 import { emptyQuests, type QuestState } from '../../../shared/src/quests';
 import { applyCompanions, cleanCompanions, companionLook, MOUNT_FORBIDDEN_KINDS, type Companions, isFlying } from '../../../shared/src/companions';
 import { DEFAULT_AUCTION_RATES, emptyBank, type AuctionRates, type Bank } from '../../../shared/src/economy';
@@ -111,6 +111,8 @@ export class Player implements Ent {
   mask = 0;
   mods = NO_MODS;
   lastCombat = -1000;
+  /** G10: when the summoned pet may use its skill again (tick). */
+  petSkillAt = 0;
   /** Receiving developer overlay data (only possible when the server allows it). */
   debug = false;
   // auto hunting: the saved configuration, whether a session is running, and its figures
@@ -1520,6 +1522,12 @@ export class World implements CombatCtx {
    * One strike against a monster: a weapon hit (`basic`) or an ability hit. Returns the damage
    * dealt (0 on a miss) and records whether it was a critical hit in `lastCrit`.
    */
+  /** G10: a pet's blow. It counts as the owner's (threat, credit) but sets off none of their talents or unique effects. */
+  petStrike(p: Player, m: Monster, mul: number, magic: boolean): number {
+    const was = this.echoing;
+    this.echoing = true;
+    try { return this.strike(p, m, mul, magic, 0, false); } finally { this.echoing = was; }
+  }
   strike(p: Player, m: Monster, mul: number, magic = !!p.rule.magic, critAdd = 0, basic = true): number {
     if (m.dead) return 0;
     if (m.evading || this.rnd() * 100 < missChance(p.level, m.level)) {
@@ -1802,6 +1810,8 @@ export class World implements CombatCtx {
         if (p.hp !== hp0) p.sver++;
         if (p.hp !== hp0 || p.res !== res0) p.selfDirty = true;
       }
+      // --- the pet joins the fight (G10) ---
+      if ((tick + p.id) % 4 === 0 && p.comp.pet) petAct(this, p, tick);
     }
   }
 

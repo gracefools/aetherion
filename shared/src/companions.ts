@@ -24,6 +24,35 @@ export const PETS: Record<string, PetDef> = {
   iron_pup: { id: 'iron_pup', name: 'Iron Pup', stat: 'dodge', base: 2, top: 5, pct: false, colors: ['#a8b4c6', '#eef2fa', '#3a4250'], shape: 'pup' },
 };
 export const PET_MAX_LEVEL = 60;
+/** G10: each pet has one skill it uses on its own while its owner fights a monster. Pets never attack players. */
+export interface PetSkill {
+  name: string;
+  /** strike: the owner's target; area: around it; heal and shield: the owner, when hurt. */
+  kind: 'strike' | 'area' | 'heal' | 'shield';
+  cdMs: number;
+  /** Damage as a share of the owner's attack (strike, area), or of their health (heal, shield), at level 1. */
+  mul: number;
+  magic?: boolean;
+  /** A status the blow leaves on the monster. */
+  status?: 'burn' | 'slow' | 'stun';
+  radius?: number;
+  /** Heal and shield wait until the owner's health is below this share. */
+  below?: number;
+}
+export const PET_SKILLS: Record<string, PetSkill> = {
+  ember_kit: { name: 'Ember Bite', kind: 'strike', cdMs: 6000, mul: 0.6, magic: true, status: 'burn' },
+  moss_sprout: { name: 'Mending Spores', kind: 'heal', cdMs: 12000, mul: 0.06, below: 0.75 },
+  frost_owlet: { name: 'Frost Gust', kind: 'strike', cdMs: 8000, mul: 0.5, magic: true, status: 'slow' },
+  bog_toad: { name: 'Mud Shell', kind: 'shield', cdMs: 20000, mul: 0.08, below: 0.6 },
+  star_mote: { name: 'Starfall', kind: 'area', cdMs: 10000, mul: 0.45, magic: true, radius: 70 },
+  iron_pup: { name: 'Pounce', kind: 'strike', cdMs: 7000, mul: 0.7, status: 'stun' },
+};
+/** How far from its owner a pet reaches a monster. */
+export const PET_REACH = 260;
+/** The skill grows with the pet: 1% a level and 15% more at each evolution. */
+export const petSkillPower = (level: number) => Math.round((1 + 0.01 * (level - 1)) * (1 + 0.15 * petStage(level)) * 1000) / 1000;
+/** The pet kinds in a fixed order (their index travels in events). */
+export const PET_IDS = Object.keys(PETS);
 /** Pets evolve at levels 20, 40 and 60: a new name, a larger body and a stronger bonus. */
 export const PET_STAGES = [1, 20, 40, 60];
 export const PET_STAGE_NAMES = ['', 'Grown', 'Elder', 'Mythic'];

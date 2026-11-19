@@ -59,6 +59,7 @@ export const enum Act {
   LevelUp = 3, // [id, 3, level]
   Fx = 4, // [casterId, 4, abilityIndex, x, y, targetId, key, ...chainedIds]  an ability took effect
   FxEnd = 5, // [ownerId, 5, key, triggered]  a trap fired or expired
+  PetSkill = 6, // [ownerId, 6, petIndex, targetId]  the owner's pet used its skill (G10)
 }
 
 // ---- client -> server ----

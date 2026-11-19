@@ -60,6 +60,7 @@ import { buildBuildings } from './buildings3d';
 import { traitOf } from '../../../shared/src/traits';
 import type { FinderState } from '../../../shared/src/social';
 import type { LadderRow } from '../../../shared/src/seasons';
+import { PET_IDS, PET_SKILLS, PETS } from '../../../shared/src/companions';
 
 export interface ChatLine {
   id: number;
@@ -1362,6 +1363,8 @@ export class Game {
         else if (e[1] === Act.Fx) {
           this.onFx(e, now);
           if (mine) myFx = true;
+        } else if (e[1] === Act.PetSkill) {
+          this.onPetSkill(e[0], e[2], e[3], now);
         } else if (e[1] === Act.FxEnd) {
           const f = this.fx.find((x) => x.key === e[2] && x.src === e[0]);
           if (f) e[3] ? (f.firedAt = now) : (f.ms = 0);
@@ -2180,6 +2183,23 @@ export class Game {
     }
   }
 
+  /** G10: a pet used its skill: a bolt or leap from the pet to the monster, or a glow on its owner. */
+  private onPetSkill(owner: number, idx: number, target: number, now: number) {
+    const kind = PET_IDS[idx], sk = kind && PET_SKILLS[kind], from = this.pets.get(owner);
+    if (!sk) return;
+    const color = PETS[kind].colors[0], to = this.posOf(target);
+    const src = from ?? this.posOf(owner);
+    if (!src || !to) return;
+    if (sk.kind === 'heal' || sk.kind === 'shield') {
+      this.blasts.push({ x: to.x, y: to.y, r: 34, t0: now, tier: 0, color: sk.kind === 'heal' ? '#9be8a6' : '#c8a060', inner: 0, kind: 'area' });
+    } else {
+      this.shots.push({ x: src.x, y: src.y - 8, to: target, t0: now, color });
+      if (sk.kind === 'area') this.blasts.push({ x: to.x, y: to.y, r: sk.radius ?? 60, t0: now + 160, tier: 0, color, inner: 0, kind: 'area' });
+      else if (!sk.magic) this.blasts.push({ x: to.x, y: to.y, r: 0, t0: now + 120, tier: 0, color: '#eef2fa', inner: 0, kind: 'claw' });
+      if (from) { from.x += (to.x - from.x) * 0.35; from.y += (to.y - from.y) * 0.35; } // it springs toward the monster, then trots back
+    }
+    if (owner === this.me?.id) this.floaters.push({ x: src.x, y: src.y - 22, text: tr(`pet.skill.${kind}` as any), color, big: false, t0: now, kind: 'info' });
+  }
   /** Pets follow their owner: they trail a little behind, catch up with a hop, and settle beside them. */
   private pets = new Map<number, { x: number; y: number; at: number }>();
   private hflip = false;

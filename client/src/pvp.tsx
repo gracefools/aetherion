@@ -16,6 +16,7 @@ import { Icon } from './ui/icons';
 import { HONOR_SHOP } from '../../shared/src/pvp';
 import { ITEMS, RARITY_COLOR } from '../../shared/src/items';
 import { Icon as ItemIcon } from './inventory';
+import { PET_SKILLS, petSkillPower } from '../../shared/src/companions';
 
 const ZONE_LABEL: Record<Hud['pvpZone'], [Key, Key]> = {
   safe: ['pvp.zone.safe', 'pvp.zone.safeTip'],
@@ -179,6 +180,7 @@ export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; 
                   : <b>{p.name}</b>}
                 <div className="sub">{PET_STAGE_NAMES[petStage(p.level)] ? `${PET_STAGE_NAMES[petStage(p.level)]} ` : ''}{d.name} · {t('common.lv', { n: p.level })}{p.level < PET_MAX_LEVEL ? ` · ${t('comp.exp', { a: p.exp, b: petExpToNext(p.level) })}` : ` · ${t('common.max')}`}</div>
                 <div className="sub">{t('comp.bonus', { v: `${petBonus(d, p.level)}${d.pct ? '%' : ''}`, stat: t(`comp.stat.${d.stat}` as Key) })}</div>
+                {PET_SKILLS[p.kind] && <div className="sub petskill"><b>{t(`pet.skill.${p.kind}` as Key)}</b> ({Math.round(PET_SKILLS[p.kind].cdMs / 1000)}s): {t(`pet.desc.${p.kind}` as Key, { n: Math.round(PET_SKILLS[p.kind].mul * petSkillPower(p.level) * 100) })}</div>}
                 <div className="actions">
                   {out ? <button className="small" onClick={() => game.compOp('dismiss')}>{t('comp.dismiss')}</button> : <button className="small primary" onClick={() => game.compOp('summon', { uid: p.uid })}>{t('comp.summon')}</button>}
                   <button className="small" onClick={() => { setRenaming(p.uid); setName(p.name); }}>{t('comp.rename')}</button>

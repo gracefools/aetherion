@@ -1,6 +1,10 @@
 // Pets and mounts on the server (M15): collection, summoning, naming, levelling, riding.
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
-import { MAX_PETS, MOUNT_FORBIDDEN_KINDS, MOUNTS, PET_EXP_SHARE, PET_MAX_LEVEL, PET_NAME, petExpToNext, PETS } from '../../../shared/src/companions';
+import { MAX_PETS, MOUNT_FORBIDDEN_KINDS, MOUNTS, PET_EXP_SHARE, PET_IDS, PET_MAX_LEVEL, PET_NAME, PET_REACH, PET_SKILLS, petExpToNext, PETS, petSkillPower } from '../../../shared/src/companions';
+import { STATUS_INDEX } from '../../../shared/src/combat';
+import { Act } from '../../../shared/src/protocol';
+import { applyStatus, emit } from './entity';
+import { Monster } from './Monster';
 import { ITEMS } from '../../../shared/src/items';
 import { TICK_MS } from '../../../shared/src/protocol';
 import { newUid, sendInv } from './Inventory';
@@ -101,5 +105,30 @@ export function petExp(w: World, p: Player, exp: number): boolean {
     w.companionsChanged(p);
   } else send(w, p);
   return up;
+}
+/** G10: the summoned pet joins the fight. Called a few times a second for each player. */
+export function petAct(w: World, p: Player, tick: number) {
+  const pet = p.comp.pet ? p.comp.pets.find((x) => x.uid === p.comp.pet) : undefined, sk = pet && PET_SKILLS[pet.kind];
+  if (!pet || !sk || p.dead || tick < p.petSkillAt) return;
+  if ((tick - p.lastCombat) * TICK_MS > COMBAT_TIMEOUT_MS) return; // only in a fight
+  const power = petSkillPower(pet.level), idx = PET_IDS.indexOf(pet.kind);
+  if (sk.kind === 'heal' || sk.kind === 'shield') {
+    if (p.hp >= p.maxHp * (sk.below ?? 1)) return;
+    const n = Math.max(1, Math.round(p.maxHp * sk.mul * power));
+    if (sk.kind === 'heal') w.heal(p, n, p);
+    else applyStatus(p, STATUS_INDEX.barrier, tick, n, p.id);
+    p.petSkillAt = tick + Math.round(sk.cdMs / TICK_MS);
+    emit(p, w.evt, [p.id, Act.PetSkill, idx, p.id]);
+    return;
+  }
+  const m = p.target;
+  if (!(m instanceof Monster) || m.dead || m.room !== p.room || Math.hypot(m.x - p.x, m.y - p.y) > PET_REACH) return;
+  p.petSkillAt = tick + Math.round(sk.cdMs / TICK_MS);
+  emit(p, w.evt, [p.id, Act.PetSkill, idx, m.id]);
+  const targets = sk.kind === 'area' ? [...m.room.monsters.values()].filter((o) => !o.dead && Math.hypot(o.x - m.x, o.y - m.y) <= (sk.radius ?? 60)) : [m];
+  for (const o of targets) {
+    w.petStrike(p, o, sk.mul * power, !!sk.magic);
+    if (sk.status && !o.dead) applyStatus(o, STATUS_INDEX[sk.status], tick, (sk.magic ? p.stats.matk : p.stats.atk) * 0.5, p.id);
+  }
 }
 export { send as sendCompanions, sendInv };

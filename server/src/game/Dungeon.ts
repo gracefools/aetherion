@@ -71,6 +71,13 @@ export class Dungeons {
     if (d === 'armageddon' && !def.armageddon) return 'Armageddon is only offered in dungeons whose boss is level 50 or higher';
     if (d === 'armageddon' && p.level < ARMAGEDDON_LEVEL) return `Armageddon requires level ${ARMAGEDDON_LEVEL}`;
     let run = this.runFor(p, def.id);
+    if (run && run.diff !== d && !run.room.players.size) {
+      // a different difficulty was chosen and nobody is left in the earlier run: it is closed and a new
+      // one opened (a run the party is still fighting in is joined on its own difficulty, as before)
+      this.runs.delete(run.room);
+      this.w.dropRoom(run.room);
+      run = undefined;
+    }
     if (run && run.diff === 'armageddon' && p.level < ARMAGEDDON_LEVEL) return `Armageddon requires level ${ARMAGEDDON_LEVEL}`;
     if (run) {
       // Join a run the party already started (same difficulty the leader chose).

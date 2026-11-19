@@ -2193,6 +2193,39 @@ test('M7 sets and unique passives: bonuses at 2 and 3 pieces; passives change co
   for (const b of ITEM_LIST) if (b.unique?.passive) assert.ok(PASSIVES[b.unique.passive], b.id);
 });
 
+test('dungeon re-entry: another difficulty opens a new run instead of the empty last one; a party still inside is joined', () => {
+  const g = gateOf('verdant');
+  const { world, join } = harness({ capacity: 20 });
+  const a = join(g.dx, g.dy, 'knight', 30, -1, 'verdant');
+  const at = { x: a.p.x, y: a.p.y };
+  assert.equal(world.dungeon(a.p, 'enter', 'ruins', 'normal'), '');
+  const first = (world as any).dungeons.runs.get(a.p.room);
+  assert.equal(first.diff, 'normal');
+  world.dungeon(a.p, 'leave', undefined, undefined);
+  world.relocate(a.p, a.p.room, at.x, at.y);
+  assert.equal(world.dungeon(a.p, 'enter', 'ruins', 'hard'), '');
+  const second = (world as any).dungeons.runs.get(a.p.room);
+  assert.ok(second && second !== first && second.diff === 'hard', 'a new run on Hard');
+  assert.ok(![...(world as any).dungeons.runs.values()].includes(first), 'the empty Normal run is closed');
+  world.dungeon(a.p, 'leave', undefined, undefined);
+  world.relocate(a.p, a.p.room, at.x, at.y);
+  assert.equal(world.dungeon(a.p, 'enter', 'ruins', 'hard'), '');
+  assert.equal((world as any).dungeons.runs.get(a.p.room), second, 'the same difficulty still rejoins');
+  // a party member still inside: the others join on that difficulty only
+  const b = join(g.dx + 30, g.dy, 'cleric', 30, -1, 'verdant');
+  world.dungeon(a.p, 'leave', undefined, undefined);
+  world.relocate(a.p, a.p.room, at.x, at.y);
+  group(world, a.p, b.p);
+  assert.equal(world.dungeon(a.p, 'enter', 'ruins', 'nightmare'), '');
+  assert.equal(world.dungeon(b.p, 'ready', undefined, true), '');
+  const run = (world as any).dungeons.runs.get(a.p.room);
+  assert.ok(run && run.diff === 'nightmare' && b.p.room === a.p.room, 'the party went in on Nightmare');
+  world.dungeon(b.p, 'leave', undefined, undefined);
+  world.relocate(b.p, b.p.room, at.x + 30, at.y);
+  assert.equal(world.dungeon(b.p, 'enter', 'ruins', 'normal'), '');
+  assert.equal(b.p.room, a.p.room, 'a party still inside is joined on its own difficulty');
+});
+
 test('M7 dungeon entry: gate, level and leadership rules; a private instance scaled to the group', () => {
   const g = gateOf('verdant');
   const { world, join } = harness({ capacity: 20 });

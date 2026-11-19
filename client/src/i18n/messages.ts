@@ -286,6 +286,23 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   duelDeclined: m('{a} declined the duel.', '{a} menolak duel.'), duelWon: m('{a} has defeated {b} in a duel{c}.', '{a} telah mengalahkan {b} dalam duel{c}.'), forfeit: m(' (forfeit)', ' (menyerah)'),
   duelBegins: m('Duel with {a}: it begins in {b} seconds. Stay close.', 'Duel dengan {a}: dimulai dalam {b} detik. Tetap berdekatan.'),
 
+  // ---- G8 matchmaking and the Shrine Clash ----
+  inMatch: m('You are already in a match', 'Kamu sudah berada dalam laga'), notInMatch: m('You are not in a match', 'Kamu tidak sedang dalam laga'), notInLine: m('You are not in line', 'Kamu tidak sedang mengantre'),
+  lineRanked: m('You are in line for a rated duel. You may go about your business until it is found.', 'Kamu mengantre duel berperingkat. Lanjutkan kegiatanmu sampai lawan ditemukan.'),
+  lineBg: m('You are in line for the Shrine Clash. You may go about your business until it is found.', 'Kamu mengantre Bentrok Altar. Lanjutkan kegiatanmu sampai laga ditemukan.'),
+  rankedBegins: m('A rated duel against {a}. It begins in {b} seconds.', 'Duel berperingkat melawan {a}. Dimulai dalam {b} detik.'),
+  bgBegins: m('The Shrine Clash begins in {a} seconds. Hold the shrine between the bases and defeat the other team: the first to {b} points wins.', 'Bentrok Altar dimulai dalam {a} detik. Kuasai altar di antara kedua markas dan kalahkan tim lawan: yang pertama mencapai {b} poin menang.'),
+  shrineUs: m('Your team holds the shrine.', 'Timmu menguasai altar.'), shrineThem: m('The other team holds the shrine.', 'Tim lawan menguasai altar.'),
+  bgKill: m('You defeated {a}: +{b} points for your team.', 'Kamu mengalahkan {a}: +{b} poin untuk timmu.'), rankedDraw: m('The rated duel ended in a draw.', 'Duel berperingkat berakhir seri.'),
+  bgDraw: m('The Shrine Clash ended in a draw, {a} to {b}: +{c} honour.', 'Bentrok Altar berakhir seri, {a} lawan {b}: +{c} kehormatan.'),
+  bgWon: m('Victory in the Shrine Clash, {a} to {b}: +{c} honour, +{d} gold.', 'Menang di Bentrok Altar, {a} lawan {b}: +{c} kehormatan, +{d} emas.'),
+  bgLost: m('Defeat in the Shrine Clash, {a} to {b}: +{c} honour.', 'Kalah di Bentrok Altar, {a} lawan {b}: +{c} kehormatan.'),
+  rankedWon: m('You won the rated duel against {a}{b}: rating +{c}, +{d} honour.', 'Kamu memenangkan duel berperingkat melawan {a}{b}: rating +{c}, +{d} kehormatan.'), theyLeft: m(' (they left)', ' (lawan pergi)'),
+  rankedLeft: m('You left the rated duel and lost it: rating -{a}.', 'Kamu meninggalkan duel berperingkat dan kalah: rating -{a}.'),
+  rankedLost: m('You lost the rated duel against {a}: rating -{b}, +{c} honour.', 'Kamu kalah dalam duel berperingkat melawan {a}: rating -{b}, +{c} kehormatan.'),
+  bgDeserted: m('You left the Shrine Clash before the end: no reward.', 'Kamu meninggalkan Bentrok Altar sebelum usai: tanpa hadiah.'),
+  matchWon: m('Victory!', 'Menang!'), matchLost: m('Defeat.', 'Kalah.'), matchDraw: m('A draw.', 'Seri.'),
+
   // ---- companions ----
   cannotUse: m('Cannot be used', 'Tidak bisa dipakai'), petName: m('Pet names: 2-14 letters and spaces, starting with a letter', 'Nama peliharaan: 2-14 huruf dan spasi, diawali huruf'),
   unknownMount: m('Unknown mount', 'Tunggangan tidak dikenal'), unknownPet: m('Unknown pet', 'Peliharaan tidak dikenal'), haveMount: m('You already have this mount', 'Kamu sudah memiliki tunggangan ini'),

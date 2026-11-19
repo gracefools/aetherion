@@ -436,7 +436,7 @@ export class Repo {
     const r = await this.db.query<{ left: number }>('UPDATE pvp_stats SET honor_spent = honor_spent + $2 WHERE character_id = $1 AND honor - honor_spent >= $2 RETURNING honor - honor_spent AS left', [id, n]);
     return r.rows[0] ? Number(r.rows[0].left) : null;
   }
-  pvpAdd(c: { id: number; name: string; job: string }, d: Partial<Record<'kills' | 'deaths' | 'duels_won' | 'duels_lost' | 'arena_kills' | 'arena_deaths' | 'honor' | 'rating', number>>) {
+  pvpAdd(c: { id: number; name: string; job: string }, d: Partial<Record<'kills' | 'deaths' | 'duels_won' | 'duels_lost' | 'arena_kills' | 'arena_deaths' | 'honor' | 'rating' | 'bg_won' | 'bg_lost', number>>) {
     const cols = Object.keys(d), vals = Object.values(d);
     return this.db.query(
       `INSERT INTO pvp_stats(character_id, name, job, ${cols.join(', ')}) VALUES ($1,$2,$3, ${cols.map((k, i) => (k === 'rating' ? `1000 + $${i + 4}` : `$${i + 4}`)).join(', ')})
@@ -448,7 +448,7 @@ export class Repo {
     if (!ids.length) return [];
     return (await this.db.query<any>('SELECT * FROM pvp_stats WHERE character_id = ANY($1::bigint[])', [`{${ids.join(',')}}`])).rows;
   }
-  async pvpRankings(by: 'rating' | 'kills' | 'duels_won' | 'arena_kills', limit = 20) {
-    return (await this.db.query<any>(`SELECT character_id AS id, name, job, kills, deaths, duels_won, duels_lost, arena_kills, arena_deaths, honor, rating FROM pvp_stats ORDER BY ${by} DESC, character_id LIMIT $1`, [limit])).rows;
+  async pvpRankings(by: 'rating' | 'kills' | 'duels_won' | 'arena_kills' | 'bg_won', limit = 20) {
+    return (await this.db.query<any>(`SELECT character_id AS id, name, job, kills, deaths, duels_won, duels_lost, arena_kills, arena_deaths, bg_won, bg_lost, honor, rating FROM pvp_stats ORDER BY ${by} DESC, character_id LIMIT $1`, [limit])).rows;
   }
 }

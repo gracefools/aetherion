@@ -20,6 +20,7 @@ import { HONOR_SHOP } from '../../../shared/src/pvp';
 import { INTERACT_RANGE } from '../../../shared/src/places';
 import { ITEMS } from '../../../shared/src/items';
 import { give, sendInv } from './Inventory';
+import { Matches } from './Matches';
 
 interface Duel {
   a: Player;
@@ -37,21 +38,29 @@ export class Pvp {
   private recent = new Map<number, Map<number, number>>();
   /** In-memory copy of each online player's rating (the database holds the record). */
   rating = new Map<number, number>();
-  constructor(private w: World, private repo: Repo) {}
+  /** G8: the matchmaking queues and the matches they make. */
+  readonly matches: Matches;
+  constructor(private w: World, private repo: Repo) {
+    this.matches = new Matches(w, this);
+  }
 
   isArena(room: ZoneRoom) {
     return room === this.arena;
   }
+  /** The open arena or a matchmade hall: the arena's rules apply in both. */
+  arenaRules(room: ZoneRoom) {
+    return room === this.arena || this.matches.isMatch(room);
+  }
   view(p: Player, now: number): PvpView {
     const d = this.duels.get(p.id);
-    return { id: p.id, level: p.level, x: p.x, y: p.y, party: p.party ? p.party.id : 0, shieldUntil: p.pvpShieldUntil, guild: p.gtag, tagUntil: p.pvpTagUntil, duel: d && now >= d.startsAt ? (d.a === p ? d.b.id : d.a.id) : 0 };
+    return { id: p.id, level: p.level, x: p.x, y: p.y, party: this.matches.teamKey(p) || (p.party ? p.party.id : 0), shieldUntil: p.pvpShieldUntil, guild: p.gtag, tagUntil: p.pvpTagUntil, duel: d && now >= d.startsAt ? (d.a === p ? d.b.id : d.a.id) : 0 };
   }
   /** Why `a` may not attack `b` ('' if it may). */
   block(a: Player, b: Player): string {
     if (b.dead || a.dead) return 'Not a valid target';
     if (a.room !== b.room) return 'Not a valid target';
     const now = Date.now();
-    return pvpBlock(this.view(a, now), this.view(b, now), a.room.zoneId, this.isArena(a.room), now);
+    return pvpBlock(this.view(a, now), this.view(b, now), a.room.zoneId, this.arenaRules(a.room), now);
   }
 
   /** One weapon or spell hit from a player on a player. */
@@ -87,7 +96,7 @@ export class Pvp {
    * up any protection, and for a while finds no shelter in a sanctuary and no way out by a portal.
    */
   onHit(a: Player, v: Player) {
-    if (this.isArena(a.room)) return;
+    if (this.arenaRules(a.room)) return;
     const d = this.duels.get(a.id);
     if (d && (d.a === v || d.b === v)) return;
     a.pvpShieldUntil = 0;
@@ -107,6 +116,7 @@ export class Pvp {
   }
   /** A player was killed by another player (open world or arena). */
   onKill(k: Player, v: Player) {
+    if (this.matches.isMatch(v.room)) return this.matches.onKill(k, v);
     const now = Date.now(), arena = this.isArena(v.room);
     v.pvpShieldUntil = now + (arena ? 3000 : PVP_RESPAWN_SHIELD_MS);
     const last = this.recent.get(k.id)?.get(v.id) ?? 0, repeat = now - last < PVP_REPEAT_MS;
@@ -134,7 +144,7 @@ export class Pvp {
     this.w.send(k, { t: 'sys', text: repeat ? `You defeated ${v.name} again. Repeated victories over the same player give no honour for ten minutes.` : `You defeated ${v.name}: +${honor} honour, rating +${delta}${arena ? `, +${ARENA_GOLD} gold` : ''}.`, cue: 'pvp' });
     this.w.send(v, { t: 'sys', text: `You were defeated by ${k.name}.${arena ? '' : ' You are protected from other players for a minute after you return.'}` });
   }
-  private bump(p: Player, d: Parameters<Repo['pvpAdd']>[1]) {
+  bump(p: Player, d: Parameters<Repo['pvpAdd']>[1]) {
     if (d.honor) this.w.seasons.add(p, 'honor', d.honor);
     if (d.rating) this.rating.set(p.id, (this.rating.get(p.id) ?? 1000) + d.rating);
     this.repo.pvpAdd({ id: p.id, name: p.name, job: p.job }, d).catch((e) => console.error('pvp record failed', e));
@@ -206,9 +216,11 @@ export class Pvp {
         return '';
       }
       case 'arena': return this.enterArena(p);
-      case 'leave': return this.leaveArena(p);
+      case 'leave': return this.matches.isMatch(p.room) ? this.matches.leave(p) : this.leaveArena(p);
+      case 'queue': return this.matches.join(p, m.mode);
+      case 'unqueue': return this.matches.leaveQueue(p);
       case 'rank': {
-        void this.repo.pvpRankings(m.by === 'kills' || m.by === 'duels_won' || m.by === 'arena_kills' ? m.by : 'rating').then((rows) => this.repo.pvpStats([p.id]).then(([me]) => this.w.send(p, { t: 'pvprank', rows, me: me ?? null })));
+        void this.repo.pvpRankings(m.by === 'kills' || m.by === 'duels_won' || m.by === 'arena_kills' || m.by === 'bg_won' ? m.by : 'rating').then((rows) => this.repo.pvpStats([p.id]).then(([me]) => this.w.send(p, { t: 'pvprank', rows, me: me ?? null })));
         return '';
       }
       default: return 'Unknown command';
@@ -248,6 +260,7 @@ export class Pvp {
       else if (now >= d.endsAt) this.endDuel(d, null, 'draw');
     }
     for (const [id, r] of this.requests) if (r.until < now) this.requests.delete(id);
+    this.matches.tick(now);
   }
 
   // ---------- arena ----------
@@ -276,6 +289,10 @@ export class Pvp {
     return '';
   }
   /** Where a fallen arena fighter comes back. */
+  /** Where a fallen fighter comes back inside the arena or a match (null: the zone's usual spot). */
+  spawnFor(p: Player) {
+    return this.matches.spawnFor(p) ?? (this.isArena(p.room) ? this.arenaSpawn() : null);
+  }
   arenaSpawn() {
     return { x: tileCenter(ARENA_SPAWN.tx) + (this.w.rnd() - 0.5) * 200, y: tileCenter(ARENA_SPAWN.ty) + (this.w.rnd() - 0.5) * 160 };
   }

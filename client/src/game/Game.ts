@@ -62,6 +62,7 @@ import type { FinderState } from '../../../shared/src/social';
 import type { LadderRow } from '../../../shared/src/seasons';
 import { PET_IDS, PET_SKILLS, PETS } from '../../../shared/src/companions';
 import { DODGE } from '../../../shared/src/combat';
+import { BG, BG_BASES, BG_SHRINE, MATCH_ZONE, type MatchView } from '../../../shared/src/matches';
 
 export interface ChatLine {
   id: number;
@@ -181,6 +182,9 @@ export interface Hud {
   /** A dungeon ready check: who asked, which dungeon, who agreed and who has not yet. */
   dready: { id: string; diff: string; from: string; until: number; ok: string[]; wait: string[] } | null;
   pvprank: { rows: any[]; me: any } | null;
+  /** G8: the matchmaking line you are in, and the match you are in (start and end as Date.now() times). */
+  mq: 'ranked' | 'bg' | null;
+  match: (MatchView & { startsAt: number; endsAt: number }) | null;
   /** G9: the dungeon finder (null until the server has sent it). */
   finder: FinderState | null;
   /** G7: the seasonal ladder last looked at. */
@@ -316,7 +320,7 @@ export class Game {
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
     guild: null, grank: 3, ginv: null, bank: emptyBank(), ah: null, ahhist: [], banklog: [],
-    comp: emptyCompanions(), duel: null, dinv: null, dready: null, pvprank: null, finder: null, season: null, arena: false, pvpZone: 'safe', depthAsk: null, depthBosses: [], bounty: [], gear: emptyGear(),
+    comp: emptyCompanions(), duel: null, dinv: null, dready: null, pvprank: null, finder: null, season: null, mq: null, match: null, arena: false, pvpZone: 'safe', depthAsk: null, depthBosses: [], bounty: [], gear: emptyGear(),
   };
   private objs: WorldObj[] = [];
   /** Gathered nodes: object id -> local time it is ready again. */
@@ -863,7 +867,7 @@ export class Game {
     if (enter) this.sendMsg({ t: 'depth', op: 'enter' });
     else this.depthQuietUntil = performance.now() + 4000; // time to walk off the portal
   }
-  pvpOp(op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy', a: { id?: number; by?: string; base?: string } = {}) {
+  pvpOp(op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy' | 'queue' | 'unqueue', a: { id?: number; by?: string; base?: string; mode?: 'ranked' | 'bg' } = {}) {
     if (op === 'accept' || op === 'decline') this.setHud({ dinv: null });
     this.sendMsg({ t: 'pvp', op, ...a });
   }
@@ -881,7 +885,9 @@ export class Game {
   canAttack(r: { meta: EntityMeta; rx: number; ry: number }): boolean {
     const me = this.me;
     if (!me || !this.map) return false;
-    const party = (id: number) => (this.hud.party?.members.some((m) => m.id === id) ? 1 : 0);
+    const mt = this.hud.match;
+    // inside a match the teams stand in for parties: team-mates are not enemies
+    const party = (id: number) => (mt ? (mt.teams[0].ids.includes(id) ? 1 : mt.teams[1].ids.includes(id) ? 2 : 0) : this.hud.party?.members.some((m) => m.id === id) ? 1 : 0);
     const duel = this.hud.duel && this.hud.duel.starts <= Date.now() ? this.hud.duel.id : 0;
     return pvpBlock(
       { id: me.id, level: me.level, x: this.cur.x, y: this.cur.y, party: party(me.id), shieldUntil: 0, duel, guild: me.gt ?? '' },
@@ -1212,6 +1218,11 @@ export class Game {
         this.pushChat({ text: `Duel with ${m.with}: it begins in ${Math.max(0, Math.round((m.starts - Date.now()) / 1000))} seconds. Stay close.` });
         return this.setHud({ duel: { with: m.with, id: m.id, starts: m.starts, ends: m.ends }, dinv: null });
       case 'pvprank': return this.setHud({ pvprank: { rows: m.rows, me: m.me } });
+      case 'mq': return this.setHud({ mq: m.mode });
+      case 'match':
+        if (m.v && !this.hud.match) sound.notify();
+        if (m.v?.result && !this.hud.match?.result) this.pushChat({ text: m.v.result === 'won' ? 'Victory!' : m.v.result === 'lost' ? 'Defeat.' : 'A draw.' });
+        return this.setHud({ match: m.v ? { ...m.v, startsAt: Date.now() + m.v.starts, endsAt: Date.now() + m.v.ends } : null, mq: m.v ? null : this.hud.mq });
       case 'finder': return this.setHud({ finder: { q: m.q, counts: m.counts } });
       case 'season': return this.setHud({ season: { season: m.season, ladder: m.ladder, ends: m.ends, rows: m.rows, me: m.me } });
       case 'pinv':
@@ -1762,6 +1773,32 @@ export class Game {
       g.fill();
     }
 
+    const mt = this.hud.match;
+    if (mt?.mode === 'bg' && map.def.id === MATCH_ZONE) {
+      // the Shrine Clash: the shrine in your team's colour when your team holds it, the other's when they do
+      const col = (s: number) => (s < 0 ? 'rgba(230,220,190,0.8)' : s === mt.side ? 'rgba(90,170,255,0.9)' : 'rgba(255,90,80,0.9)');
+      const pulse = (Math.sin(now / 400) + 1) / 2, sx = tileCenter(BG_SHRINE.tx), sy = tileCenter(BG_SHRINE.ty), r = BG.shrineR * TILE;
+      g.save();
+      g.strokeStyle = col(mt.shrine);
+      g.lineWidth = 2 + pulse * 2;
+      g.setLineDash([10, 8]);
+      g.beginPath();
+      g.ellipse(sx, sy, r, r * 0.8, 0, 0, 7);
+      g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = col(mt.shrine);
+      g.globalAlpha = 0.15 + pulse * 0.1;
+      g.fill();
+      BG_BASES.forEach((b, s) => {
+        g.globalAlpha = 0.5;
+        g.strokeStyle = col(s);
+        g.lineWidth = 2;
+        g.beginPath();
+        g.ellipse(tileCenter(b.tx), tileCenter(b.ty), TILE * 3, TILE * 2.4, 0, 0, 7);
+        g.stroke();
+      });
+      g.restore();
+    }
     if (this.hunter.on) {
       // the hunting area: the hunter never leaves this circle
       const ar = this.hunter.area();

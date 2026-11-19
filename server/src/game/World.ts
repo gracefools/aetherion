@@ -968,7 +968,7 @@ export class World implements CombatCtx {
     p.known.clear();
     this.send(p, {
       t: 'welcome', id: p.id, zone: p.room.zoneId, channel: p.room.channel, tick: this.tick, x: p.x, y: p.y,
-      self: p.meta(), stats: p.stats, hp: p.hp, res: p.res, exp: p.exp, next: expToNext(p.level), dev: this.opts.debugOverlay || undefined, auto: p.autoCfg, factions: this.quests.factions, comp: p.comp, bank: p.bank, gear: p.gear, arena: this.pvp.isArena(p.room) || undefined, build: p.build, inv: p.inv, eq: p.eq, gold: p.gold, disc: [...p.disc],
+      self: p.meta(), stats: p.stats, hp: p.hp, res: p.res, exp: p.exp, next: expToNext(p.level), dev: this.opts.debugOverlay || undefined, auto: p.autoCfg, factions: this.quests.factions, comp: p.comp, bank: p.bank, gear: p.gear, arena: this.pvp.arenaRules(p.room) || undefined, build: p.build, inv: p.inv, eq: p.eq, gold: p.gold, disc: [...p.disc],
     });
     const cd: [string, number][] = [];
     for (const [id, at] of p.room.nodeReady) if (at > this.tick) cd.push([id, (at - this.tick) * TICK_MS]);
@@ -1533,7 +1533,7 @@ export class World implements CombatCtx {
   }
   /** Back to the zone's spawn point at full health, with a short protective ward. No EXP or item penalty. */
   private respawn(p: Player) {
-    const sp = p.room.map.def.spawn, at = this.pvp.isArena(p.room) ? this.pvp.arenaSpawn() : { x: tileCenter(sp.tx), y: tileCenter(sp.ty) };
+    const sp = p.room.map.def.spawn, at = this.pvp.spawnFor(p) ?? { x: tileCenter(sp.tx), y: tileCenter(sp.ty) };
     p.dead = false;
     p.x = at.x;
     p.y = at.y;
@@ -1889,7 +1889,7 @@ export class World implements CombatCtx {
 
   private transfer(p: Player) {
     const portal = portalAt(p.room.map, p.x, p.y);
-    if (portal?.to === EXIT && !p.dead) return void (this.pvp.isArena(p.room) ? this.pvp.leaveArena(p) : this.rifts.isRift(p.room) ? this.rifts.leave(p) : this.raids.isRaid(p.room) ? this.raids.leave(p) : this.life.isHome(p.room) ? this.life.leaveHome(p) : this.dungeons.leave(p));
+    if (portal?.to === EXIT && !p.dead) return void (this.pvp.matches.isMatch(p.room) ? this.pvp.matches.leave(p) : this.pvp.isArena(p.room) ? this.pvp.leaveArena(p) : this.rifts.isRift(p.room) ? this.rifts.leave(p) : this.raids.isRaid(p.room) ? this.raids.leave(p) : this.life.isHome(p.room) ? this.life.leaveHome(p) : this.dungeons.leave(p));
     if (!portal || !ZONES[portal.to] || p.dead) return;
     const dest = ZONES[portal.to], now = Date.now();
     const refuse = (text: string) => {

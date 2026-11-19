@@ -17,6 +17,7 @@ import { HONOR_SHOP } from '../../shared/src/pvp';
 import { ITEMS, RARITY_COLOR } from '../../shared/src/items';
 import { Icon as ItemIcon } from './inventory';
 import { PET_SKILLS, petSkillPower } from '../../shared/src/companions';
+import { BG, RANKED } from '../../shared/src/matches';
 
 const ZONE_LABEL: Record<Hud['pvpZone'], [Key, Key]> = {
   safe: ['pvp.zone.safe', 'pvp.zone.safeTip'],
@@ -32,7 +33,8 @@ export function PvpZoneBadge({ hud, game }: { hud: Hud; game: Game }) {
   return toRail(
     <div className={'hud pvpzone ' + hud.pvpZone} title={t(tip, { n: Math.round((DEPTH_MONSTER.exp - 1) * 100) })} role="status" aria-label={t('pvp.zone.label', { name: t(label) })}>
       {t(label)}
-      {hud.arena && <button className="small" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveArena')}</button>}
+      {hud.arena && !hud.match && <button className="small" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveArena')}</button>}
+      {hud.mq && <span className="mq">{t(hud.mq === 'ranked' ? 'mm.inLineRanked' : 'mm.inLineBg')} <button className="small" onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button></span>}
     </div>
   );
 }
@@ -63,6 +65,31 @@ export function DuelInvite({ hud, game }: { hud: Hud; game: Game }) {
   );
 }
 
+/** G8: the match in progress: the score, the clock and the shrine (battleground), and the way out. */
+export function MatchBar({ hud, game }: { hud: Hud; game: Game }) {
+  useT();
+  const m = hud.match, [, tick] = useState(0);
+  useEffect(() => {
+    if (!m) return;
+    const id = setInterval(() => tick((x: number) => x + 1), 250);
+    return () => clearInterval(id);
+  }, [m]);
+  if (!m) return null;
+  const now = Date.now(), starts = Math.ceil((m.startsAt - now) / 1000), left = Math.max(0, Math.ceil((m.endsAt - now) / 1000));
+  const mine = m.teams[m.side], theirs = m.teams[1 - m.side];
+  const clock = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  return (
+    <div className="hud duelbar matchbar panel" role="status" aria-label={t(m.mode === 'ranked' ? 'mm.ranked' : 'mm.bg')}>
+      {m.mode === 'bg' && <b className="score"><span className="us" title={mine.names.join(', ')}>{mine.score}</span> : <span className="them" title={theirs.names.join(', ')}>{theirs.score}</span></b>}
+      {m.mode === 'ranked' && <b>{t('mm.vs', { name: theirs.names.join(', ') })}</b>}
+      {m.result ? <b className="count">{t(m.result === 'won' ? 'mm.won' : m.result === 'lost' ? 'mm.lost' : 'mm.draw')}</b>
+        : starts > 0 ? <b className="count">{t('mm.startsIn', { n: starts })}</b> : <span>{clock}</span>}
+      {m.mode === 'bg' && !m.result && <small className="sub">{t(m.shrine < 0 ? 'mm.shrineFree' : m.shrine === m.side ? 'mm.shrineUs' : 'mm.shrineThem')}</small>}
+      {!m.result && <button className="small" onClick={() => game.pvpOp('leave')}>{t('mm.leave')}</button>}
+    </div>
+  );
+}
+
 export function DuelStatus({ hud, game }: { hud: Hud; game: Game }) {
   useT();
   const d = hud.duel, [, tick] = useState(0);
@@ -81,7 +108,7 @@ export function DuelStatus({ hud, game }: { hud: Hud; game: Game }) {
   );
 }
 
-const BY: [string, Key][] = [['rating', 'pvp.by.rating'], ['kills', 'pvp.by.kills'], ['duels_won', 'pvp.by.duels'], ['arena_kills', 'pvp.by.arena']];
+const BY: [string, Key][] = [['rating', 'pvp.by.rating'], ['kills', 'pvp.by.kills'], ['duels_won', 'pvp.by.duels'], ['arena_kills', 'pvp.by.arena'], ['bg_won', 'pvp.by.bg']];
 export function Rankings({ hud, game }: { hud: Hud; game: Game }) {
   const [by, setBy] = useState('rating');
   useEffect(() => game.pvpOp('rank', { by }), [by]);
@@ -91,7 +118,7 @@ export function Rankings({ hud, game }: { hud: Hud; game: Game }) {
       <div className="tabs" role="tablist" aria-label={t('pvp.rankBy')}>
         {BY.map(([k, l]) => <button key={k} role="tab" aria-selected={by === k} className={by === k ? 'on' : ''} onClick={() => setBy(k)}>{t(l)}</button>)}
       </div>
-      {r?.me && <p className="sub">{t('pvp.me', { rating: r.me.rating, kills: r.me.kills, deaths: r.me.deaths, won: r.me.duels_won, lost: r.me.duels_lost, arena: r.me.arena_kills, honor: r.me.honor })}</p>}
+      {r?.me && <p className="sub">{t('pvp.me', { rating: r.me.rating, kills: r.me.kills, deaths: r.me.deaths, won: r.me.duels_won, lost: r.me.duels_lost, arena: r.me.arena_kills, honor: r.me.honor, bw: r.me.bg_won ?? 0, bl: r.me.bg_lost ?? 0 })}</p>}
       <div className="ahlist" role="table" aria-label={t('pvp.rankings')}>
         {!r && <p className="sub">{t('common.loading')}</p>}
         {r && !r.rows.length && <p className="sub">{t('pvp.noRanks')}</p>}
@@ -113,7 +140,15 @@ export function ArenaMaster({ hud, game }: { hud: Hud; game: Game }) {
     <>
       <p>{t('pvp.arenaSay')}</p>
       <div className="actions">
-        {hud.arena ? <button className="primary" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveTheArena')}</button> : <button className="primary" onClick={() => game.pvpOp('arena')}>{t('pvp.enterArena')}</button>}
+        {hud.arena && !hud.match ? <button className="primary" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveTheArena')}</button> : !hud.match && <button className="primary" onClick={() => game.pvpOp('arena')}>{t('pvp.enterArena')}</button>}
+      </div>
+      <h3>{t('mm.title')}</h3>
+      <p className="sub">{t('mm.about', { n: BG.target, win: BG.winHonor, lose: BG.loseHonor, rw: RANKED.winHonor })}</p>
+      <div className="actions">
+        {hud.mq ? <button onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button> : !hud.match && <>
+          <button className="primary" onClick={() => game.pvpOp('queue', { mode: 'ranked' })}>{t('mm.queueRanked')}</button>
+          <button className="primary" onClick={() => game.pvpOp('queue', { mode: 'bg' })}>{t('mm.queueBg')}</button>
+        </>}
       </div>
       <h3>{t('honor.shop')}</h3>
       <HonorShop hud={hud} game={game} />

@@ -11,6 +11,7 @@ import type { Gear } from './gear';
 import type { AuctionRates, Bank, GuildView, Listing } from './economy';
 import type { FinderState } from './social';
 import type { LadderRow } from './seasons';
+import type { MatchView } from './matches';
 export type { Appearance };
 
 export const TICK_RATE = 20;
@@ -94,7 +95,7 @@ export type ClientMsg =
   | { t: 'quest'; op: 'accept' | 'abandon' | 'turnin' | 'shop'; id?: string; faction?: string; base?: string }
   | { t: 'guild'; op: string; [k: string]: unknown }
   | { t: 'eco'; op: string; [k: string]: unknown }
-  | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy'; id?: number; by?: string; base?: string }
+  | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy' | 'queue' | 'unqueue'; id?: number; by?: string; base?: string; mode?: string }
   | { t: 'finder'; op: 'join' | 'leave' | 'state'; dungeon?: string; diff?: string }
   | { t: 'season'; op: 'view'; ladder?: string }
   | { t: 'comp'; op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount'; uid?: string; id?: string; name?: string }
@@ -296,6 +297,9 @@ export type ServerMsg =
   | { t: 'dinv'; from: string; id: number; ms: number }
   | { t: 'duel'; with: string; id: number; starts: number; ends: number; result?: string }
   | { t: 'pvprank'; rows: any[]; me: any }
+  /** G8: the matchmaking line you are in (null: none), and the match you are in (null: it is over for you). */
+  | { t: 'mq'; mode: 'ranked' | 'bg' | null }
+  | { t: 'match'; v: MatchView | null }
   | { t: 'comp'; comp: Companions }
   | { t: 'pong'; c: number }
   /** G2 talents: time taken off every skill cooldown. */

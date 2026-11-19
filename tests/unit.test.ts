@@ -4989,6 +4989,105 @@ test('M15 arena: entered at the Arena Master, everyone fights everyone (teams by
   assert.equal(world.pvpOp(A.p, { op: 'leave' }), 'You are not in the arena');
 });
 
+import { BG, BG_SHRINE, formTeams, MATCH_END_MS, pairRanked, pickBattleground, RANKED, ratingWindow } from '../shared/src/matches';
+
+test('G8 matchmaking rules: rating windows widen with waiting, teams are balanced, a battleground fills or waits', () => {
+  assert.equal(ratingWindow(0), 100);
+  assert.ok(ratingWindow(60_000) > ratingWindow(10_000));
+  const now = 1e6;
+  assert.deepEqual(pairRanked([{ id: 1, rating: 1000, since: now }, { id: 2, rating: 1500, since: now }, { id: 3, rating: 1050, since: now }], now), [[1, 3]], 'the closest pair, the far one waits');
+  assert.equal(pairRanked([{ id: 1, rating: 1000, since: now - 120_000 }, { id: 2, rating: 1500, since: now - 120_000 }], now).length, 1, 'after a long wait the gap is bridged');
+  const t = formTeams([1600, 1500, 1400, 1300, 1200, 1100].map((rating, i) => ({ id: i + 1, rating, since: now })));
+  const sum = (ids: number[]) => ids.reduce((s, id) => s + 1700 - id * 100, 0);
+  assert.equal(t[0].length, 3);
+  assert.ok(Math.abs(sum(t[0]) - sum(t[1])) <= 100, 'the strongest are spread across the teams');
+  const q = (n: number, wait: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1, rating: 1000, since: now - wait }));
+  assert.equal(pickBattleground(q(6, 0), now)!.length, 6, 'a full match starts at once');
+  assert.equal(pickBattleground(q(3, 0), now), null, 'a short line waits');
+  assert.equal(pickBattleground(q(3, BG.fillWaitMs), now)!.length, 2, 'then starts with an even number');
+});
+
+test('G8 rated duel: queued anywhere, matched by rating, fought in a private hall, rating changes, everyone goes home', () => {
+  const h = harness({ capacity: 10 }), { world } = h, mm = world.pvp.matches as any;
+  const A = h.join(0, 0, 'knight', 30), B = h.join(200, 0, 'mage', 30);
+  const home = { x: A.p.x, y: A.p.y };
+  assert.equal(world.pvpOp(A.p, { op: 'queue', mode: 'ranked' }), '');
+  assert.equal(world.pvpOp(A.p, { op: 'queue', mode: 'nope' }), 'Unknown command');
+  assert.equal(world.pvpOp(B.p, { op: 'queue', mode: 'ranked' }), '');
+  assert.ok(A.out.some((m) => m.t === 'mq' && m.mode === 'ranked'));
+  mm.tick(Date.now());
+  assert.ok(mm.isMatch(A.p.room) && A.p.room === B.p.room, 'both taken to the same hall');
+  assert.ok(A.p.room.monsters.size === 0);
+  assert.notEqual(world.pvp.block(A.p, B.p), '', 'nobody is hurt before the start');
+  const m = mm.of.get(A.p.id);
+  m.startsAt = Date.now() - 1;
+  for (const p of [A.p, B.p]) p.pvpShieldUntil = 0;
+  assert.equal(world.pvp.block(A.p, B.p), '', 'then they fight');
+  const ra = world.pvp.rating.get(A.p.id) ?? 1000;
+  world.hurt(B.p, 1e9, 0, A.p);
+  assert.ok(B.p.dead && m.overAt > 0 && m.winner === m.side.get(A.p.id));
+  assert.ok((world.pvp.rating.get(A.p.id) ?? 0) > ra, 'the winner gains rating');
+  assert.ok(A.out.some((x) => x.t === 'match' && x.v?.result === 'won') && B.out.some((x) => x.t === 'match' && x.v?.result === 'lost'));
+  m.overAt -= MATCH_END_MS;
+  mm.tick(Date.now());
+  assert.equal(A.p.room.zoneId, 'eldoria');
+  assert.ok(Math.hypot(A.p.x - home.x, A.p.y - home.y) < 2, 'back where they were');
+  assert.ok(!B.p.dead && B.p.room.zoneId === 'eldoria', 'the loser is brought back on their feet');
+  assert.ok(!mm.of.has(A.p.id) && mm.matches.size === 0, 'the hall is closed');
+  // leaving a rated duel loses it (once out of combat: nobody is taken from a fight)
+  for (const p of [A.p, B.p]) p.lastCombat = -1000;
+  world.pvpOp(A.p, { op: 'queue', mode: 'ranked' });
+  world.pvpOp(B.p, { op: 'queue', mode: 'ranked' });
+  mm.tick(Date.now());
+  const rb = world.pvp.rating.get(B.p.id) ?? 1000;
+  assert.equal(world.pvpOp(B.p, { op: 'leave' }), '');
+  assert.equal(B.p.room.zoneId, 'eldoria');
+  assert.ok((world.pvp.rating.get(B.p.id) ?? 0) < rb, 'whoever leaves loses');
+  assert.equal(world.pvpOp(B.p, { op: 'unqueue' }), 'You are not in line');
+});
+
+test('G8 Shrine Clash: two balanced teams, team-mates are safe, kills and the shrine score, honour for both sides', () => {
+  const h = harness({ capacity: 10 }), { world } = h, mm = world.pvp.matches as any;
+  const ps = [h.join(0, 0, 'knight', 30), h.join(30, 0, 'mage', 30), h.join(60, 0, 'cleric', 30), h.join(90, 0, 'ranger', 30)].map((x) => x.p);
+  for (const p of ps) assert.equal(world.pvpOp(p, { op: 'queue', mode: 'bg' }), '');
+  mm.tick(Date.now());
+  assert.ok(!mm.isMatch(ps[0].room), 'four in line: it waits for more');
+  for (const p of ps) mm.queue.get(p.id).since -= BG.fillWaitMs;
+  mm.tick(Date.now());
+  assert.ok(ps.every((p) => mm.isMatch(p.room) && p.room === ps[0].room), 'then all four go in');
+  const m = mm.of.get(ps[0].id);
+  m.startsAt = Date.now() - 1;
+  for (const p of ps) p.pvpShieldUntil = 0;
+  const mate = ps.find((p) => p !== ps[0] && m.side.get(p.id) === m.side.get(ps[0].id))!, foe = ps.find((p) => m.side.get(p.id) !== m.side.get(ps[0].id))!;
+  assert.equal(world.pvp.block(ps[0], mate), 'That player is on your team');
+  assert.equal(world.pvp.block(ps[0], foe), '');
+  const side = m.side.get(ps[0].id);
+  world.hurt(foe, 1e9, 0, ps[0]);
+  assert.equal(m.score[side], BG.killPoints, 'a kill scores');
+  // the fallen come back at their base
+  foe.deadTick -= Math.ceil(BG.respawnMs / TICK_MS) + 1;
+  mm.tick(Date.now());
+  assert.ok(!foe.dead && mm.isMatch(foe.room), 'back in the fight');
+  // holding the shrine alone scores
+  for (const p of ps) world.relocate(p, p.room, m.side.get(p.id) === side ? tileCenter(BG_SHRINE.tx) : tileCenter(BG_SHRINE.tx) + 30 * TILE, tileCenter(BG_SHRINE.ty));
+  const before = m.score[side];
+  m.nextHold = Date.now() - 1;
+  mm.tick(Date.now());
+  assert.equal(m.score[side], before + 1, 'the shrine scores for the team on it');
+  assert.equal(m.shrine, side);
+  // reaching the target wins; both sides are paid
+  m.score[side] = BG.target - 1;
+  const gold = ps[0].gold;
+  m.nextHold = Date.now() - 1;
+  mm.tick(Date.now());
+  assert.ok(m.overAt > 0 && m.winner === side);
+  assert.equal(ps[0].gold, gold + BG.winGold);
+  m.overAt -= MATCH_END_MS;
+  mm.tick(Date.now());
+  assert.ok(ps.every((p) => p.room.zoneId === 'eldoria'), 'everyone goes home');
+  assert.ok(RANKED.winHonor > 0);
+});
+
 test('M15 pets: whistles join the collection, a summoned pet gives its bonus, follows the owner on screen, levels up, can be named', () => {
   const h = harness({ capacity: 10 }), { world } = h;
   const a = h.join(0, 0, 'berserker', 20), p = a.p, other = h.join(30, 0, 'mage', 20);

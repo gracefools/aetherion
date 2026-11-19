@@ -292,7 +292,11 @@ export class Player implements Ent {
     this.selfDirty = true;
   }
   meta(): PlayerMeta {
-    return { id: this.id, name: this.name, job: this.job, level: this.level, ap: this.ap, x: this.x, y: this.y, d: this.dir, hp: this.hp, mhp: this.maxHp, st: this.mask, ...companionLook(this.comp), ...(this.gtag ? { gt: this.gtag } : {}), ...(this.weaponGlow() ? { wa: this.weaponGlow() } : {}), ...(this.journal.ti ? { ti: this.journal.ti } : {}), ...(this.life.aura && AURA_SKINS[this.life.aura] ? { wk: this.life.aura } : {}) };
+    return { id: this.id, name: this.name, job: this.job, level: this.level, ap: this.ap, x: this.x, y: this.y, d: this.dir, hp: this.hp, mhp: this.maxHp, st: this.mask, ...companionLook(this.comp), ...(this.gtag ? { gt: this.gtag } : {}), ...(this.weaponLook() ? { wa: this.weaponLook() } : {}), ...(this.journal.ti ? { ti: this.journal.ti } : {}), ...(this.life.aura && AURA_SKINS[this.life.aura] ? { wk: this.life.aura } : {}) };
+  }
+  /** What others see: the armament glow, or a faint one for a worn glow skin (G11). */
+  weaponLook(): number {
+    return this.weaponGlow() || (this.eq.weapon && this.life.aura && AURA_SKINS[this.life.aura] ? 1 : 0);
   }
   /** Weapon glow from the weapon armament (+6, +12, +18), shown only while a weapon is equipped. */
   weaponGlow(): number {

@@ -6563,6 +6563,17 @@ test('season pass and wardrobe: season experience from play, levels claimed once
   assert.equal(world.lifeOp(p, { op: 'claim', level: 10 }), '');
   assert.equal(world.lifeOp(p, { op: 'aura', id: 'violet' }), '');
   assert.equal(p.meta().wk, 'violet');
+  // G11: the glow shop sells looks for gold, never stats; the season's glows are not for sale
+  assert.equal(world.lifeOp(p, { op: 'buyaura', id: 'violet' }), 'Not for sale');
+  p.gold = 30_000;
+  const stats0 = JSON.stringify(p.stats);
+  assert.equal(world.lifeOp(p, { op: 'buyaura', id: 'abyss' }), 'Not enough gold');
+  assert.equal(world.lifeOp(p, { op: 'buyaura', id: 'crimson' }), '');
+  assert.equal(p.gold, 5_000);
+  assert.ok(p.life.auras.includes('crimson') && p.meta().wk === 'crimson', 'owned and worn at once');
+  assert.equal(world.lifeOp(p, { op: 'buyaura', id: 'crimson' }), 'You already own that glow');
+  assert.equal(JSON.stringify(p.stats), stats0, 'no stat changes');
+  if (p.eq.weapon) assert.ok(p.meta().wa! >= 1, 'a worn glow shows on any weapon');
   // the wardrobe: a helmet worn once becomes a look
   give(p, spec('plate_helm', { ilvl: 5 }));
   const helm = p.inv.find((i) => i.base === 'plate_helm');

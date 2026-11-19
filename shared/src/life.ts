@@ -93,11 +93,19 @@ export function seasonReward(level: number): SeasonReward {
 // ---------------------------------------------------------------------------------------------
 // Wardrobe: how gear looks (any armour or helmet ever worn), and weapon glow colours
 // ---------------------------------------------------------------------------------------------
-export const AURA_SKINS: Record<string, { name: string; color: string }> = {
+export const AURA_SKINS: Record<string, { name: string; color: string; price?: number }> = {
   violet: { name: 'Violet Glow', color: '#b07aff' },
   emerald: { name: 'Emerald Glow', color: '#5fe08a' },
   aurora: { name: 'Aurora Glow', color: '#7fe8ff' },
+  // G11: the cosmetics shop (gold only; a look, never a stat)
+  crimson: { name: 'Crimson Glow', color: '#ff4a5a', price: 25_000 },
+  sakura: { name: 'Blossom Glow', color: '#ffa8d0', price: 40_000 },
+  solar: { name: 'Solar Glow', color: '#ffd24a', price: 40_000 },
+  abyss: { name: 'Abyssal Glow', color: '#5a3aff', price: 60_000 },
+  starlight: { name: 'Starlight Glow', color: '#f4f8ff', price: 120_000 },
 };
+/** The glow skins for sale; the others come from the season pass. */
+export const AURA_SHOP = Object.keys(AURA_SKINS).filter((id) => AURA_SKINS[id].price);
 
 // ---------------------------------------------------------------------------------------------
 // The stored state

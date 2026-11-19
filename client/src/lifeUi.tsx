@@ -8,6 +8,7 @@ import {
 } from '../../shared/src/life';
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
+import { AURA_SHOP } from '../../shared/src/life';
 
 const TABS = ['prof', 'home', 'season', 'wardrobe'] as const;
 type Tab = (typeof TABS)[number];
@@ -91,8 +92,19 @@ export function LifePanel({ game, onClose }: { game: Game; onClose: () => void }
           <h3>{t('life.auras')}</h3>
           <div className="titlelist">
             <button className={!l.aura ? 'on' : ''} onClick={() => game.lifeOp('aura', { id: '' })}>{t('life.auraNone')}</button>
-            {Object.entries(AURA_SKINS).map(([id, a]) => <button key={id} disabled={!l.auras.includes(id)} className={l.aura === id ? 'on' : ''} onClick={() => game.lifeOp('aura', { id })} style={{ color: a.color }}>✦ {a.name}</button>)}
+            {Object.entries(AURA_SKINS).filter(([id]) => !AURA_SKINS[id].price || l.auras.includes(id)).map(([id, a]) => <button key={id} disabled={!l.auras.includes(id)} className={l.aura === id ? 'on' : ''} onClick={() => game.lifeOp('aura', { id })} style={{ color: a.color }}>✦ {a.name}</button>)}
           </div>
+          {AURA_SHOP.some((id) => !l.auras.includes(id)) && <>
+            <h3>{t('shop.cosmetic')}</h3>
+            <p className="sub">{t('shop.cosmeticHelp')}</p>
+            <div className="titlelist cosmeticshop">
+              {AURA_SHOP.filter((id) => !l.auras.includes(id)).map((id) => (
+                <button key={id} style={{ color: AURA_SKINS[id].color }} disabled={(hud.gold ?? 0) < AURA_SKINS[id].price!} onClick={() => game.lifeOp('buyaura', { id })} title={t('shop.buyFor', { price: AURA_SKINS[id].price!.toLocaleString() })}>
+                  ✦ {AURA_SKINS[id].name} <small>{AURA_SKINS[id].price!.toLocaleString()}g</small>
+                </button>
+              ))}
+            </div>
+          </>}
         </div>
       )}
     </div>

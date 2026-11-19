@@ -146,7 +146,7 @@ evInvasion: m('Invasion! Monsters march on {a} in {b}. Defend the village!', 'In
   restOwn: m('Rest in your own bed', 'Istirahat di tempat tidurmu sendiri'), nearBed: m('Lie down next to your bed', 'Berbaringlah di dekat tempat tidurmu'), notTired: m('You are not tired yet', 'Kamu belum lelah'),
   rested: m('You wake up rested: stronger for half an hour.', 'Kamu bangun segar: lebih kuat selama setengah jam.'), unknownSeason: m('Unknown season level', 'Level musim tidak dikenal'),
   seasonNotYet: m('You have not reached that season level', 'Kamu belum mencapai level musim itu'), unknownSlot: m('Unknown slot', 'Slot tidak dikenal'), noLook: m('You have not collected that look', 'Kamu belum mengoleksi tampilan itu'),
-  noAura: m('You have not unlocked that glow', 'Kamu belum membuka cahaya itu'),
+  noAura: m('You have not unlocked that glow', 'Kamu belum membuka cahaya itu'), ownAura: m('You already own that glow', 'Kamu sudah memiliki cahaya itu'),
     guildNoBuilding: m('Unknown building', 'Bangunan tidak dikenal'), guildBuildingMax: m('That building is at its highest level', 'Bangunan itu sudah di level tertinggi'),
   guildNoPoints: m('The guild has no points to spend: it earns five with each guild level', 'Guild tidak punya poin: guild mendapat lima poin setiap naik level'),
   guildBuilt: m('{a} raised the {b} to level {c}: +{d}% {e} for every member.', '{a} menaikkan {b} ke level {c}: +{d}% {e} untuk setiap anggota.'),

@@ -284,6 +284,20 @@ export class Lives {
         this.touch(p);
         return '';
       }
+      case 'buyaura': {
+        const a = typeof m.id === 'string' ? AURA_SKINS[m.id] : undefined;
+        if (!a?.price) return 'Not for sale';
+        if (p.life.auras.includes(m.id)) return 'You already own that glow';
+        if (p.gold < a.price) return 'Not enough gold';
+        p.gold -= a.price;
+        p.life.auras.push(m.id);
+        p.life.aura = m.id; // worn at once
+        p.selfDirty = true;
+        sendInv(this.w, p);
+        this.w.relook(p);
+        this.touch(p);
+        return '';
+      }
       case 'aura': {
         if (m.id && !p.life.auras.includes(m.id)) return 'You have not unlocked that glow';
         p.life.aura = m.id && AURA_SKINS[m.id] ? m.id : '';

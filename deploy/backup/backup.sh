@@ -11,13 +11,18 @@ KEEP=${BACKUP_KEEP:-28}
 mkdir -p /backups
 while true; do
   f="/backups/aetherion-$(date -u +%Y%m%d-%H%M).sql.gz"
-  if pg_dump --clean --if-exists --no-owner -h postgres -U aetherion aetherion | gzip -6 > "$f.part"; then
+  # pg_dump compresses by itself, so its own exit status decides (a pipe would report gzip's)
+  if pg_dump --clean --if-exists --no-owner -Z 6 -h postgres -U aetherion -f "$f.part" aetherion && [ -s "$f.part" ]; then
     mv "$f.part" "$f"
     echo "backup written: $f ($(du -h "$f" | cut -f1))"
+    wait_s=$((EVERY * 3600))
   else
     rm -f "$f.part"
-    echo "backup FAILED at $(date -u)" >&2
+    echo "backup FAILED at $(date -u); trying again in 5 minutes" >&2
+    wait_s=300
   fi
+  # an empty gzip (20 bytes) is a failed backup from before this check; a real dump is kilobytes
+  find /backups -name 'aetherion-*.sql.gz' -size -100c -delete
   ls -1t /backups/aetherion-*.sql.gz 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f
-  sleep $((EVERY * 3600))
+  sleep "$wait_s"
 done

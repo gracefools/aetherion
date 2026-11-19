@@ -3,6 +3,7 @@
 // Drawn in screen space over the world and under the name plates.
 import { darkness, weatherAt, type Weather } from '../../../shared/src/events';
 import type { Theme } from '../../../shared/src/world';
+import { ambient } from './ambient';
 
 interface Drop { x: number; y: number; v: number; s: number; }
 const COUNT: Record<Weather, number> = { clear: 0, rain: 180, storm: 260, snow: 140, ash: 110, fog: 0, stars: 40 };
@@ -75,6 +76,8 @@ export class Sky {
       g.fillRect(0, 0, W, H);
     }
     g.restore();
+    // ---- the air of the place: pollen and leaves by day, fireflies at night, dust, embers, spores ----
+    if (!indoors) ambient.motes(g, W, H, now, dt, theme, darkness(serverNow), density);
     // ---- night ----
     const dark = (indoors ? 0 : darkness(serverNow) * (w === 'storm' ? 1 : 0.9)) * darkScale; // style B lights the night itself, so less shade
     if (dark > 0.02) {

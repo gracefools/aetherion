@@ -63,6 +63,7 @@ import type { LadderRow } from '../../../shared/src/seasons';
 import { PET_IDS, PET_SKILLS, PETS } from '../../../shared/src/companions';
 import { DODGE } from '../../../shared/src/combat';
 import { BG, BG_BASES, BG_SHRINE, MATCH_ZONE, type MatchView } from '../../../shared/src/matches';
+import { ambient, windOf } from './ambient';
 
 export interface ChatLine {
   id: number;
@@ -233,6 +234,9 @@ interface Remote {
   stepAt: number;
 }
 interface Drawable {
+  /** Squash and stretch around the feet (1 = none): breathing, the jolt of a hit, the stretch of a lunge. */
+  sqx?: number;
+  sqy?: number;
   /** The weapon glow colour worn (wardrobe). */
   wk?: string;
   /** The pet's evolution stage (0-3): drawn larger and glowing. */
@@ -1463,6 +1467,7 @@ export class Game {
         });
         if (amount > 0 && !(flags & (Dmg.Heal | Dmg.Dot | Dmg.Miss)) && this.hits.length < 5 * 40)
           this.hits.push(pos.x + (Math.random() * 10 - 5), pos.y - (r?.mt ? monsterHeight(r.mt) * 0.5 : 14), now + (mine ? 0 : INTERP_DELAY), flags & Dmg.Crit ? 1 : 0, mine ? 1 : 0);
+          if (settings.get().graphics.quality !== 'low') ambient.burst(pos.x, pos.y - (r?.mt ? monsterHeight(r.mt) * 0.5 : 14), flags & Dmg.Crit ? '#ffd24a' : mine ? '#ff9a8a' : '#fff3c4', flags & Dmg.Crit ? 14 : 6, flags & Dmg.Crit ? 110 : 70, now + (mine ? 0 : INTERP_DELAY));
         if (amount > 0 && !(flags & Dmg.Heal)) {
           if (mine) this.selfHitAt = now;
           else if (r) r.hitAt = now + INTERP_DELAY;
@@ -1818,6 +1823,8 @@ export class Game {
       g.stroke();
       g.setLineDash([]);
     }
+    // living water: small glints wander over the water in view
+    ambient.water(g, map, camX, camY, vw, vh, now);
     // Ground warnings for incoming area attacks: the fill grows until the attack lands.
     const fx25w = settings.get().graphics.quality !== 'low';
     for (let i = this.blasts.length - 1; i >= 0; i--) if (!drawBlastGround(g, this.blasts[i], now)) this.blasts.splice(i, 1);
@@ -1931,7 +1938,7 @@ export class Game {
       const b = r.buf;
       const move = r.m || (b.length >= 6 && rt < b[b.length - 3] ? Move.Run : Move.Idle);
       const o = pool.pop() ?? ({} as Drawable);
-      o.mark = '';
+      o.mark = ''; o.sqx = o.sqy = 1;
       o.x = r.rx; o.y = r.ry; o.sheet = r.sheet; o.id = r.meta.id;
       const frac = r.mhp ? r.hp / r.mhp : 0;
       if (r.mt) {
@@ -1942,6 +1949,17 @@ export class Game {
         else if (r.act === 'attack' && now >= r.actAt && now - r.actAt < mAnimDuration('attack')) { a = 'attack'; t = now - r.actAt; }
         else if (r.hitAt && now >= r.hitAt && now - r.hitAt < 170) { a = 'hit'; t = 0; }
         o.sx = mAnimFrame(a, t) * F; o.sy = r.d === 1 ? F : 0; o.sw = F; o.ox = F / 2; o.oy = Math.round(42 * MK * sc) - 9 + (def.flying ? 6 : 0);
+        // alive between frames: it breathes, jolts flat when struck and stretches into its own blows
+        if (a === 'hit' || (r.hitAt && now >= r.hitAt && now - r.hitAt < 220 && a !== 'death')) {
+          const k = 1 - Math.min(1, (now - r.hitAt) / 220), j = Math.sin(k * Math.PI) * 0.16;
+          o.sqx = 1 + j; o.sqy = 1 - j;
+        } else if (a === 'attack') {
+          const k = Math.min(1, t / mAnimDuration('attack')), j = Math.sin(k * Math.PI) * 0.1;
+          o.sqx = 1 - j * 0.6; o.sqy = 1 + j;
+        } else if (a !== 'death') {
+          const br = Math.sin(now / (def.boss ? 760 : 520) + r.meta.id * 1.7) * (def.flying ? 0.035 : 0.022);
+          o.sqx = 1 - br * 0.6; o.sqy = 1 + br;
+        }
         o.aura = 0;
         o.alpha = 1;
         o.pet = o.mount = null; o.flip = false; o.wa = 0;
@@ -1989,6 +2007,7 @@ export class Game {
     }
     {
       const me = this.me, o = pool.pop() ?? ({} as Drawable), mhp = this.hud.stats?.maxHp ?? 1;
+      o.sqx = o.sqy = 1;
       o.mark = '';
       o.x = px; o.y = py; o.sheet = this.sheet!; o.id = me.id;
       o.alpha = this.stealthed ? 0.5 : 1;
@@ -2018,12 +2037,19 @@ export class Game {
     for (const ob of this.objs) {
       if (Math.abs(ob.x - px) > 760 || Math.abs(ob.y - py) > 480) continue;
       const o = pool.pop() ?? ({} as Drawable), npc = isNpc(ob);
+      o.sqx = o.sqy = 1;
       o.mark = npc ? this.questMarks().npc.get(ob.id) ?? '' : '';
       o.x = ob.x; o.y = ob.y; o.id = 0; o.aura = npc ? ob.ap!.aura : 0; o.bar = -1; o.barW = 0; o.alpha = 1;
       o.pet = o.mount = null; o.flip = false; o.wa = 0;
       if (npc) {
         const hs = hdChar(ob.ap!, ob.job!);
-        if (hs) { o.sheet = hs; o.sx = (HD_COL.idle + (Math.floor(now / 240 + ob.x) % 4)) * HD; o.sy = 0; o.sw = HD; o.ox = HD_OX; o.oy = HD_OY; }
+        if (hs) {
+          // townsfolk turn to whoever comes near, and otherwise glance about now and then
+          const dx = this.cur.x - ob.x, dy = this.cur.y - ob.y, near = Math.hypot(dx, dy) < 130;
+          const glance = Math.floor((now + ob.x * 131) / 2600) % 5;
+          const row = near ? (Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : dy < 0 ? 3 : 0) : glance === 1 ? 1 : glance === 3 ? 2 : 0;
+          o.sheet = hs; o.sx = hdFrame('idle', now + ob.x * 37) * HD; o.sy = row * HD; o.sw = HD; o.ox = HD_OX; o.oy = HD_OY;
+        }
         else { o.sheet = getCharSheet(ob.ap!, ob.job!); o.sx = (Math.floor(now / 520 + ob.x) % 2) * FRAME_W; o.sy = 0; o.sw = FRAME_W; o.ox = SPRITE_OX; o.oy = SPRITE_OY; }
         o.label = ob.name; o.labelY = hs ? HD_NAME : NAME_OY; o.color = '#9fe0a0';
         o.title = tr(`npc.title.${ob.kind}` as any);
@@ -2056,7 +2082,10 @@ export class Game {
     let order = 0;
     if (st) for (const tl of visTrees) for (const t of tl) {
       if (t.x > camX + vw + 40 || t.x + t.img.width < camX - 40 || t.y > camY + vh + 40 || t.footY < camY - 40) continue;
-      st.sprite(t.img, 0, 0, t.img.width, t.img.height, t.x, t.y, t.img.width, t.img.height, t.footY, order++);
+      // the wind: a slow sway, and gusts rolling across the map from the west; every tree its own phase
+      const gust = Math.max(0, Math.sin(now / 2600 - t.x / 420)) ** 3;
+      const sway = (Math.sin(now / 1150 + t.x * 0.013 + t.footY * 0.007) * 0.022 + gust * 0.03 * Math.sin(now / 260 + t.x * 0.05)) * windOf(map.def.theme);
+      st.sprite(t.img, 0, 0, t.img.width, t.img.height, t.x, t.y, t.img.width, t.img.height, t.footY, order++, 1, false, true, sway);
     }
     for (const o of list) {
       const sx = Math.round(o.x), sy = Math.round(o.y);
@@ -2064,16 +2093,24 @@ export class Game {
         const PW = o.pet ? o.pet.width / 2 : 0;
         if (o.pet) {
           const stg = o.petStage ?? 0, pw = Math.round(PW * (1 + 0.15 * stg)), hx = Math.round(o.petX ?? sx) - pw / 2, py0 = Math.round(o.petY ?? sy);
-          st.sprite(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, hx, py0 - pw + 8 - Math.round(o.petHop ?? 0), pw, pw, py0, order++, o.alpha, o.flip && PW !== PET_W);
+          // a pet stretches as it leaps, flattens as it lands, breathes when it sits, and glitters once evolved
+          const hop = o.petHop ?? 0, pq = hop > 0.3 ? (hop - 2) * 0.03 : Math.sin(now / 430 + o.id) * 0.03, pwx = pw * (1 - pq), pwy = pw * (1 + pq);
+          st.sprite(o.pet, (Math.floor(now / 300 + o.id) & 1) * PW, 0, PW, PW, hx - (pwx - pw) / 2, py0 - pwy + 8 - Math.round(hop), pwx, pwy, py0, order++, o.alpha, o.flip && PW !== PET_W);
+          if (stg >= 1 && !low && Math.random() < 0.05 * stg) ambient.puff(hx + Math.random() * pw, py0 - Math.random() * pw, ['#ffffff', '#ffffff', '#9ad0ff', '#ffe08a'][stg], now, 2, 520);
         }
         let lift = 0;
         if (o.mount) {
-          const MS = 2, hover = o.flying ? 16 + Math.round(Math.sin(now / 300 + o.id) * 2) : 0, f = Math.floor(now / 160 + o.id) & 1;
+          // at a gallop the mount bounces and kicks up dust; a flyer leaves a shimmer; standing, it breathes
+          const spd = ambient.speedOf(o.id, o.x, o.y, now), going = spd > 40;
+          const bounce = going && !o.flying ? Math.round(Math.abs(Math.sin(now / 85 + o.id)) * 2.5) : 0;
+          const MS = 2, hover = (o.flying ? 16 + Math.round(Math.sin(now / 300 + o.id) * 2) : 0) + bounce, f = Math.floor(now / (going ? 110 : 320) + o.id) & 1;
+          if (going && !low && Math.random() < 0.3) ambient.puff(sx + (Math.random() - 0.5) * 22, o.flying ? sy - 10 : sy + 6, o.flying ? '#cfe8ff' : '#c8b898', now, o.flying ? 2 : 3, o.flying ? 420 : 380);
           lift = 14 + hover;
           if (o.mount.width === HD_MOUNT_W * 2) st.sprite(o.mount, f * HD_MOUNT_W, 0, HD_MOUNT_W, HD_MOUNT_H, sx - HD_MOUNT_W / 2, sy - hover - HD_MOUNT_H + 12, HD_MOUNT_W, HD_MOUNT_H, sy, order++, o.alpha, o.flip);
           else st.sprite(o.mount, f * MOUNT_W, 0, MOUNT_W, MOUNT_H, sx - (MOUNT_W * MS) / 2, sy - hover - MOUNT_H * MS + 14, MOUNT_W * MS, MOUNT_H * MS, sy, order++, o.alpha, o.flip);
         }
-        st.sprite(o.sheet, o.sx, o.sy, o.sw, o.sw, sx - o.ox, sy - o.oy - lift, o.sw, o.sw, sy, order++, o.alpha);
+        const qx = o.sqx ?? 1, qy = o.sqy ?? 1;
+        st.sprite(o.sheet, o.sx, o.sy, o.sw, o.sw, sx - o.ox * qx, sy - o.oy * qy - lift, o.sw * qx, o.sw * qy, sy, order++, o.alpha);
         if (o.wa) drawWeaponGlow(g, (o.wk && AURA_SKINS[o.wk]?.color) || WEAPON_AURA_COLORS[o.wa], sx + (o.flip ? -8 : 8), sy - 15 - lift, now, o.wa, o.id);
         if (o.aura && !low) drawAura(g, o.aura, sx, sy, now, o.id);
         continue;
@@ -2120,16 +2157,39 @@ export class Game {
       if (o.wa) drawWeaponGlow(g, (o.wk && AURA_SKINS[o.wk]?.color) || WEAPON_AURA_COLORS[o.wa], sx + (o.flip ? -8 : 8), sy - 15 - lift, now, o.wa, o.id);
       if (o.aura && !low) drawAura(g, o.aura, sx, sy, now, o.id);
     }
+    // homes are lived in: smoke drifts from the chimneys, and after dusk the windows throw warm light on the ground
+    if (!low) {
+      const dusk = map.def.kind === 'dungeon' ? 0 : darkness(this.skyNow(now));
+      for (const d of this.doors) {
+        if (Math.abs(d.x - px) > vw || Math.abs(d.y - py) > vh) continue;
+        if (Math.random() < 0.07) ambient.puff(d.x + 20 + (Math.random() - 0.5) * 4, d.y - 92, Math.random() < 0.5 ? '#d8d8dc' : '#b8b8c0', now, 4, 1700);
+        if (dusk > 0.2) {
+          const flick = 0.85 + 0.15 * Math.sin(now / 190 + d.x), r = 46;
+          const gl = g.createRadialGradient(d.x, d.y + 8, 2, d.x, d.y + 8, r);
+          gl.addColorStop(0, `rgba(255,196,110,${0.34 * dusk * flick})`);
+          gl.addColorStop(1, 'rgba(255,196,110,0)');
+          g.fillStyle = gl;
+          g.fillRect(d.x - r, d.y + 8 - r * 0.6, r * 2, r * 1.2);
+        }
+      }
+    }
+    ambient.drawSparks(g, now);
     // Projectiles fly from the attacker to wherever the target currently is.
     for (let i = this.shots.length - 1; i >= 0; i--) {
       const s = this.shots[i], k = (now - s.t0) / 140;
       if (k < 0) continue;
       const to = this.posOf(s.to);
       if (k >= 1 || !to) {
+        if (to) ambient.burst(to.x, to.y - 10, s.color, 5, 55, now);
         this.shots.splice(i, 1);
         continue;
       }
-      const x = Math.round(s.x + (to.x - s.x) * k), y = Math.round(s.y + (to.y - 10 - s.y) * k);
+      // a slight arc, a glowing head, and a trail of fading embers behind it
+      const x = Math.round(s.x + (to.x - s.x) * k), y = Math.round(s.y + (to.y - 10 - s.y) * k - Math.sin(k * Math.PI) * 6);
+      ambient.puff(x, y, s.color, now, 2, 240);
+      const gl = g.createRadialGradient(x, y, 0, x, y, 7);
+      gl.addColorStop(0, s.color); gl.addColorStop(1, 'rgba(255,255,255,0)');
+      g.globalAlpha = 0.6; g.fillStyle = gl; g.fillRect(x - 7, y - 7, 14, 14); g.globalAlpha = 1;
       g.fillStyle = s.color;
       g.fillRect(x - 2, y - 1, 4, 3);
       g.fillStyle = '#ffffff';

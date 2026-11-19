@@ -577,7 +577,7 @@ function Hotbar({ hud, game }: { hud: Hud; game: Game }) {
       {b.runes.slots.map((el, sl) => (
         <div className="slots rune" key={sl} aria-label={t('rune.slot', { n: sl + 1 })}>
           {el ? runeSpells(el).map((def, i) => <Slot key={def.id} def={def} hotkey={runeKey(sl, i)} hud={hud} game={game} locked={(b.runes.lv[el] ?? 1) + s.runeLevel >= def.unlock! ? '' : t('rune.needLevel', { n: def.unlock! })} />)
-            : <span className="emptyrune">{t('rune.slot', { n: sl + 1 })}<br />{t('rune.empty')}</span>}
+            : <span className="emptyrune" title={`${t('rune.slot', { n: sl + 1 })} · ${t('rune.empty')}`}><b>+</b><small>{sl + 1}</small></span>}
         </div>
       ))}
       <PotionBar hud={hud} game={game} />

@@ -608,6 +608,11 @@
   .stepper { display: inline-flex; align-items: center; gap: 2px; } .stepper input { width: 52px; text-align: center; padding: 2px; } .stepper button { width: 24px; padding: 0; }
   .ware .quick { display: inline-flex; gap: 6px; } .ware .quick button { padding: 0; font-size: 11px; }
   .bulktotal { margin: 4px 0; }
+  /* an empty rune slot is a small dashed square, not a wide label: the hotbar stays narrow */
+  .emptyrune { width: 38px !important; height: 38px !important; border: 1px dashed #4a5068; border-radius: 8px; position: relative; color: #6a7088 !important; }
+  .emptyrune b { font-size: 18px; line-height: 1; } .emptyrune small { position: absolute; right: 3px; bottom: 1px; font-size: 9px; }
+  /* between the chat (left) and the menu dock (right) on narrower screens the hotbar shrinks to fit */
+  @media (min-width: 901px) and (max-width: 1500px) { .hotbar { transform: translateX(-50%) scale(.82); transform-origin: 50% 100%; } }
 </style>
 </head>
 <body>

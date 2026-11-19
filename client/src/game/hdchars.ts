@@ -12,9 +12,10 @@ import { ramp } from './hdart';
 export type RGB = [number, number, number];
 export const HD = 64;
 export const HD_ANIMS = {
-  idle: { frames: 4, ms: 240, loop: true },
-  walk: { frames: 6, ms: 105, loop: true },
-  run: { frames: 6, ms: 78, loop: true },
+  // idle breathes over eight frames and blinks once; walking and running take eight steps a cycle
+  idle: { frames: 8, ms: 210, loop: true },
+  walk: { frames: 8, ms: 80, loop: true },
+  run: { frames: 8, ms: 60, loop: true },
   attack: { frames: 5, ms: 72, loop: false },
   cast: { frames: 5, ms: 100, loop: false },
   hit: { frames: 2, ms: 110, loop: false },

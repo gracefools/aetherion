@@ -356,7 +356,8 @@ export function buildChunk(map: ZoneMap, cx: number, cy: number, stage = false):
       set(i, R.grass[Math.max(0, Math.min(4, k + (tv - 1) * (k > 0 && k < 4 ? 1 : 0)))]);
       if (n < 0.22 && jit < 0.12) set(i, moss);
     } else { // grass
-      set(i, R.grass[pick5[Math.max(0, Math.min(8, Math.floor((n * 0.85 + jit * 0.35) * 9 - 0.6)))]]);
+      const macro = (vnoise(X, Y, 110, 17) - 0.5) * 2.6 + (vnoise(X, Y, 41, 23) - 0.5) * 1.2; // meadow patches
+      set(i, R.grass[pick5[Math.max(0, Math.min(8, Math.floor((n * 0.85 + jit * 0.35) * 9 - 0.6 + macro)))]]);
       if (edge < 0.07) set(i, R.grass[4]); // a lit lip where grass meets path or stone
     }
   }
@@ -371,7 +372,40 @@ export function buildChunk(map: ZoneMap, cx: number, cy: number, stage = false):
       const flowers = t === T.Flower ? 7 : rr() < 0.12 ? 2 : 0;
       for (let k = 0; k < flowers; k++) flower(g, ox + 3 + Math.floor(rr() * 26), oy + 4 + Math.floor(rr() * 25), p.flora[Math.floor(rr() * p.flora.length)], R.grass);
       if (t === T.Grass && rr() < 0.05) { const dl = decos(theme), s = dl[Math.floor(rr() * dl.length)]; g.drawImage(s, ox + Math.floor(rr() * (TS - s.width)), oy + Math.floor(rr() * (TS - s.height))); }
+      if (t === T.Grass) {
+        if (rr() < 0.22) { // a clover patch: a few dark leaves with a pale heart
+          const x = ox + 5 + Math.floor(rr() * 22), y = oy + 6 + Math.floor(rr() * 20);
+          g.fillStyle = css(R.grass[0]);
+          for (const [dx, dy] of [[0, 0], [2, 1], [-2, 1], [1, 3], [-1, -2], [3, -1]]) g.fillRect(x + dx, y + dy, 2, 2);
+          g.fillStyle = css(R.grass[4]); g.fillRect(x, y, 1, 1); g.fillRect(x + 2, y + 1, 1, 1);
+        }
+        if (rr() < 0.16) { // a pebble or two, lit from the upper left
+          for (let k = 0; k < 1 + Math.floor(rr() * 2); k++) {
+            const x = ox + 4 + Math.floor(rr() * 24), y = oy + 6 + Math.floor(rr() * 22);
+            g.fillStyle = 'rgba(20,24,30,0.3)'; g.fillRect(x, y + 2, 4, 1);
+            g.fillStyle = css(R.stone[2]); g.fillRect(x, y, 3, 2);
+            g.fillStyle = css(R.stone[4]); g.fillRect(x, y, 2, 1);
+            g.fillStyle = css(R.stone[0]); g.fillRect(x + 2, y + 1, 1, 1);
+          }
+        }
+        if (rr() < 0.14) { // fallen leaves
+          for (let k = 0; k < 2 + Math.floor(rr() * 3); k++) {
+            const x = ox + 3 + Math.floor(rr() * 26), y = oy + 4 + Math.floor(rr() * 24);
+            g.fillStyle = p.flora[Math.floor(rr() * p.flora.length)]; g.globalAlpha = 0.75; g.fillRect(x, y, 2, 1); g.fillRect(x + 1, y + 1, 1, 1); g.globalAlpha = 1;
+          }
+        }
+      }
     } else if (t === T.Path) {
+      if (rr() < 0.07) { // a shallow puddle that catches the sky
+        const x = ox + 9 + Math.floor(rr() * 12), y = oy + 10 + Math.floor(rr() * 12), w = 6 + Math.floor(rr() * 6);
+        g.fillStyle = css(R.dirt[0]); g.beginPath(); g.ellipse(x, y, w, w * 0.45, 0, 0, 7); g.fill();
+        g.fillStyle = css(R.water[2]); g.globalAlpha = 0.75; g.beginPath(); g.ellipse(x, y, w - 1.5, w * 0.45 - 1, 0, 0, 7); g.fill(); g.globalAlpha = 1;
+        g.fillStyle = css(R.foam); g.fillRect(x - Math.floor(w / 2), y - 1, Math.max(2, Math.floor(w / 2)), 1);
+      }
+      if (rr() < 0.3) { // a rut worn by carts
+        const x = ox + Math.floor(rr() * 20), y = oy + 6 + Math.floor(rr() * 20);
+        g.fillStyle = css(R.dirt[1]); g.fillRect(x, y, 9 + Math.floor(rr() * 8), 1);
+      }
       for (let k = 0; k < 3; k++) { const x = ox + Math.floor(rr() * 30), y = oy + Math.floor(rr() * 30); g.fillStyle = css(R.dirt[0]); g.fillRect(x, y + 1, 3, 1); g.fillStyle = css(R.dirt[4]); g.fillRect(x, y, 2, 1); }
     } else if (t === T.Portal || t === T.Gate) runeCircle(g, ox + 16, oy + 16, t === T.Portal ? '#7ae0ff' : '#ffb04a');
   }

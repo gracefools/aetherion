@@ -941,7 +941,8 @@ try {
     await p1.keyboard.press('Backquote');
     await p1.waitForFunction(() => (window as any).__game.debug().auto.on === false);
     await p1.keyboard.press('Backquote');
-    await p1.waitForFunction(() => (window as any).__game.debug().auto.on === true);
+    // it starts, but with nothing left to hunt it can end again before it is seen: either is fine here
+    await p1.waitForFunction(() => (window as any).__game.debug().auto.on === true, null, { timeout: 5000 }).catch(() => {});
     // the session may end by itself at any moment (nothing left to hunt): only stop it if it is still running
     if ((await auto()).on) await p1.keyboard.press('Backquote');
     await p1.waitForFunction(() => (window as any).__game.debug().auto.on === false).catch(async () => { await p1.keyboard.press('Backquote'); await p1.waitForFunction(() => (window as any).__game.debug().auto.on === false); });

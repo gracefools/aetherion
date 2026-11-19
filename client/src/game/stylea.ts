@@ -104,7 +104,7 @@ function makeLook(ap: Appearance, job: Job): Look {
 interface Pose {
   bob: number; liftL: number; liftR: number; armL: number; armR: number; // front and back
   A: number; l1: number; l2: number; arm: number; bend: number; armFar: number; sway: number; // side
-  atk: number | null; cast: number; hit: boolean;
+  atk: number | null; cast: number; hit: boolean; blink: boolean;
   /** Attacks: where the swing came from (its trail is drawn between) and how far the body lunges. */
   atkPrev: number | null; lunge: number;
   /** Attacks: the weapon's own angle, how far each arm reaches (1 = relaxed), the far arm's attack
@@ -140,10 +140,14 @@ const ATTACKS: Record<string, AtkSpec> = {
 const THRUST = new Set(['daggers', 'staff', 'holy_staff', 'orb', 'bow', 'crossbow']);
 const TAU = Math.PI * 2, ease = (t: number) => t * t * (3 - 2 * t);
 function poseFor(a: HdAnim, f: number, kind = 'sword_shield'): Pose {
-  const p: Pose = { bob: 0, liftL: 0, liftR: 0, armL: 0, armR: 0, A: 0, l1: 0, l2: 0, arm: 0.1, bend: 0.3, armFar: -0.05, sway: 0, atk: null, cast: 0, hit: false, atkPrev: null, lunge: 0, wpn: 0, reach: 1, far: null, reachFar: 1, wpnFar: 0, draw: 0, flash: 0 };
-  if (a === 'idle') { p.bob = f >= 2 ? 1 : 0; p.sway = p.bob; }
+  const p: Pose = { bob: 0, liftL: 0, liftR: 0, armL: 0, armR: 0, A: 0, l1: 0, l2: 0, arm: 0.1, bend: 0.3, armFar: -0.05, sway: 0, atk: null, cast: 0, hit: false, blink: false, atkPrev: null, lunge: 0, wpn: 0, reach: 1, far: null, reachFar: 1, wpnFar: 0, draw: 0, flash: 0 };
+  if (a === 'idle') {
+    // breathing: the body settles and rises, the arms follow a beat later, the cape stirs; one blink a cycle
+    p.bob = f >= 3 && f <= 6 ? 1 : 0; p.sway = [0, 0, 1, 1, 1, 0, 0, 0][f]; p.blink = f === 7;
+    p.armL = p.armR = f >= 4 && f <= 7 ? 1 : 0; p.arm = 0.1 + (f >= 4 ? 0.06 : 0);
+  }
   else if (a === 'walk' || a === 'run') {
-    const k = a === 'run' ? 1.4 : 1, ph = (f / 6) * TAU, s = Math.sin(ph), c = Math.cos(ph);
+    const k = a === 'run' ? 1.4 : 1, ph = (f / HD_ANIMS[a].frames) * TAU, s = Math.sin(ph), c = Math.cos(ph);
     p.bob = Math.abs(s) > 0.6 ? -1 : 0;
     p.liftL = Math.round(Math.max(0, s) * 2 * k); p.liftR = Math.round(Math.max(0, -s) * 2 * k);
     p.armL = Math.round(-s * k); p.armR = Math.round(s * k);
@@ -453,7 +457,7 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
   return finish();
 
   function eyeAt(x: number, y: number) {
-    if (L.eyes === 3) { r(x, y + 2, 2, 1, L.eye); return; } // calm: closed
+    if (L.eyes === 3 || pose.blink) { r(x, y + 2, 2, 1, L.eye); return; } // calm, or blinking: closed
     const w = L.eyes === 2 ? 3 : 2, h = L.eyes === 1 ? 2 : 3;
     r(x, y + (L.eyes === 1 ? 1 : 0), w, h, L.eye);
     p(x, y + (L.eyes === 1 ? 1 : 0), L.white);

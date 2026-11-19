@@ -266,7 +266,7 @@ export class Stage3D {
    * have put it (dx, dy, dw, dh in map pixels) for a figure standing at map row `footY`.
    * `order` breaks ties between sprites on the same row (later is in front).
    */
-  sprite(sheet: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number, footY: number, order: number, alpha = 1, flip = false, shadow = true) {
+  sprite(sheet: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, dw: number, dh: number, footY: number, order: number, alpha = 1, flip = false, shadow = true, sway = 0) {
     let b = this.bills[this.used];
     if (!b) {
       // one shared texture per sheet; each sprite picks its frame through its own uv coordinates
@@ -316,6 +316,8 @@ export class Stage3D {
     mat.opacity = alpha;
     m.castShadow = shadow && alpha > 0.6;
     m.updateMatrix();
+    // wind: a shear that moves the top sideways while the foot (local y = 0) stays planted
+    if (sway) m.matrix.elements[4] = sway * dh;
   }
 
   /**
@@ -405,7 +407,9 @@ export class Stage3D {
       if (!s) { l.intensity = 0; continue; }
       l.position.set(s.x, s.h, s.y);
       l.color.setHex(s.color);
-      l.intensity = s.power;
+      // flames are never quite steady: two slow waves and a little flutter, different for every lamp
+      const t = performance.now() / 1000, k = s.x * 0.37 + s.y * 0.13;
+      l.intensity = s.power * (0.86 + 0.08 * Math.sin(t * 2.3 + k) + 0.05 * Math.sin(t * 7.1 + k * 2) + 0.03 * Math.sin(t * 17 + k * 3));
       l.distance = s.range;
     }
   }

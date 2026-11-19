@@ -61,6 +61,7 @@ import { Traits } from './Traits';
 import { talentsOf } from '../../../shared/src/talents';
 import { freePoints } from '../../../shared/src/abilities';
 import { buildChanged } from './Abilities';
+import { AFFIX_DIFFS } from '../../../shared/src/traits';
 
 export interface Conn {
   send(data: string): void;
@@ -1360,7 +1361,8 @@ export class World implements CombatCtx {
     const who = world ? [...m.room.players.values()].filter((p) => (m.contrib.get(p.id) ?? 0) >= m.maxHp * 0.01) : run ? [...m.room.players.values()] : rewarded;
     for (const p of who) {
       const items: ItemSpec[] = [];
-      const rolls = 1 + (world && top.has(p.id) ? 1 : 0);
+      // the week's affix (G7) makes Hard and above harder: their bosses give one more item
+      const rolls = 1 + (world && top.has(p.id) ? 1 : 0) + (run && !world && AFFIX_DIFFS.includes(run.diff) ? 1 : 0);
       for (let i = 0; i < rolls; i++) items.push(rollBossItem(this.rnd, m.def.id, m.level, p.job, world ? 'world' : run?.diff ?? 'normal'));
       items.push({ base: 'upgrade_stone', rar: 0, ilvl: 1, aff: [], up: 0, qty: world ? 3 : 2 });
       items.push({ base: BOSS_SCROLL[world ? 'world' : run?.diff ?? 'normal'], rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });

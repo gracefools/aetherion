@@ -4,7 +4,7 @@
 // monster's burst, lightning) are shown first as warning circles, like any monster area attack.
 import { Act, TICK_MS } from '../../../shared/src/protocol';
 import { mitigate, STATUS_INDEX } from '../../../shared/src/combat';
-import { traitOf } from '../../../shared/src/traits';
+import { traitIn } from '../../../shared/src/traits';
 import { blocked } from '../../../shared/src/world';
 import { applyStatus, emit } from './entity';
 import type { Monster } from './Monster';
@@ -31,6 +31,10 @@ export class Traits {
   private scratch: Player[] = [];
   constructor(private w: World) {}
 
+  /** The region's trait, or in a dungeon run of Hard or above the week's affix (G7). */
+  traitFor(room: ZoneRoom) {
+    return traitIn(room.zoneId, this.w.dungeons.runs.get(room)?.diff, Date.now());
+  }
   /** The blow a monster deals, before defence. */
   private power(m: Monster) {
     return m.def.atk * m.atkScale;
@@ -44,7 +48,7 @@ export class Traits {
 
   /** A monster's blow landed on a player. */
   onHit(m: Monster, p: Player, dealt: number) {
-    const t = traitOf(m.room.zoneId);
+    const t = this.traitFor(m.room);
     if (!t || p.dead) return;
     const tick = this.w.tick, r = this.w.rnd();
     if (t.id === 'thorns' && r < 0.2) applyStatus(p, STATUS_INDEX.root, tick, 0, m.id);
@@ -63,7 +67,7 @@ export class Traits {
 
   /** A monster died (rewards are already given). */
   onDeath(m: Monster) {
-    const t = traitOf(m.room.zoneId);
+    const t = this.traitFor(m.room);
     if (!t || m.summoner) return;
     const tick = this.w.tick, power = this.power(m);
     if (t.id === 'embers') {
@@ -73,7 +77,7 @@ export class Traits {
     } else if (t.id === 'volatile') {
       this.warn(m, m.x, m.y, 74, 900);
       this.hazard({ room: m.room, x: m.x, y: m.y, r: 74, at: tick + ticks(900), power: power * 1.2, magic: false, src: m });
-    } else if (t.id === 'restless' && !m.risen && this.w.rnd() < 0.35) {
+    } else if (t.id === 'restless' && !m.risen && !m.def.boss && this.w.rnd() < 0.35) {
       // rises again a moment later, at a third of its health (only once)
       m.riseAt = tick + ticks(1000);
     }
@@ -81,7 +85,7 @@ export class Traits {
 
   /** Once per tick for every region room with players in it. */
   tick(room: ZoneRoom) {
-    const t = traitOf(room.zoneId), tick = this.w.tick;
+    const t = this.traitFor(room), tick = this.w.tick;
     if (t) {
       for (const m of room.monsters.values()) {
         if (m.riseAt && tick >= m.riseAt) this.rise(m);

@@ -8,6 +8,7 @@ import type { Game, Hud } from './game/Game';
 import { rarName } from './inventory';
 import { t, tm, tv, useT } from './i18n';
 import { toRail } from './rail';
+import { AFFIX_DIFFS, affixEndsAt, weeklyAffix } from '../../shared/src/traits';
 
 export function BossBar({ hud }: { hud: Hud }) {
   useT();
@@ -119,6 +120,14 @@ export function GateDialog({ hud, game }: { hud: Hud; game: Game }) {
         {[3, 4, 5].map((r, i) => <b key={r} style={{ color: RARITY_COLOR[r] }}>{rarName(r)} {w[i]}%{i < 2 ? ' · ' : ''}</b>)}
       </div>
       <div className="uniques">{(BOSS_UNIQUES[def.boss] ?? []).map((id) => <span key={id} style={{ color: RARITY_COLOR[ITEMS[id].unique!.rar] }}>{ITEMS[id].name}</span>)}</div>
+      {(() => {
+        const a = weeklyAffix(Date.now()), on = AFFIX_DIFFS.includes(diff), days = Math.ceil((affixEndsAt(Date.now()) - Date.now()) / 86_400_000);
+        return (
+          <p className={'affix' + (on ? ' on' : '')} style={{ borderColor: a.color }}>
+            <b style={{ color: a.color }}>{t('affix.weekly')}: {a.name}</b> {a.desc} <small>{on ? t('affix.on') : t('affix.off')} {t('affix.days', { n: days })}</small>
+          </p>
+        );
+      })()}
       {low && <p className="err">{t('err.needLevelDot', { n: def.minLevel })}</p>}
       {diff === 'nightmare' && <p className="sub">{t('dng.nightmareDrops')}</p>}
       {diff === 'armageddon' && <p className="sub">{t('dng.armageddonDrops')}</p>}

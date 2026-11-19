@@ -37,3 +37,18 @@ export const TRAITS: Record<string, RegionTrait> = {
     desc: 'Monsters phase out for a moment and cannot be hurt.', tip: 'Switch targets while one is out of reach.' },
 };
 export const traitOf = (zone: string): RegionTrait | undefined => TRAITS[zone];
+
+// ---------- G7: the weekly dungeon affix ----------
+/** Difficulties that carry the week's affix; their bosses drop one more item in return. */
+export const AFFIX_DIFFS = ['hard', 'nightmare', 'armageddon'];
+const WEEK_MS = 7 * 86_400_000;
+/** The affix of the week (UTC weeks since the epoch, rotating through the ten region traits). */
+export function weeklyAffix(now: number): RegionTrait {
+  const list = Object.values(TRAITS);
+  return list[Math.floor(now / WEEK_MS) % list.length];
+}
+/** When the current affix gives way to the next (ms). */
+export const affixEndsAt = (now: number) => (Math.floor(now / WEEK_MS) + 1) * WEEK_MS;
+/** The trait in force somewhere: a region's own, or the week's affix in a dungeon run of Hard or above. */
+export const traitIn = (zone: string, dungeonDiff: string | undefined, now: number): RegionTrait | undefined =>
+  TRAITS[zone] ?? (dungeonDiff && AFFIX_DIFFS.includes(dungeonDiff) ? weeklyAffix(now) : undefined);

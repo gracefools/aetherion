@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { allDiscoveries, isNpc, NODE_RESPAWN_MS, objById, RECIPES, REGION_RES, teleportCost, WAYSTONE_RANGE, zoneObjects } from '../shared/src/places';
 import { speakerName, STORY, STORY_REGIONS } from '../shared/src/story';
-import { traitOf, TRAITS } from '../shared/src/traits';
+import { affixEndsAt, traitIn, traitOf, TRAITS, weeklyAffix } from '../shared/src/traits';
 import { statusNames } from '../shared/src/combat';
 import { talentsOf, TALENT_TIERS } from '../shared/src/talents';
 import { FACTIONS, LORE } from '../shared/src/lore';
@@ -2285,6 +2285,25 @@ test('every dungeon: entered from its gate, cleared, and its boss gives equipmen
 
   }
   assert.deepEqual(report, []);
+});
+
+test('G7 weekly dungeon affix: rotates every week, applies on Hard and above, and the boss gives one more item', () => {
+  const W = 7 * 86_400_000, t0 = Date.UTC(2026, 10, 19);
+  assert.notEqual(weeklyAffix(t0).id, weeklyAffix(t0 + W).id, 'a new affix every week');
+  assert.equal(weeklyAffix(t0).id, weeklyAffix(affixEndsAt(t0) - 1).id);
+  assert.equal(traitIn('ruins', 'normal', t0), undefined, 'Normal runs are as before');
+  assert.equal(traitIn('ruins', 'hard', t0)!.id, weeklyAffix(t0).id);
+  assert.equal(traitIn('emberwaste', undefined, t0)!.id, 'embers', 'regions keep their own trait');
+  const equips = (diff: string) => {
+    const g = gateOf('verdant'), { world, join } = harness({ capacity: 20 }), a = join(g.dx, g.dy, 'knight', 30, -1, 'verdant');
+    assert.equal(world.dungeon(a.p, 'enter', 'ruins', diff), '');
+    const run = world.dungeons.runs.get(a.p.room)!;
+    assert.equal(!!world.traits.traitFor(a.p.room), diff !== 'normal');
+    const before = a.p.inv.filter((i) => ITEMS[i.base].kind === 'equip').length;
+    for (let s = 0; s < 8; s++) { for (const m of [...run.alive]) world.hurt(m, 1e9, 0, a.p); const now = Date.now(); world.dungeons.tick(now); world.dungeons.tick(now + 3000); }
+    return a.p.inv.filter((i) => ITEMS[i.base].kind === 'equip').length - before;
+  };
+  assert.ok(equips('hard') > equips('normal'), 'one more boss item on Hard');
 });
 
 test('M7 dungeon run: waves, elite, boss with phases, completion rewards, closing, and immediate re-entry', () => {

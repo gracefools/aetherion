@@ -770,7 +770,7 @@ try {
     await p1.keyboard.press('KeyO');
     const panel = p1.getByRole('dialog', { name: 'Settings' });
     await panel.waitFor();
-    assert.ok(await panel.getByText('Temporary placeholder audio').isVisible(), 'the stand-in audio is labelled as temporary in the game itself');
+    assert.equal(await panel.getByText('Temporary placeholder audio').count(), 0, 'the audio is recorded, so no placeholder notice is shown');
     // moves a slider the way a drag does: the browser's own value setter, then the input event React listens for
     const slide = (name: string, value: number) => panel.locator(`input[name=${name}]`).evaluate((el, v) => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, String(v));

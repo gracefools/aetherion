@@ -135,6 +135,7 @@ export class Pvp {
     this.w.send(v, { t: 'sys', text: `You were defeated by ${k.name}.${arena ? '' : ' You are protected from other players for a minute after you return.'}` });
   }
   private bump(p: Player, d: Parameters<Repo['pvpAdd']>[1]) {
+    if (d.honor) this.w.seasons.add(p, 'honor', d.honor);
     if (d.rating) this.rating.set(p.id, (this.rating.get(p.id) ?? 1000) + d.rating);
     this.repo.pvpAdd({ id: p.id, name: p.name, job: p.job }, d).catch((e) => console.error('pvp record failed', e));
   }

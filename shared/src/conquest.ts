@@ -83,6 +83,14 @@ export const RAID_MIN = 10;
 export const RAID_MAX = 20;
 export const RAID_ZONE = 'd_raid';
 export const RAID_BOSS = 'raid_shadow';
+/** G7: the raids, one a week in turn; the Raid Herald names the week's. */
+export const RAIDS: { boss: string; place: string }[] = [
+  { boss: 'raid_shadow', place: "the Shadow's Sanctum" },
+  { boss: 'raid_briar', place: 'the Briar Throne' },
+  { boss: 'raid_tyrant', place: "the Tyrant's Roost" },
+  { boss: 'raid_unmaker', place: 'the Edge Unmade' },
+];
+export const raidOfWeek = (now: number) => RAIDS[Math.floor(now / (7 * 86_400_000)) % RAIDS.length];
 /** Health of everything in the raid grows with the raiders: this much per player. */
 export const raidHpScale = (players: number) => 0.4 + 0.12 * Math.max(1, players);
 /** The raid's waves before the boss: elite guards, more with more raiders. */

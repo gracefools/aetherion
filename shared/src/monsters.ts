@@ -380,6 +380,29 @@ MONSTERS.treasure_goblin = mob('treasure_goblin', 'Treasure Goblin', 30, 'normal
   });
   MONSTERS.raid_shadow = { ...src, id: 'raid_shadow', name: "Aetherion's Shadow", level: 100, hp: Math.round(src.hp * 3), radius: 34, boss: copy, respawnMs: 0 };
 }
+// G7: three more raid bosses, each from a late world boss (bigger areas, more circles, its own summons)
+for (const [id, name, from, title, intro, minion] of [
+  ['raid_briar', 'The Briar Throne', 'thorn_king', 'The Forest That Stopped Counting', 'Roots split the floor. The Briar Throne takes its seat.', 'thornheart_ancient'],
+  ['raid_tyrant', 'Dragon Tyrant Ascendant', 'dragon_tyrant', 'Last of the Burning Emperors', 'Wings fill the hall. The Dragon Tyrant has come back to claim it.', 'oathless_champion'],
+  ['raid_unmaker', 'The Unmaker Unbound', 'the_unmaker', 'What Waits Past the Edge of Stars', 'The light goes out of the room, one colour at a time.', 'null_colossus'],
+] as const) {
+  const src = MONSTERS[from];
+  if (!src?.boss) continue;
+  const copy = JSON.parse(JSON.stringify(src.boss)) as BossDef;
+  copy.title = title;
+  copy.intro = intro;
+  copy.world = false;
+  copy.enrageMs = 15 * 60000;
+  copy.phases.forEach((ph, i) => {
+    if (i) ph.say = i === copy.phases.length - 1 ? `${name} unleashes everything. Finish it!` : `${name} grows stronger!`;
+    for (const a of ph.pattern) {
+      if (a.summon && MONSTERS[minion]) a.summon.type = minion;
+      if (a.aoe) a.aoe = Math.round(a.aoe * 1.4);
+      if (a.multi) a.multi = a.multi + 4;
+    }
+  });
+  MONSTERS[id] = { ...src, id, name, level: 100, hp: Math.round(src.hp * 3), radius: 34, boss: copy, respawnMs: 0 };
+}
 // world bosses: wider area attacks than any other monster
 for (const d of Object.values(MONSTERS))
   if (d.boss?.world) for (const ph of d.boss.phases) for (const a of ph.pattern) if (a.aoe) a.aoe = Math.round(a.aoe * WORLD_BOSS_AREA);

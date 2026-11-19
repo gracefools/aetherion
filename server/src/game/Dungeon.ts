@@ -218,6 +218,7 @@ export class Dungeons {
     const gold = Math.round(40 * run.def.level * k.gold * this.w.goldRate);
     for (const p of run.room.players.values()) {
       this.w.quests.onClear(p, run.def.id);
+      if (run.diff !== 'normal') this.w.seasons.add(p, 'dungeon', 1);
       this.w.journals.onClear(p, run.diff);
       p.gold += gold;
       const stones = 1 + (run.diff === 'normal' ? 0 : run.diff === 'hard' ? 1 : 2);

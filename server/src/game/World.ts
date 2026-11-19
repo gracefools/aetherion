@@ -64,6 +64,7 @@ import { buildChanged } from './Abilities';
 import { AFFIX_DIFFS } from '../../../shared/src/traits';
 import { Finder } from './Finder';
 import { LFG_CHAT_MS, WORLD_CHAT_MS } from '../../../shared/src/social';
+import { Seasons } from './Seasons';
 
 export interface Conn {
   send(data: string): void;
@@ -398,6 +399,7 @@ export class World implements CombatCtx {
   readonly parties = new Parties(this);
   readonly dungeons = new Dungeons(this);
   readonly finder = new Finder(this);
+  readonly seasons: Seasons;
   readonly journals = new Journals(this);
   readonly events = new WorldEvents(this);
   /** Trades are stored the moment they complete: both inventories and the audit row in one transaction. */
@@ -440,6 +442,7 @@ export class World implements CombatCtx {
   }
 
   constructor(private repo: Repo, readonly opts: WorldOpts) {
+    this.seasons = new Seasons(this, repo);
     this.rnd = opts.rng ?? Math.random;
     this.dropRate = opts.dropRate ?? 1;
     this.goldRate = opts.goldRate ?? 1;
@@ -823,6 +826,12 @@ export class World implements CombatCtx {
   async eco(p: Player, m: unknown) {
     const why = await this.economy.op(p, m).catch((e) => (console.error('economy command failed', e), 'The request could not be completed'));
     if (why) this.send(p, { t: 'no', a: 'eco', why });
+    return why;
+  }
+  /** G7: the seasonal ladders. */
+  seasonOp(p: Player, m: unknown) {
+    const why = this.seasons.op(p, m);
+    if (why) this.send(p, { t: 'no', a: 'season', why });
     return why;
   }
   /** G9: the dungeon finder. */
@@ -1853,6 +1862,7 @@ export class World implements CombatCtx {
   /** The Depths: players carrying a bounty are shown to everyone there; boss timers go to everyone. */
   private depthTick() {
     if (this.tick % 20 === 11) this.finder.tick(Date.now());
+    if (this.tick % 200 === 13) void this.seasons.tick(Date.now()).catch((e) => console.error('season payout failed', e));
     // story quests: "go to" objectives are checked about once a second
     if (this.tick % 20 === 7) for (const p of this.online.values()) if (!p.dead && Object.keys(p.quests.active).some((id) => id.startsWith('story_'))) this.quests.onMove(p);
     if (this.tick % 40 === 0)

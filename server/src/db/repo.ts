@@ -413,6 +413,24 @@ export class Repo {
 
   // ---------- PvP ----------
   /** Adds to a character's PvP record (creating it on first use). */
+  /** G7 ladders: add to a score, or keep the better of two. */
+  seasonScore(season: string, ladder: string, c: { id: number; name: string; job: string }, score: number, mode: 'max' | 'add') {
+    const upd = mode === 'max' ? 'GREATEST(season_scores.score, EXCLUDED.score)' : 'season_scores.score + EXCLUDED.score';
+    return this.db.query(`INSERT INTO season_scores(season, ladder, character_id, name, job, score) VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (season, ladder, character_id) DO UPDATE SET score = ${upd}, name = EXCLUDED.name, updated_at = now()`, [season, ladder, c.id, c.name, c.job, score]);
+  }
+  async seasonTop(season: string, ladder: string, limit: number) {
+    return (await this.db.query<any>('SELECT character_id AS id, name, job, score FROM season_scores WHERE season=$1 AND ladder=$2 ORDER BY score DESC, updated_at, character_id LIMIT $3', [season, ladder, limit])).rows.map((r) => ({ id: Number(r.id), name: r.name, job: r.job, score: Number(r.score) }));
+  }
+  async seasonMine(season: string, ladder: string, id: number) {
+    const r = (await this.db.query<any>(`SELECT score, (SELECT COUNT(*) FROM season_scores o WHERE o.season=$1 AND o.ladder=$2 AND o.score > s.score) + 1 AS rank
+       FROM season_scores s WHERE season=$1 AND ladder=$2 AND character_id=$3`, [season, ladder, id])).rows[0];
+    return r ? { score: Number(r.score), rank: Number(r.rank) } : null;
+  }
+  /** Marks a season's ladder as paid; false when it already was (so it is paid exactly once). */
+  async seasonClaim(season: string, ladder: string): Promise<boolean> {
+    return ((await this.db.query('INSERT INTO season_paid(season, ladder) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING season', [season, ladder])).rows.length) > 0;
+  }
   /** Spends honour if there is enough: the new spendable amount, or null when there is not. */
   async pvpSpend(id: number, n: number): Promise<number | null> {
     const r = await this.db.query<{ left: number }>('UPDATE pvp_stats SET honor_spent = honor_spent + $2 WHERE character_id = $1 AND honor - honor_spent >= $2 RETURNING honor - honor_spent AS left', [id, n]);

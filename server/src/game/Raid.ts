@@ -1,7 +1,7 @@
 // Raids on the server: a lobby at the Raid Herald in Eldoria (ten to twenty raiders), then a
 // private instance with two waves of elite guards and Aetherion's Shadow, whose health grows with
 // the number of raiders. Everyone inside when the Shadow falls is rewarded.
-import { RAID_BOSS, RAID_LEVEL, RAID_MAX, RAID_MIN, RAID_ZONE, raidHpScale, raidWave, type RaidLobby, type RaidState } from '../../../shared/src/conquest';
+import { raidOfWeek, RAID_LEVEL, RAID_MAX, RAID_MIN, RAID_ZONE, raidHpScale, raidWave, type RaidLobby, type RaidState } from '../../../shared/src/conquest';
 import { sigilTierForBoss, rollSigil } from '../../../shared/src/gear';
 import { ITEMS, rollBossItem, type ItemSpec } from '../../../shared/src/items';
 import { MONSTERS, mobAtk, mobHp } from '../../../shared/src/monsters';
@@ -26,6 +26,9 @@ class RaidRun {
   emptySince = 0;
   readonly alive = new Set<Monster>();
   last = '';
+  /** G7: which raid this is (the week's boss and the name of its hall). */
+  boss = 'raid_shadow';
+  place = "the Shadow's Sanctum";
   constructor(readonly room: ZoneRoom, readonly level: number, readonly players: number, readonly members: number[]) {}
   snapshot(): RaidState {
     return { stage: this.stage, stages: 3, left: this.alive.size, state: this.state, players: this.players };
@@ -76,7 +79,7 @@ export class Raids {
         if (this.lobbyOf(p.id)) return 'You are already in a raid group';
         const l = { id: this.nextId++, leader: p.id, members: [p.id] };
         this.lobbies.set(l.id, l);
-        this.w.announce(p.room, `${p.name} is gathering a raid against Aetherion's Shadow at the Raid Herald.`, 'stage');
+        this.w.announce(p.room, `${p.name} is gathering a raid against ${MONSTERS[raidOfWeek(Date.now()).boss].name} at the Raid Herald.`, 'stage');
         this.sendLobbies();
         return '';
       }
@@ -119,6 +122,9 @@ export class Raids {
     const avg = Math.round(group.reduce((n, x) => n + x.level, 0) / group.length);
     const room = new ZoneRoom(RAID_ZONE, 7000 + this.nextId++);
     const run = new RaidRun(room, Math.max(RAID_LEVEL, avg + 5), group.length, group.map((p) => p.id));
+    const wk = raidOfWeek(Date.now());
+    run.boss = wk.boss;
+    run.place = wk.place;
     this.runs.set(room, run);
     this.w.addRoom(room);
     const sp = ZONES[RAID_ZONE].spawn;
@@ -127,7 +133,7 @@ export class Raids {
       this.w.relocate(p, room, tileCenter(sp.tx), tileCenter(sp.ty));
       this.w.send(p, { t: 'raid', run: run.snapshot() });
     }
-    this.w.announceAll(`A raid of ${group.length} enters the Shadow's Sanctum.`, 'worldboss');
+    this.w.announceAll(`A raid of ${group.length} enters ${run.place}.`, 'worldboss');
   }
   leave(p: Player): string {
     const run = this.runs.get(p.room);
@@ -158,10 +164,10 @@ export class Raids {
       this.w.announce(run.room, run.stage === 1 ? 'The Shadow\'s guards bar the way!' : 'Its elite guard stands before the throne!', 'stage');
     } else {
       const c = CHAMBERS[BOSS_ROOM];
-      const m = this.w.spawn(run.room, RAID_BOSS, tileCenter(c.cx + 5), tileCenter(c.cy), scaleFor(RAID_BOSS, run.level, hp));
+      const m = this.w.spawn(run.room, run.boss, tileCenter(c.cx + 5), tileCenter(c.cy), scaleFor(run.boss, run.level, hp));
       m.noRespawn = true;
       run.alive.add(m);
-      this.w.announce(run.room, 'Aetherion\'s Shadow rises from the throne. Hold together!', 'boss');
+      this.w.announce(run.room, `${MONSTERS[run.boss].name} rises. Hold together!`, 'boss');
     }
   }
   onKill(m: Monster) {
@@ -175,7 +181,7 @@ export class Raids {
     run.state = 'won';
     run.overAt = Date.now();
     for (const p of run.room.players.values()) {
-      const items: ItemSpec[] = [rollBossItem(this.w.rnd, RAID_BOSS, run.level, p.job, 'raid'), rollBossItem(this.w.rnd, RAID_BOSS, run.level, p.job, 'raid'),
+      const items: ItemSpec[] = [rollBossItem(this.w.rnd, run.boss, run.level, p.job, 'raid'), rollBossItem(this.w.rnd, run.boss, run.level, p.job, 'raid'),
         { base: 'awakening_essence', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 }, { base: 'arm_core', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 }];
       const tier = sigilTierForBoss(run.level);
       if (tier && this.w.rnd() < 0.5) items.push(rollSigil(this.w.rnd, tier));
@@ -187,7 +193,8 @@ export class Raids {
       if (reins) award(this.w, p, 0, [{ base: reins, rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 }]);
       for (const it of items) if (it.rar >= 5) this.w.announce(run.room, `${p.name} received Mythic loot: ${ITEMS[it.base].name}!`, 'loot');
     }
-    this.w.announceAll(`Aetherion's Shadow has fallen to a raid of ${run.players}!`, 'bossdown');
+    this.w.announceAll(`${MONSTERS[run.boss].name} has fallen to a raid of ${run.players}!`, 'bossdown');
+    for (const p of run.room.players.values()) this.w.seasons.add(p, 'raid', 1);
   }
   tick(now: number) {
     for (const l of [...this.lobbies.values()]) {

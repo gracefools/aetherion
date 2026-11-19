@@ -1931,7 +1931,7 @@ test('M7 boss definitions: six bosses with phases, enrage timers, summons, and l
   const bosses = Object.values(MONSTERS).filter((d) => d.boss && ['abyssal_golem', 'ancient_dragon', 'demon_lord', 'frost_queen', 'rune_guardian', 'shadow_knight'].includes(d.id));
   assert.equal(bosses.length, 6);
   // levels 45-200: ten dungeon bosses and five world bosses more
-  assert.equal(Object.values(MONSTERS).filter((d) => d.boss).length, 6 + 10 + 5 + 1 + DEPTHS.length, 'the raid boss, and one in each of the Depths');
+  assert.equal(Object.values(MONSTERS).filter((d) => d.boss).length, 6 + 10 + 5 + 4 + DEPTHS.length, 'the four raid bosses, and one in each of the Depths');
   for (const d of bosses) {
     const b = d.boss!;
     assert.ok(b.phases.length >= 3 && b.phases[0].at === 1, `${d.id} phases`);
@@ -6277,7 +6277,54 @@ test('rune fusion: two attuned runes at level 5 make a spell of their own, from 
 // ---------------------------------------------------------------------------------------------
 // Raids, guild territory war, faction conquest
 // ---------------------------------------------------------------------------------------------
-import { bannerOf, followed, nextSiegeOf, SIEGE_EVERY_MS, siegeAt, TERRITORIES } from '../shared/src/conquest';
+import { bannerOf, followed, nextSiegeOf, RAIDS, raidOfWeek, SIEGE_EVERY_MS, siegeAt, TERRITORIES } from '../shared/src/conquest';
+import { LADDERS, seasonBefore, seasonEndsAt, seasonOf, ladderReward } from '../shared/src/seasons';
+
+test('G7 raids: four raid bosses in weekly turn, each built from a late boss with its own drops', () => {
+  const W = 7 * 86_400_000, t0 = Date.UTC(2026, 10, 19);
+  assert.deepEqual(new Set(RAIDS.map((_, i) => raidOfWeek(t0 + i * W).boss)).size, RAIDS.length, 'every raid comes round');
+  for (const r of RAIDS) {
+    const m = MONSTERS[r.boss];
+    assert.ok(m?.boss && !m.boss.world, r.boss);
+    if (r.boss === 'raid_shadow') continue; // the Shadow keeps its own raid pool
+    assert.ok(BOSS_UNIQUES[r.boss]?.length, `${r.boss} drops`);
+    for (const id of BOSS_UNIQUES[r.boss]) assert.ok(ITEMS[id], `${r.boss}: ${id}`);
+  }
+});
+
+test('G7 seasons: monthly, the season before, rewards for the top ten, and payout once by mail', async () => {
+  assert.equal(seasonOf(Date.UTC(2026, 10, 19)), '2026-11');
+  assert.equal(seasonBefore('2026-01'), '2025-12');
+  assert.equal(seasonBefore('2026-11'), '2026-10');
+  assert.equal(seasonEndsAt(Date.UTC(2026, 11, 31, 23)), Date.UTC(2027, 0, 1));
+  assert.ok(ladderReward(1)!.gold > ladderReward(2)!.gold && ladderReward(3)!.items.length === 1 && !ladderReward(4)!.items.length && ladderReward(11) === null);
+  const { world, join } = harness({ capacity: 20 });
+  const scores: any[] = [], mails: any[] = [], paid = new Set<string>();
+  (world.seasons as any).repo = {
+    seasonScore: async (...a: any[]) => void scores.push(a),
+    seasonTop: async (season: string, ladder: string) => (ladder === 'raid' ? [{ id: 7, name: 'Top', job: 'knight', score: 5 }, { id: 8, name: 'Next', job: 'mage', score: 2 }] : []),
+    seasonMine: async () => ({ score: 5, rank: 1 }),
+    seasonClaim: async (s: string, l: string) => (paid.has(s + l) ? false : (paid.add(s + l), true)),
+    systemMail: async (...a: any[]) => void mails.push(a),
+  };
+  const a = join(0, 0, 'knight', 30);
+  world.seasons.add(a.p, 'rift', 12);
+  world.seasons.add(a.p, 'honor', 0);
+  assert.deepEqual(scores.map((s) => [s[1], s[3], s[4]]), [['rift', 12, 'max']], 'nothing is written for nothing');
+  assert.equal(world.seasonOp(a.p, { op: 'view', ladder: 'raid' }), '');
+  await new Promise((r) => setTimeout(r, 10));
+  const v = a.out.find((m) => m.t === 'season');
+  assert.ok(v && v.ladder === 'raid' && v.rows.length === 2 && v.me.rank === 1);
+  const now = Date.UTC(2026, 11, 2);
+  await world.seasons.tick(now);
+  assert.equal(mails.length, 2, 'the top of last season is paid');
+  assert.match(mails[0][1], /Season 2026-11: Raids, rank 1/);
+  assert.ok(mails[0][4] > mails[1][4] && mails[0][3].some((i: any) => i.base === 'scroll_rare'));
+  (world.seasons as any).lastCheck = 0;
+  await world.seasons.tick(now + 1);
+  assert.equal(mails.length, 2, 'and only once');
+  assert.equal(LADDERS.length, 4);
+});
 
 test('raids: a group at the Raid Herald, two waves of elites, Aetherion\'s Shadow scaled to the raiders, rewards for everyone inside', () => {
   const { world, join } = harness({ capacity: 30, world: { raidMin: 3 } });
@@ -6302,8 +6349,8 @@ test('raids: a group at the Raid Herald, two waves of elites, Aetherion\'s Shado
     assert.equal(run.stage, stage);
     if (stage === 3) {
       const boss = [...run.alive][0];
-      assert.equal(boss.def.id, 'raid_shadow');
-      assert.ok(boss.maxHp > MONSTERS.raid_shadow.hp * 0.5, 'scaled to the raid');
+      assert.equal(boss.def.id, raidOfWeek(Date.now()).boss, "this week's raid boss");
+      assert.ok(boss.maxHp > MONSTERS[boss.def.id].hp * 0.5, 'scaled to the raid');
     } else assert.ok([...run.alive].every((m) => m.def.elite));
     for (const m of [...run.alive]) world.hurt(m, 1e9, 0, raiders[0]);
   }

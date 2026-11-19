@@ -142,3 +142,6 @@ for (const e of EXPANSION) {
   if (e.world) MONSTER_LOOK[e.world.id] = { from: e.world.from, hue: e.hue };
 }
 for (const d of DEPTHS) MONSTER_LOOK[d.boss.id] = { from: d.boss.from, hue: d.hue };
+// G7: the raid bosses wear their source boss's art, shifted again
+for (const [id, from, shift] of [['raid_briar', 'thorn_king', 140], ['raid_tyrant', 'dragon_tyrant', 160], ['raid_unmaker', 'the_unmaker', 120]] as const)
+  if (MONSTER_LOOK[from]) MONSTER_LOOK[id] = { from: MONSTER_LOOK[from].from, hue: (MONSTER_LOOK[from].hue + shift) % 360 };

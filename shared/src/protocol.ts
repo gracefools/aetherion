@@ -10,6 +10,7 @@ import type { Companions } from './companions';
 import type { Gear } from './gear';
 import type { AuctionRates, Bank, GuildView, Listing } from './economy';
 import type { FinderState } from './social';
+import type { LadderRow } from './seasons';
 export type { Appearance };
 
 export const TICK_RATE = 20;
@@ -92,6 +93,7 @@ export type ClientMsg =
   | { t: 'eco'; op: string; [k: string]: unknown }
   | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy'; id?: number; by?: string; base?: string }
   | { t: 'finder'; op: 'join' | 'leave' | 'state'; dungeon?: string; diff?: string }
+  | { t: 'season'; op: 'view'; ladder?: string }
   | { t: 'comp'; op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount'; uid?: string; id?: string; name?: string }
   | { t: 'ping'; c: number };
 
@@ -295,6 +297,8 @@ export type ServerMsg =
   | { t: 'pong'; c: number }
   /** G2 talents: time taken off every skill cooldown. */
   | { t: 'cdcut'; ms: number }
+  /** G7: one seasonal ladder: its top and this player's place. */
+  | { t: 'season'; season: string; ladder: string; ends: number; rows: LadderRow[]; me: { score: number; rank: number } | null }
   /** G9: the dungeon finder as this player sees it. */
   | ({ t: 'finder' } & FinderState)
   | { t: 'kick'; reason: string };

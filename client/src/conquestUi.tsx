@@ -6,6 +6,8 @@ import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
 import { toRail } from './rail';
 import { Icon } from './ui/icons';
+import { raidOfWeek } from '../../shared/src/conquest';
+import { MONSTERS } from '../../shared/src/monsters';
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
@@ -16,6 +18,7 @@ export function RaidHerald({ hud, game }: { hud: Hud; game: Game }) {
   return (
     <>
       <p>{t('raid.say', { min: RAID_MIN, max: RAID_MAX })}</p>
+      <p className="affix on"><b>{t('raid.week', { name: MONSTERS[raidOfWeek(Date.now()).boss]?.name ?? '' })}</b> <small>{MONSTERS[raidOfWeek(Date.now()).boss]?.boss?.title}</small></p>
       {low && <p className="err">{t('err.needLevelDot', { n: RAID_LEVEL })}</p>}
       <div className="actions">
         {!mine && <button className="primary" disabled={low} onClick={() => game.raidOp('open')}>{t('raid.open')}</button>}

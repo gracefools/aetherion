@@ -533,6 +533,10 @@ export const BOSS_UNIQUES: Record<string, string[]> = {
   abyssal_golem: ['ab_hood', 'ab_amulet', 'ab_ring', 'golem_core', 'heart_of_aetherion'],
   shadow_knight: ['ab_hood', 'ab_amulet', 'ab_ring', 'queens_tear', 'golem_core', 'shadowmantle', 'stormstride'],
   demon_lord: ['ds_helm', 'ds_amulet', 'ds_ring', 'rb_circlet', 'rb_amulet', 'rb_ring', 'wyrmfang', 'guardian_sigil', 'demon_crown', 'heart_of_aetherion'],
+  // G7: the raid bosses beside the Shadow
+  raid_briar: ['bw_hood', 'bw_amulet', 'bw_ring', 'thorn_crown', 'wild_god_antler'],
+  raid_tyrant: ['hk_crown', 'hk_amulet', 'hk_ring', 'tyrant_banner', 'wyrm_heart'],
+  raid_unmaker: ['sf_crown', 'sf_amulet', 'sf_ring', 'unmade_star', 'lich_phylactery'],
   // G6: the dungeon bosses and world bosses past level 45
   forgeborn_titan: ['fg_helm', 'fg_amulet', 'fg_ring', 'titans_ember'],
   verdant_colossus: ['bw_hood', 'bw_amulet', 'bw_ring', 'titans_ember'],

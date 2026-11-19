@@ -140,6 +140,8 @@ export class Rifts {
     this.w.announce(run.room, `${why} You reached floor ${run.best}. You will be returned in 20 seconds.`, 'phase');
     const secs = Math.round((now - run.startedAt) / 1000), week = riftWeek(now);
     if (run.best > 0)
+      for (const id of run.entered.keys()) { const o = this.w.online.get(id); if (o) this.w.seasons.add(o, 'rift', run.best); }
+    if (run.best > 0)
       for (const [id, x] of run.entered)
         await this.repo.saveRiftScore(week, id, x.name, x.job, run.best, secs, run.entered.size).catch((e) => console.error('rift score failed', e));
   }

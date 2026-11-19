@@ -1345,6 +1345,23 @@ test('M15 PvP over the network: the arena, a victory stored in PostgreSQL, and t
   A.b.raw({ t: 'pvp', op: 'buy', base: 'conquerors_medal' });
   await A.b.until(() => A.seen.some((m) => m.t === 'sys' && /Not enough honour/.test(m.text)), 3000, 'refused');
   assert.ok(!A.p.inv.some((i) => i.base === 'conquerors_medal'));
+  // G7: the honour won is on this season's ladder, stored in PostgreSQL
+  let lad: any[] = [];
+  for (let i = 0; i < 30 && !lad.length; i++) {
+    lad = (await app.db.query<any>("SELECT score FROM season_scores WHERE ladder = 'honor' AND character_id = $1", [A.b.characterId])).rows;
+    if (!lad.length) await sleep(100);
+  }
+  assert.ok(lad[0]?.score > 0, 'honour on the season ladder');
+  assert.equal(await A.ask({ t: 'season', op: 'view', ladder: 'honor' }, 'season'), '');
+  assert.equal(A.last('season').rows[0].name, 'Arenaone');
+  // last season is paid once, by mail
+  const { seasonBefore: before0, seasonOf: of0 } = await import('../shared/src/seasons');
+  const past = before0(of0(Date.now()));
+  await app.db.query("INSERT INTO season_scores(season, ladder, character_id, name, job, score) VALUES ($1, 'raid', $2, 'Arenaone', 'knight', 3)", [past, A.b.characterId]);
+  for (let k = 0; k < 2; k++) { (app.world.seasons as any).lastCheck = 0; await app.world.seasons.tick(Date.now()); }
+  const sm = (await app.db.query<any>('SELECT subject, gold FROM mail WHERE to_id = $1 AND subject LIKE $2', [A.b.characterId, `Season ${past}%`])).rows;
+  assert.equal(sm.length, 1, 'one payout letter');
+  assert.equal(sm[0].gold, 100000);
   // the rating comes back after logging in again
   A.b.close();
   await sleep(GRACE + 1300);

@@ -9,10 +9,11 @@ import { MONSTERS } from '../../shared/src/monsters';
 import { REGIONS, ZONES } from '../../shared/src/world';
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
+import { SeasonTab } from './seasonUi';
 
 const BONUS_KEY: Record<string, string> = { atk: 'stat.atk', matk: 'stat.matk', maxHp: 'stat.hp', def: 'stat.def', mdef: 'stat.mdef', crit: 'stat.crit', critDmg: 'stat.critDmg', healPower: 'stat.heal', moveMul: 'stat.speed', lifesteal: 'stat.lifesteal', dodge: 'stat.dodge' };
 export const bonusText = (b: Bonus) => Object.entries(b).map(([k, v]) => `+${v}${k === 'crit' || k === 'dodge' || k === 'lifesteal' ? '' : '%'} ${t(BONUS_KEY[k] as any)}`).join(', ');
-const TABS = ['missions', 'achievements', 'titles', 'codex'] as const;
+const TABS = ['missions', 'achievements', 'titles', 'codex', 'season'] as const;
 type Tab = (typeof TABS)[number];
 
 export function JournalPanel({ game, onClose }: { game: Game; onClose: () => void }) {
@@ -31,6 +32,7 @@ export function JournalPanel({ game, onClose }: { game: Game; onClose: () => voi
       <div className="tabs" role="tablist" aria-label={t('jr.sections')}>
         {TABS.map((x) => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{t(`jr.tab.${x}` as any)}</button>)}
       </div>
+      {tab === 'season' && <SeasonTab hud={hud} game={game} />}
       {tab === 'missions' && (
         <div className="jrbody">
           <section className="jrlogin" aria-label={t('jr.login')}>

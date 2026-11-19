@@ -472,6 +472,8 @@
   .finderq { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--gold); border-radius: 6px; background: rgba(201,162,74,.1); }
   .finderrow { grid-template-columns: 52px 1fr auto; } .finderrow .lv { color: var(--dim); font-size: 12px; } .finderrow.locked { opacity: .55; } .finder .tabs { margin: 6px 0 8px; }
   .goals { margin-bottom: 10px; } .goal { display: grid; gap: 3px; margin: 6px 0; } .goal.done span:first-child { color: #7fe08a; } .goal.done span:first-child::after { content: ' ✔'; }
+  .ladder { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 3px; } .ladder li { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; align-items: baseline; padding: 4px 6px; border-bottom: 1px dotted #2c3348; }
+  .ladder li.me { background: rgba(201,162,74,.14); } .ladder b { color: var(--gold); } .ladder em { font-style: normal; font-variant-numeric: tabular-nums; } .season .tabs { margin: 6px 0; }
   /* chat tabs with unread counts */
   .chattabs { display: flex; gap: 2px; margin: -2px 0 6px; overflow-x: auto; scrollbar-width: none; }
   .chattab { position: relative; padding: 3px 9px; font-size: 12px; border-radius: 5px 5px 0 0; background: rgba(255,255,255,.04); border: 1px solid transparent; border-bottom-color: var(--line); color: var(--dim); white-space: nowrap; transition: color .12s, background .12s; }

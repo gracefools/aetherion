@@ -9,7 +9,7 @@ export const ACTIONS = {
   'move.left': ['KeyA', 'ArrowLeft'],
   'move.right': ['KeyD', 'ArrowRight'],
   walk: ['ShiftLeft', 'ShiftRight'],
-  'mount.toggle': ['Comma'],
+  'mount.toggle': ['KeyR'],
   dodge: ['AltLeft'],
   attack: ['Space'],
   target: ['Tab'],
@@ -21,7 +21,7 @@ export const ACTIONS = {
   'fusion.2': ['Digit0'],
   'fusion.3': ['Minus'],
   'skill.1': ['Digit1'], 'skill.2': ['Digit2'], 'skill.3': ['Digit3'], 'skill.4': ['Digit4'], 'skill.5': ['Digit5'], 'skill.6': ['Digit6'], 'skill.7': ['Digit7'],
-  'rune.1.1': ['KeyQ'], 'rune.1.2': ['KeyE'], 'rune.1.3': ['KeyR'],
+  'rune.1.1': ['KeyQ'], 'rune.1.2': ['KeyE'], 'rune.1.3': ['Comma'],
   'rune.2.1': ['KeyT'], 'rune.2.2': ['KeyY'], 'rune.2.3': ['KeyU'],
   'rune.3.1': ['KeyG'], 'rune.3.2': ['KeyH'], 'rune.3.3': ['KeyJ'],
   chat: ['Enter'],
@@ -55,6 +55,8 @@ export const ACTION_GROUPS: [string, Action[]][] = [
 /** Keys that are never bindable: Escape closes everything, F5/F11/F12 belong to the browser, F9 is the developer overlay. */
 export const RESERVED_KEYS = ['Escape', 'F5', 'F11', 'F12', 'F9', 'MetaLeft', 'MetaRight', 'ContextMenu'];
 export const MAX_KEYS_PER_ACTION = 2;
+/** The current set of default keys (see GameSettings.keysV). */
+export const KEYS_VERSION = 2;
 const CODE = /^[A-Za-z0-9]{1,20}$/;
 export type KeyBindings = Record<Action, string[]>;
 export const defaultBindings = (): KeyBindings => Object.fromEntries(ACTION_LIST.map((a) => [a, [...ACTIONS[a]]])) as KeyBindings;
@@ -115,6 +117,8 @@ export interface MapMarker {
 }
 export interface GameSettings {
   keys: KeyBindings;
+  /** Which set of default keys the bindings were made from: 2 = mount on R (rune 1.3 on comma). */
+  keysV: number;
   lang: Lang;
   uiScale: number;
   graphics: {
@@ -151,6 +155,7 @@ export interface GameSettings {
 }
 export const defaultGameSettings = (): GameSettings => ({
   keys: defaultBindings(),
+  keysV: KEYS_VERSION,
   lang: 'en',
   uiScale: 1,
   graphics: { quality: 'high', shake: true, damageNumbers: true, nameplates: true, weather: true, questMarkers: true, art: 'hd', renderer: 'hd2d' },
@@ -171,7 +176,13 @@ const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
 export function cleanGameSettings(raw: unknown): GameSettings {
   const r = obj(raw), out = defaultGameSettings();
   // keys: known actions only, valid codes, no reserved key, at most two per action, no key used twice
-  const k = obj(r.keys), used = new Set<string>();
+  const k = { ...obj(r.keys) }, used = new Set<string>();
+  // bindings made before the mount moved to R: whoever still has the old default keys gets the new ones
+  if (r.keysV !== KEYS_VERSION && 'mount.toggle' in k) {
+    const same = (v: unknown, c: string) => Array.isArray(v) && v.length === 1 && v[0] === c;
+    if (same(k['mount.toggle'], 'Comma') && same(k['rune.1.3'], 'KeyR')) [k['mount.toggle'], k['rune.1.3']] = [['KeyR'], ['Comma']];
+    else if (same(k['mount.toggle'], 'Comma') && !Object.values(k).some((v) => Array.isArray(v) && v.includes('KeyR'))) k['mount.toggle'] = ['KeyR'];
+  }
   const keys = {} as KeyBindings;
   for (const a of ACTION_LIST) {
     const list = Array.isArray(k[a]) ? (k[a] as unknown[]) : null;

@@ -5446,6 +5446,21 @@ test('M16 key bindings: defaults have no conflicts, conflicts are detected, rese
   assert.equal(keyLabel('ArrowLeft'), '←');
 });
 
+test('mount key on R: new defaults, and saved bindings with the old defaults move over once', () => {
+  assert.deepEqual(defaultBindings()['mount.toggle'], ['KeyR']);
+  assert.deepEqual(defaultBindings()['rune.1.3'], ['Comma'], 'rune 1.3 takes the comma');
+  assert.equal(keyConflicts(defaultBindings()).size, 0, 'still no conflicts');
+  const old = { ...defaultBindings(), 'mount.toggle': ['Comma'], 'rune.1.3': ['KeyR'] };
+  const s = cleanGameSettings({ keys: old });
+  assert.deepEqual([s.keys['mount.toggle'], s.keys['rune.1.3'], s.keysV], [['KeyR'], ['Comma'], 2], 'the old defaults are swapped');
+  assert.deepEqual(cleanGameSettings(s).keys['mount.toggle'], ['KeyR'], 'and stay');
+  // a player's own choices are kept
+  const mine = cleanGameSettings({ keys: { ...old, 'mount.toggle': ['KeyN'] } });
+  assert.deepEqual([mine.keys['mount.toggle'], mine.keys['rune.1.3']], [['KeyN'], ['KeyR']]);
+  const later = cleanGameSettings({ keys: { ...defaultBindings(), 'mount.toggle': ['Comma'], 'rune.1.3': ['KeyR'] }, keysV: 2 });
+  assert.deepEqual(later.keys['mount.toggle'], ['Comma'], 'a choice made after the change is not undone');
+});
+
 test('M16 settings document: every field is validated; bad values fall back to defaults; markers are cleaned and capped', () => {
   assert.deepEqual(cleanGameSettings(null), defaultGameSettings());
   assert.deepEqual(cleanGameSettings('nonsense'), defaultGameSettings());

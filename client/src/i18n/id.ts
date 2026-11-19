@@ -187,7 +187,7 @@ export const id: Record<keyof typeof en, string> = {
   'comp.petName': 'Nama peliharaan', 'comp.exp': '{a}/{b} exp', 'comp.bonus': '+{v} {stat} saat dipanggil', 'comp.dismiss': 'Suruh pergi', 'comp.summon': 'Panggil', 'comp.rename': 'Ganti nama',
   'comp.releaseAsk': 'Lepaskan {name}?', 'comp.releaseWarn': 'Hilang selamanya.', 'comp.release': 'Lepaskan', 'comp.keep': 'Simpan',
   'comp.speed': '+{n}% kecepatan gerak · butuh Lv.{lv}', 'comp.dismount': 'Turun', 'comp.ride': 'Tunggangi',
-  'comp.rules': 'Kamu tidak bisa menunggang saat bertarung, di dungeon, atau di arena; terkena serangan, menyerang, atau merapal membuatmu turun.',
+  'comp.rules': 'Tekan {mount} untuk naik atau turun dari tunggangan. Kamu tidak bisa menunggang di dungeon, arena, atau laga; menyerang atau merapal membuatmu turun, tetapi terkena serangan tidak.',
   'comp.stat.maxHp': 'nyawa', 'comp.stat.atk': 'serangan', 'comp.stat.matk': 'sihir', 'comp.stat.def': 'pertahanan', 'comp.stat.crit': 'peluang kritis', 'comp.stat.dodge': 'menghindar',
 
   // ---- pengaturan ----

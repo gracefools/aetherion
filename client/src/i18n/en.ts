@@ -185,7 +185,7 @@ export const en = {
   'comp.petName': 'Pet name', 'comp.exp': '{a}/{b} exp', 'comp.bonus': '+{v} {stat} while summoned', 'comp.dismiss': 'Dismiss', 'comp.summon': 'Summon', 'comp.rename': 'Rename',
   'comp.releaseAsk': 'Release {name}?', 'comp.releaseWarn': 'Gone for good.', 'comp.release': 'Release', 'comp.keep': 'Keep',
   'comp.speed': '+{n}% movement speed · requires Lv.{lv}', 'comp.dismount': 'Dismount', 'comp.ride': 'Ride',
-  'comp.rules': 'You cannot ride in combat, in dungeons or in the arena; taking damage, attacking or casting puts you back on foot.',
+  'comp.rules': 'Press {mount} to ride your mount or get off it. You cannot ride in dungeons, the arena or matches; attacking or casting puts you back on foot, but taking hits does not.',
   'comp.stat.maxHp': 'health', 'comp.stat.atk': 'attack', 'comp.stat.matk': 'magic', 'comp.stat.def': 'defence', 'comp.stat.crit': 'critical chance', 'comp.stat.dodge': 'dodge',
 
   // ---- settings ----

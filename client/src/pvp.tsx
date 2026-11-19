@@ -260,14 +260,14 @@ export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; 
                 <div className="sub">{t('comp.speed', { n: Math.round((d.speed - 1) * 100), lv: d.level })}</div>
                 <div className="actions">
                   {on ? <button className="small" onClick={() => game.compOp('dismount')}>{t('comp.dismount')}</button>
-                    : <button className="small primary" disabled={low} title={low ? t('err.needLevel', { n: d.level }) : undefined} onClick={() => game.compOp('mount', { id })}>{t('comp.ride')}</button>}
+                    : <button className="small primary" disabled={low} title={low ? t('err.needLevel', { n: d.level }) : undefined} onClick={() => game.compOp('mount', { id })}>{t('comp.ride')} <kbd>{keyOf('mount.toggle')}</kbd></button>}
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-      <p className="sub">{t('comp.rules', { key: keyOf('panel.companions') })}</p>
+      <p className="sub">{t('comp.rules', { key: keyOf('panel.companions'), mount: keyOf('mount.toggle') })}</p>
     </div>
   );
 }

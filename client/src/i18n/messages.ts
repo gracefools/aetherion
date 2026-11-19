@@ -314,6 +314,9 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   r2Won: m('Your team won the rated 2v2: rating +{a}, +{b} honour.', 'Timmu memenangkan 2v2 berperingkat: rating +{a}, +{b} kehormatan.'),
   r2Lost: m('Your team lost the rated 2v2: rating -{a}, +{b} honour.', 'Timmu kalah dalam 2v2 berperingkat: rating -{a}, +{b} kehormatan.'),
   r2Left: m('You left the rated 2v2 and lost it: rating -{a}.', 'Kamu meninggalkan 2v2 berperingkat dan kalah: rating -{a}.'),
+  mAnswer: m('A match is waiting for your answer', 'Ada laga yang menunggu jawabanmu'), mNoAnswer: m('No match is waiting for your answer', 'Tidak ada laga yang menunggu jawabanmu'),
+  mDropped: m('The match was not accepted in time: you have left the line.', 'Laga tidak diterima tepat waktu: kamu keluar dari antrean.'),
+  mBack: m('Someone did not accept the match: you are back in line, in your place.', 'Ada yang tidak menerima laga: kamu kembali mengantre, di tempatmu semula.'),
   matchWon: m('Victory!', 'Menang!'), matchLost: m('Defeat.', 'Kalah.'), matchDraw: m('A draw.', 'Seri.'),
 
   // ---- companions ----

@@ -219,6 +219,8 @@ export class Pvp {
       case 'leave': return this.matches.isMatch(p.room) ? this.matches.leave(p) : this.leaveArena(p);
       case 'queue': return this.matches.join(p, m.mode);
       case 'unqueue': return this.matches.leaveQueue(p);
+      case 'maccept': return this.matches.answer(p, true);
+      case 'mdecline': return this.matches.answer(p, false);
       case 'rank': {
         void this.repo.pvpRankings(m.by === 'kills' || m.by === 'duels_won' || m.by === 'arena_kills' || m.by === 'bg_won' ? m.by : 'rating').then((rows) => this.repo.pvpStats([p.id]).then(([me]) => this.w.send(p, { t: 'pvprank', rows, me: me ?? null })));
         return '';

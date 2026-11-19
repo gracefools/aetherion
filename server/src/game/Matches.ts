@@ -3,7 +3,7 @@
 // where they were when it ends. Rated duels change rating; the battleground pays honour to both sides.
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
 import {
-  BG, BG_BASES, BG_SHRINE, MATCH_DROP_MS, MATCH_END_MS, MATCH_ZONE, isRated, pairRanked, pickBattleground, pickRanked2, RANKED, RANKED_HALL,
+  BG, BG_BASES, BG_SHRINE, MATCH_DROP_MS, MATCH_END_MS, MATCH_ZONE, READY_MS, isRated, pairRanked, pickBattleground, pickRanked2, RANKED, RANKED_HALL,
   shrineHolder, type MatchMode, type MatchView, type QueueEntry,
 } from '../../../shared/src/matches';
 import { ratingDelta } from '../../../shared/src/pvp';
@@ -38,6 +38,15 @@ interface Match {
   kd: Map<number, [number, number]>;
 }
 
+interface Offer {
+  mode: MatchMode;
+  teams: [number[], number[]];
+  until: number;
+  yes: Set<number>;
+  /** Each player's place in line, given back if the match falls through. */
+  held: Map<number, { mode: MatchMode; since: number; group: number }>;
+}
+
 export class Matches {
   /** player id -> what they queued for and since when */
   private queue = new Map<number, { mode: MatchMode; since: number; group: number }>();
@@ -47,6 +56,8 @@ export class Matches {
   private nextId = 1;
   /** What each player in line was last told about how many are waiting with them. */
   private told = new Map<number, number>();
+  /** Matches found and waiting for everyone to accept: player id -> its offer. */
+  private offered = new Map<number, Offer>();
   constructor(private w: World, private pvp: Pvp) {}
 
   isMatch(room: ZoneRoom) {
@@ -66,10 +77,11 @@ export class Matches {
   }
 
   /** Why a player cannot be taken into a match right now ('' if they can). */
-  private unfit(p: Player): string {
+  private unfit(p: Player, asked = false): string {
     if (!p.conn) return 'offline';
     if (p.dead) return 'You are dead';
     if (this.of.has(p.id)) return 'You are already in a match';
+    if (!asked && this.offered.has(p.id)) return 'A match is waiting for your answer';
     if ((ZONES[p.room.zoneId].kind === 'dungeon' && !this.pvp.isArena(p.room)) || this.w.life.isHome(p.room)) return 'Leave the dungeon first';
     if ((this.w.tick - p.lastCombat) * TICK_MS <= COMBAT_TIMEOUT_MS) return 'Not while in combat';
     return '';
@@ -77,6 +89,7 @@ export class Matches {
   join(p: Player, mode: unknown): string {
     if (mode !== 'ranked' && mode !== 'ranked2' && mode !== 'bg') return 'Unknown command';
     if (this.of.has(p.id)) return 'You are already in a match';
+    if (this.offered.has(p.id)) return 'A match is waiting for your answer';
     if ((ZONES[p.room.zoneId].kind === 'dungeon' && !this.pvp.isArena(p.room)) || this.w.life.isHome(p.room)) return 'Leave the dungeon first';
     const party = p.party && p.party.members.length > 1 ? p.party : null;
     if (mode !== 'ranked' && party) {
@@ -101,6 +114,7 @@ export class Matches {
     return '';
   }
   leaveQueue(p: Player): string {
+    if (this.offered.has(p.id)) return this.answer(p, false);
     const q = this.queue.get(p.id);
     if (!q) return 'You are not in line';
     // a party leaves the line together
@@ -122,6 +136,11 @@ export class Matches {
       else if (q.group && p.party?.id !== q.group) q.group = 0; // left the party: in line alone from now on
     }
     this.findMatches(now);
+    // an offer not answered in time, or by someone who has gone, falls through
+    for (const o of new Set(this.offered.values())) {
+      const gone = [...o.held.keys()].filter((id) => !o.yes.has(id) && (now >= o.until || !this.w.online.get(id)?.conn));
+      if (gone.length) this.fallThrough(o, gone);
+    }
     for (const m of this.matches) this.run(m, now);
     // everyone in line hears how many wait in the same line (only when it changes)
     const count = new Map<MatchMode, number>();
@@ -147,10 +166,61 @@ export class Matches {
       for (const [id, q] of this.queue) if (q.group && !out.some((e) => e.id === id)) short.add(q.group);
       return out.filter((e) => !e.group || !short.has(e.group));
     };
-    for (const [a, b] of pairRanked(fit('ranked'), now)) this.start('ranked', [[a], [b]], now);
-    for (let r2 = fit('ranked2'), t = pickRanked2(r2, now); t; r2 = r2.filter((e) => !t![0].includes(e.id) && !t![1].includes(e.id)), t = pickRanked2(r2, now)) this.start('ranked2', t, now);
+    for (const [a, b] of pairRanked(fit('ranked'), now)) this.offer('ranked', [[a], [b]], now);
+    for (let r2 = fit('ranked2'), t = pickRanked2(r2, now); t; r2 = r2.filter((e) => !t![0].includes(e.id) && !t![1].includes(e.id)), t = pickRanked2(r2, now)) this.offer('ranked2', t, now);
     const bg = pickBattleground(fit('bg'), now);
-    if (bg) this.start('bg', bg, now);
+    if (bg) this.offer('bg', bg, now);
+  }
+
+  /** A match is found: everyone in it is asked first, and kept out of line meanwhile. */
+  private offer(mode: MatchMode, teams: [number[], number[]], now: number) {
+    const o: Offer = { mode, teams, until: now + READY_MS, yes: new Set(), held: new Map() };
+    for (const id of [...teams[0], ...teams[1]]) {
+      o.held.set(id, this.queue.get(id)!);
+      this.queue.delete(id);
+      this.offered.set(id, o);
+      const p = this.w.online.get(id);
+      if (p) this.w.send(p, { t: 'mfound', mode, ms: READY_MS });
+    }
+  }
+  /** A player's answer to the match found for them. */
+  answer(p: Player, yes: boolean): string {
+    const o = this.offered.get(p.id);
+    if (!o) return 'No match is waiting for your answer';
+    if (!yes) return this.fallThrough(o, [p.id]), '';
+    o.yes.add(p.id);
+    this.w.send(p, { t: 'mfound', mode: o.mode, ms: Math.max(0, o.until - Date.now()), ok: true });
+    if (o.yes.size < o.held.size) return '';
+    // everyone said yes: whoever cannot go now (in a dungeon, in a fight, dead) lets the others down
+    const unfit = [...o.held.keys()].filter((id) => { const x = this.w.online.get(id); return !x || this.unfit(x, true); });
+    if (unfit.length) return this.fallThrough(o, unfit), '';
+    for (const id of o.held.keys()) {
+      this.offered.delete(id);
+      const x = this.w.online.get(id);
+      if (x) this.w.send(x, { t: 'mfound', mode: null });
+    }
+    this.start(o.mode, o.teams, Date.now());
+    return '';
+  }
+  /** The match will not happen: those who let it down leave the line, the rest go back to their place in it. */
+  private fallThrough(o: Offer, out: number[]) {
+    for (const [id, q] of o.held) {
+      this.offered.delete(id);
+      const p = this.w.online.get(id);
+      if (out.includes(id)) {
+        if (p) {
+          this.w.send(p, { t: 'mfound', mode: null });
+          this.w.send(p, { t: 'mq', mode: null });
+          this.w.send(p, { t: 'sys', text: 'The match was not accepted in time: you have left the line.' });
+        }
+        continue;
+      }
+      if (!p) continue;
+      this.queue.set(id, q);
+      this.told.delete(id);
+      this.w.send(p, { t: 'mfound', mode: null });
+      this.w.send(p, { t: 'sys', text: 'Someone did not accept the match: you are back in line, in your place.' });
+    }
   }
 
   private start(mode: MatchMode, teams: [number[], number[]], now: number) {

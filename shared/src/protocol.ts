@@ -95,7 +95,7 @@ export type ClientMsg =
   | { t: 'quest'; op: 'accept' | 'abandon' | 'turnin' | 'shop'; id?: string; faction?: string; base?: string }
   | { t: 'guild'; op: string; [k: string]: unknown }
   | { t: 'eco'; op: string; [k: string]: unknown }
-  | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy' | 'queue' | 'unqueue'; id?: number; by?: string; base?: string; mode?: string }
+  | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy' | 'queue' | 'unqueue' | 'maccept' | 'mdecline'; id?: number; by?: string; base?: string; mode?: string }
   | { t: 'finder'; op: 'join' | 'leave' | 'state'; dungeon?: string; diff?: string }
   | { t: 'season'; op: 'view'; ladder?: string }
   | { t: 'comp'; op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount'; uid?: string; id?: string; name?: string }
@@ -300,6 +300,8 @@ export type ServerMsg =
   /** G8: the matchmaking line you are in (null: none), and the match you are in (null: it is over for you). */
   | { t: 'mq'; mode: 'ranked' | 'ranked2' | 'bg' | null; n?: number; waited?: number }
   | { t: 'match'; v: MatchView | null }
+  /** A match was found and waits for your answer (mode null: the question is gone); ok once you accepted. */
+  | { t: 'mfound'; mode: 'ranked' | 'ranked2' | 'bg' | null; ms?: number; ok?: boolean }
   | { t: 'comp'; comp: Companions }
   | { t: 'pong'; c: number }
   /** G2 talents: time taken off every skill cooldown. */

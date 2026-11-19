@@ -4991,6 +4991,43 @@ test('M15 arena: entered at the Arena Master, everyone fights everyone (teams by
 
 import { BG, BG_SHRINE, levelWindow, MATCH_END_MS, pairRanked, pickBattleground, pickRanked2, RANKED, ratingWindow } from '../shared/src/matches';
 
+/** One matchmaking tick, and everyone a match was found for accepts it. */
+function go(world: any) {
+  const mm = world.pvp.matches;
+  mm.tick(Date.now());
+  for (const id of [...mm.offered.keys()]) world.pvpOp(world.online.get(id), { op: 'maccept' });
+}
+
+test('G8 ready check: a found match waits for everyone; a decline or no answer sends the others back to their place', () => {
+  const h = harness({ capacity: 10 }), { world } = h, mm = world.pvp.matches as any;
+  const A = h.join(0, 0, 'knight', 30), B = h.join(30, 0, 'mage', 30), C = h.join(60, 0, 'cleric', 30);
+  world.pvpOp(A.p, { op: 'queue', mode: 'ranked' });
+  world.pvpOp(B.p, { op: 'queue', mode: 'ranked' });
+  const since = mm.queue.get(A.p.id).since;
+  mm.tick(Date.now());
+  assert.ok(A.out.some((m) => m.t === 'mfound' && m.mode === 'ranked') && !mm.isMatch(A.p.room), 'asked first, not taken');
+  assert.equal(world.pvpOp(A.p, { op: 'queue', mode: 'bg' }), 'A match is waiting for your answer');
+  world.pvpOp(A.p, { op: 'maccept' });
+  assert.ok(!mm.isMatch(A.p.room), 'one yes is not enough');
+  world.pvpOp(B.p, { op: 'mdecline' });
+  assert.equal(mm.queued(B.p), null, 'whoever declines leaves the line');
+  assert.equal(mm.queued(A.p), 'ranked', 'the other goes back');
+  assert.equal(mm.queue.get(A.p.id).since, since, 'in their old place');
+  // no answer in time
+  world.pvpOp(C.p, { op: 'queue', mode: 'ranked' });
+  mm.tick(Date.now());
+  world.pvpOp(C.p, { op: 'maccept' });
+  for (const o of new Set(mm.offered.values()) as Set<any>) o.until = Date.now() - 1;
+  mm.tick(Date.now());
+  assert.equal(mm.queued(A.p), null, 'A did not answer and left the line');
+  assert.equal(mm.queued(C.p), 'ranked', 'C waits on');
+  // both say yes: the match starts
+  world.pvpOp(A.p, { op: 'queue', mode: 'ranked' });
+  go(world);
+  assert.ok(mm.isMatch(A.p.room) && A.p.room === C.p.room);
+  assert.equal(world.pvpOp(B.p, { op: 'maccept' }), 'No match is waiting for your answer');
+});
+
 test('G8 matchmaking rules: rating windows widen with waiting, teams are balanced, a battleground fills or waits', () => {
   assert.equal(ratingWindow(0), 100);
   assert.ok(ratingWindow(60_000) > ratingWindow(10_000));
@@ -5026,10 +5063,10 @@ test('G8 rated duel: queued anywhere, matched by rating, fought in a private hal
   assert.equal(world.pvpOp(B.p, { op: 'queue', mode: 'ranked' }), '');
   assert.ok(A.out.some((m) => m.t === 'mq' && m.mode === 'ranked'));
   B.p.lastCombat = A.p.lastCombat = world.tick; // in combat a moment: not matched yet, but told who waits
-  mm.tick(Date.now());
+  go(world);
   assert.ok(A.out.some((m) => m.t === 'mq' && m.mode === 'ranked' && m.n === 2 && m.waited >= 0), 'the line says how many wait');
   B.p.lastCombat = A.p.lastCombat = -1000;
-  mm.tick(Date.now());
+  go(world);
   assert.ok(mm.isMatch(A.p.room) && A.p.room === B.p.room, 'both taken to the same hall');
   assert.ok(A.p.room.monsters.size === 0);
   assert.notEqual(world.pvp.block(A.p, B.p), '', 'nobody is hurt before the start');
@@ -5046,7 +5083,7 @@ test('G8 rated duel: queued anywhere, matched by rating, fought in a private hal
   assert.ok((world.pvp.rating.get(A.p.id) ?? 0) > ra, 'the winner gains rating');
   assert.ok(A.out.some((x) => x.t === 'match' && x.v?.result === 'won') && B.out.some((x) => x.t === 'match' && x.v?.result === 'lost'));
   m.overAt -= MATCH_END_MS;
-  mm.tick(Date.now());
+  go(world);
   assert.equal(A.p.room.zoneId, 'eldoria');
   assert.ok(Math.hypot(A.p.x - home.x, A.p.y - home.y) < 2, 'back where they were');
   assert.ok(!B.p.dead && B.p.room.zoneId === 'eldoria', 'the loser is brought back on their feet');
@@ -5055,7 +5092,7 @@ test('G8 rated duel: queued anywhere, matched by rating, fought in a private hal
   for (const p of [A.p, B.p]) p.lastCombat = -1000;
   world.pvpOp(A.p, { op: 'queue', mode: 'ranked' });
   world.pvpOp(B.p, { op: 'queue', mode: 'ranked' });
-  mm.tick(Date.now());
+  go(world);
   const rb = world.pvp.rating.get(B.p.id) ?? 1000;
   assert.equal(world.pvpOp(B.p, { op: 'leave' }), '');
   assert.equal(B.p.room.zoneId, 'eldoria');
@@ -5067,10 +5104,10 @@ test('G8 Shrine Clash: two balanced teams, team-mates are safe, kills and the sh
   const h = harness({ capacity: 10 }), { world } = h, mm = world.pvp.matches as any;
   const ps = [h.join(0, 0, 'knight', 30), h.join(30, 0, 'mage', 30), h.join(60, 0, 'cleric', 30), h.join(90, 0, 'ranger', 30)].map((x) => x.p);
   for (const p of ps) assert.equal(world.pvpOp(p, { op: 'queue', mode: 'bg' }), '');
-  mm.tick(Date.now());
+  go(world);
   assert.ok(!mm.isMatch(ps[0].room), 'four in line: it waits for more');
   for (const p of ps) mm.queue.get(p.id).since -= BG.fillWaitMs;
-  mm.tick(Date.now());
+  go(world);
   assert.ok(ps.every((p) => mm.isMatch(p.room) && p.room === ps[0].room), 'then all four go in');
   const m = mm.of.get(ps[0].id);
   m.startsAt = Date.now() - 1;
@@ -5083,24 +5120,24 @@ test('G8 Shrine Clash: two balanced teams, team-mates are safe, kills and the sh
   assert.equal(m.score[side], BG.killPoints, 'a kill scores');
   // the fallen come back at their base
   foe.deadTick -= Math.ceil(BG.respawnMs / TICK_MS) + 1;
-  mm.tick(Date.now());
+  go(world);
   assert.ok(!foe.dead && mm.isMatch(foe.room), 'back in the fight');
   // holding the shrine alone scores
   for (const p of ps) world.relocate(p, p.room, m.side.get(p.id) === side ? tileCenter(BG_SHRINE.tx) : tileCenter(BG_SHRINE.tx) + 30 * TILE, tileCenter(BG_SHRINE.ty));
   const before = m.score[side];
   m.nextHold = Date.now() - 1;
-  mm.tick(Date.now());
+  go(world);
   assert.equal(m.score[side], before + 1, 'the shrine scores for the team on it');
   assert.equal(m.shrine, side);
   // reaching the target wins; both sides are paid
   m.score[side] = BG.target - 1;
   const gold = ps[0].gold;
   m.nextHold = Date.now() - 1;
-  mm.tick(Date.now());
+  go(world);
   assert.ok(m.overAt > 0 && m.winner === side);
   assert.equal(ps[0].gold, gold + BG.winGold);
   m.overAt -= MATCH_END_MS;
-  mm.tick(Date.now());
+  go(world);
   assert.ok(ps.every((p) => p.room.zoneId === 'eldoria'), 'everyone goes home');
   assert.ok(RANKED.winHonor > 0);
 });
@@ -5131,7 +5168,7 @@ test('G8 rated 2v2: a party of two or two alone, close ratings, the fallen stay 
   assert.equal(mm.queued(ps[1]), 'ranked2', 'the partner is in line too');
   world.pvpOp(ps[2], { op: 'queue', mode: 'ranked2' });
   world.pvpOp(ps[3], { op: 'queue', mode: 'ranked2' });
-  mm.tick(Date.now());
+  go(world);
   const m = mm.of.get(ps[0].id);
   assert.ok(m && m.mode === 'ranked2' && ps.every((p) => mm.of.get(p.id) === m));
   assert.equal(m.side.get(ps[0].id), m.side.get(ps[1].id), 'the party on one team');
@@ -5152,7 +5189,7 @@ test('G8 rated 2v2: a party of two or two alone, close ratings, the fallen stay 
   assert.ok((world.pvp.rating.get(ps[0].id) ?? 0) > ra && (world.pvp.rating.get(ps[1].id) ?? 0) > ra, 'both winners gain');
   assert.ok((world.pvp.rating.get(a.id) ?? 0) < 1000 && (world.pvp.rating.get(b.id) ?? 0) < 1000, 'both losers lose');
   m.overAt -= MATCH_END_MS;
-  mm.tick(Date.now());
+  go(world);
   assert.ok(ps.every((p) => p.room.zoneId === 'eldoria' && !p.dead), 'everyone home on their feet');
   // a party of three cannot join a 2v2
   group(world, ps[0], ps[2]);
@@ -5171,7 +5208,7 @@ test('G8 Shrine Clash with a party: one queues the whole party, it fights on one
   world.pvpOp(ps[2], { op: 'queue', mode: 'bg' });
   world.pvpOp(ps[3], { op: 'queue', mode: 'bg' });
   for (const p of ps) mm.queue.get(p.id).since -= BG.fillWaitMs;
-  mm.tick(Date.now());
+  go(world);
   const m = mm.of.get(ps[0].id);
   assert.ok(m && ps.every((p) => mm.of.get(p.id) === m), 'a two-against-two');
   assert.equal(m.side.get(ps[0].id), m.side.get(ps[1].id), 'the party on one team');

@@ -37,6 +37,8 @@ export const BG = {
 };
 /** Both kinds of match end with everyone sent home after this long. */
 export const MATCH_END_MS = 6000;
+/** A found match waits this long for everyone in it to accept. */
+export const READY_MS = 20_000;
 /** A fighter who is disconnected this long leaves the match (and a rated duel is lost). */
 export const MATCH_DROP_MS = 20_000;
 export const MATCH_ZONE = 'd_ruins';

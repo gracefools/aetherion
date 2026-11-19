@@ -57,7 +57,7 @@ import { ownsRune } from '../../shared/src/runes';
 import { STATUS } from '../../shared/src/combat';
 import { TradeInvite, TradePanel } from './trade';
 import { GuildInvite, GuildPanel } from './guild';
-import { CompanionsPanel, DepthAsk, DuelInvite, DuelStatus, MatchBar, PvpZoneBadge } from './pvp';
+import { CompanionsPanel, DepthAsk, DuelInvite, DuelStatus, MatchBar, MatchReady, PvpZoneBadge } from './pvp';
 import { toRail } from './rail';
 import { TraitBadge } from './traitsUi';
 import { TalentPicker } from './talentsUi';
@@ -726,6 +726,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       <Guard><DepthAsk hud={hud} game={game} /></Guard>
       <Guard><DuelStatus hud={hud} game={game} /></Guard>
       <Guard><MatchBar hud={hud} game={game} /></Guard>
+      <Guard><MatchReady hud={hud} game={game} /></Guard>
       <Guard><PvpZoneBadge hud={hud} game={game} /></Guard>
       <Guard><TraitBadge hud={hud} /></Guard>
       <Guard><StatusBar hud={hud} /></Guard>

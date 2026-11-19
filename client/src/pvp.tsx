@@ -72,6 +72,27 @@ export function DuelInvite({ hud, game }: { hud: Hud; game: Game }) {
   );
 }
 
+/** G8: a match was found: accept or decline before the time runs out. */
+export function MatchReady({ hud, game }: { hud: Hud; game: Game }) {
+  useT();
+  const f = hud.mfound, [, tick] = useState(0);
+  useEffect(() => {
+    if (!f) return;
+    const id = setInterval(() => tick((x: number) => x + 1), 250);
+    return () => clearInterval(id);
+  }, [f]);
+  if (!f) return null;
+  const left = Math.max(0, Math.ceil((f.until - performance.now()) / 1000));
+  const name = t(f.mode === 'ranked' ? 'mm.ranked' : f.mode === 'ranked2' ? 'mm.ranked2' : 'mm.bg');
+  return (
+    <div className="hud inviteask panel" role="alertdialog" aria-label={t('mm.found', { name })} style={{ top: '40%' }}>
+      <p><b>{t('mm.found', { name })}</b></p>
+      <p className="sub">{f.ok ? t('mm.waitOthers', { n: left }) : t('mm.answerIn', { n: left })}</p>
+      {!f.ok && <div className="actions"><button onClick={() => game.pvpOp('mdecline')}>{t('common.decline')}</button><button className="primary" onClick={() => game.pvpOp('maccept')}>{t('common.accept')}</button></div>}
+    </div>
+  );
+}
+
 /** G8: the match in progress: the score, the clock and the shrine (battleground), and the way out. */
 export function MatchBar({ hud, game }: { hud: Hud; game: Game }) {
   useT();

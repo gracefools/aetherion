@@ -12,6 +12,7 @@ import { keyOf } from './game/Game';
 import { itemIcon } from './game/icons';
 import { t, tm, tv, useT, type Key } from './i18n';
 import { ArmamentTab, SigilInfo, SigilTab, StatBlocks } from './gearUi';
+import { hideTip, tip } from './tooltip';
 
 const PCT: Partial<Record<GearStat, boolean>> = { crit: true, critDmg: true, lifesteal: true, dodge: true, healPower: true };
 const fmt = (k: GearStat, v: number) => (PCT[k] ? `${Math.round(v * (k === 'crit' || k === 'dodge' ? 10 : 1000)) / 10}%` : String(Math.round(v)));
@@ -36,13 +37,14 @@ const BAG_FILTERS: [BagFilter, Key, (i: Item) => boolean][] = [
 ];
 /** One click on the sort icon sorts the way that suits what is shown: gear by rarity, the rest by type. */
 const sortFor = (f: BagFilter): SortKey => (f === 'equip' ? 'rarity' : f === 'mat' || f === 'scroll' ? 'name' : 'kind');
-function Cell({ item, sel, onClick, onUse, mark = false }: { item?: Item; sel: boolean; onClick: () => void; onUse: () => void; mark?: boolean }) {
+function Cell({ item, sel, onClick, onUse, mark = false, hud }: { item?: Item; sel: boolean; onClick: () => void; onUse: () => void; mark?: boolean; hud?: Hud }) {
   if (!item) return <span className="cell empty" />;
   const b = ITEMS[item.base];
+  const tipProps = hud ? tip(() => <ItemTip item={item} hud={hud} />) : {};
   return (
     <button
       className={'cell' + (sel ? ' sel' : '') + (mark ? ' marked' : '')} style={{ borderColor: b.kind === 'equip' ? RARITY_COLOR[item.rar] : undefined }}
-      onClick={onClick} onDoubleClick={onUse} aria-label={`${b.kind === 'equip' ? rarName(item.rar) + ' ' : ''}${itemName(item)}${item.qty > 1 ? ` ×${item.qty}` : ''}${item.bd ? ` (${t('item.bound')})` : ''}`} aria-pressed={sel}
+      {...tipProps} onClick={onClick} onDoubleClick={(e: any) => { hideTip(); onUse(); void e; }} aria-label={`${b.kind === 'equip' ? rarName(item.rar) + ' ' : ''}${itemName(item)}${item.qty > 1 ? ` ×${item.qty}` : ''}${item.bd ? ` (${t('item.bound')})` : ''}`} aria-pressed={sel}
     >
       <Icon item={item} />
       {item.qty > 1 && <span className="qty">{item.qty}</span>}
@@ -53,6 +55,52 @@ function Cell({ item, sel, onClick, onUse, mark = false }: { item?: Item; sel: b
 }
 
 const KIND_LINE: Record<string, Key> = { potion: 'item.kind.potion', scroll: 'item.kind.scroll', pet: 'item.kind.pet', mount: 'item.kind.mount', material: 'item.kind.material', sigil: 'item.kind.sigil' };
+/**
+ * The hover card for an item (or an item base, as sold in a shop): name in its rarity's colour, what
+ * it is, bound or tradable, its stats and how they compare with what is worn, set and passive, its
+ * description, what it sells for and what a double click does.
+ */
+export function ItemTip({ item, base, hud, price }: { item?: Item; base?: string; hud: Hud; price?: number }) {
+  const it: Item = item ?? { uid: '', base: base!, rar: ITEMS[base!].unique?.rar ?? 0, ilvl: hud.self?.level ?? 1, aff: [], up: 0, qty: 1 };
+  const b = ITEMS[it.base], me = hud.self;
+  if (!b) return null;
+  const worn = !!item && SLOTS.some((s) => hud.eq[s]?.uid === item.uid);
+  const cur = b.slot && !worn ? hud.eq[b.slot] : undefined, st = itemStats(it), curSt = cur ? itemStats(cur) : {};
+  const keys = [...new Set([...Object.keys(st), ...Object.keys(curSt)])] as GearStat[];
+  const block = b.kind === 'equip' && me ? equipBlock(it, me.job, me.level) : '';
+  const use = b.kind === 'equip' ? (worn ? 'tip.dblUnequip' : 'tip.dblEquip') : b.kind === 'potion' ? 'tip.dblDrink' : b.kind === 'pet' || b.kind === 'mount' ? 'tip.dblAdd' : b.kind === 'scroll' ? 'tip.dblRead' : it.base.startsWith('furn_') ? 'tip.dblPlace' : '';
+  return (
+    <div className="tipcard" style={{ ['--rar' as any]: b.kind === 'equip' ? RARITY_COLOR[it.rar] : '#c9a24a' }}>
+      <div className="tiphead">
+        <Icon item={it} size={36} />
+        <div>
+          <b className="tipname">{itemName(it)}{it.up > 0 ? ` +${it.up}` : ''}{it.qty > 1 ? ` ×${it.qty}` : ''}</b>
+          <div className="sub">{b.kind === 'equip' ? t('item.equipLine', { rar: rarName(it.rar), slot: slotName(b.slot!), ilvl: it.ilvl, req: reqLevel(it) }) : t(KIND_LINE[b.kind] ?? 'item.kind.material', { key: keyOf('panel.companions') })}</div>
+          {b.kind === 'equip' && item && <div className={'boundline' + (it.bd ? ' on' : '')}>{it.bd ? `⛓ ${t('item.bound')}` : t('item.tradable')}</div>}
+        </div>
+      </div>
+      {b.kind === 'equip' && item && <StatBlocks item={it} hud={hud} worn={worn} />}
+      {b.kind === 'equip' && !item && <div className="statgrid">{(Object.keys(st) as GearStat[]).map((k) => <div key={k}><span>{tv(STAT_LABEL[k])}</span><b>{fmt(k, st[k]!)}</b></div>)}</div>}
+      {b.kind === 'equip' && cur && keys.some((k) => Math.abs((st[k] ?? 0) - (curSt[k] ?? 0)) > 1e-9) && (
+        <div className="tipcompare">
+          <small className="sub">{t('tip.vsWorn', { name: itemName(cur) })}</small>
+          {keys.map((k) => {
+            const d = (st[k] ?? 0) - (curSt[k] ?? 0);
+            return Math.abs(d) > 1e-9 ? <span key={k} className={d > 0 ? 'better' : 'worse'}>{d > 0 ? '▲' : '▼'} {tv(STAT_LABEL[k])} {fmt(k, Math.abs(d))}</span> : null;
+          })}
+        </div>
+      )}
+      {b.unique?.passive && <p className="passive"><b>{PASSIVES[b.unique.passive].name}:</b> {PASSIVES[b.unique.passive].text}</p>}
+      {b.unique?.set && <p className="sub"><b>{SETS[b.unique.set].name}</b>: {SETS[b.unique.set].bonus.map((x, i) => `(${i + 2}) ${x.text}`).join(' · ')}</p>}
+      <p className="sub tipdesc">{b.desc}</p>
+      {block && <p className="err">{tm(block)}</p>}
+      <div className="tipfoot">
+        {price !== undefined ? <span className="gold">{t('tip.price', { g: price })}</span> : <span className="gold">{t('tip.sells', { g: sellValue(it) * it.qty })}</span>}
+        {use && item && <span>{t(use as Key)}</span>}
+      </div>
+    </div>
+  );
+}
 function Details({ item, worn, hud, game, askRead = false }: { item: Item; worn: Slot | null; hud: Hud; game: Game; askRead?: boolean }) {
   const me = hud.self!, b = ITEMS[item.base], st = itemStats(item);
   const block = b.kind === 'equip' ? equipBlock(item, me.job, me.level) : '';
@@ -190,7 +238,7 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
           <div className="eqrow">
             {SLOTS.map((s) => (
               <div key={s} className="eqslot">
-                {hud.eq[s] ? <Cell item={hud.eq[s]} sel={sel === hud.eq[s]!.uid} onClick={() => setSel(hud.eq[s]!.uid)} onUse={() => game.invOp('unequip', { slot: s })} /> : <span className="cell empty" />}
+                {hud.eq[s] ? <Cell hud={hud} item={hud.eq[s]} sel={sel === hud.eq[s]!.uid} onClick={() => setSel(hud.eq[s]!.uid)} onUse={() => game.invOp('unequip', { slot: s })} /> : <span className="cell empty" />}
                 <small>{slotName(s)}</small>
               </div>
             ))}
@@ -217,7 +265,7 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
             </span>
           </div>
           <div className="grid baggrid" role="list">
-            {shownItems.map((it) => <Cell key={it.uid} item={it} sel={sel === it.uid} mark={!!marks?.has(it.uid)} onClick={() => (marks ? toggle(it.uid) : (setSel(it.uid), setAskRead('')))} onUse={() => !marks && quick(it)} />)}
+            {shownItems.map((it) => <Cell hud={hud} key={it.uid} item={it} sel={sel === it.uid} mark={!!marks?.has(it.uid)} onClick={() => (marks ? toggle(it.uid) : (setSel(it.uid), setAskRead('')))} onUse={() => !marks && quick(it)} />)}
             {filtering ? !shownItems.length && <p className="sub">{t('bag.none')}</p>
               : Array.from({ length: Math.min(INVENTORY_SIZE - hud.inv.length, Math.max(0, 48 - hud.inv.length) + ((8 - (hud.inv.length % 8)) % 8)) }, (_, i) => <span key={`e${i}`} className="cell empty" />)}
           </div>
@@ -226,42 +274,55 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
         </div>
         <div>
           {item ? <Details item={item} worn={worn} hud={hud} game={game} askRead={askRead === item.uid} /> : <p className="sub">{t('bag.select')}</p>}
-          <h3>{t('shop.title')}</h3>
           {hud.shop ? (
-            <div className="shop">
-              {!marks ? <button className="small" onClick={() => setMarks(new Set())}>{t('bulk.open')}</button> : (
+            <div className="shop merchant">
+              <div className="merchhead">
+                <h3>{t('shop.title')}</h3>
+                <b className="gold purse">{t('common.gold', { n: hud.gold })}</b>
+              </div>
+              <div className="tabs" role="group" aria-label={t('shop.title')}>
+                <button aria-pressed={!marks} className={!marks ? 'on' : ''} onClick={() => setMarks(null)}>{t('shop.tabBuy')}</button>
+                <button aria-pressed={!!marks} className={marks ? 'on' : ''} onClick={() => setMarks(marks ?? new Set())}>{t('bulk.open')}</button>
+              </div>
+              {marks ? (
                 <div className="bulk" role="group" aria-label={t('bulk.label')}>
+                  <p className="sub">{t('bulk.help')}</p>
                   <div className="actions">
                     <button className="small" onClick={() => markAll((i) => ITEMS[i.base].kind === 'equip' && i.rar === 0)}>{t('bulk.common')}</button>
                     <button className="small" onClick={() => markAll((i) => ITEMS[i.base].kind === 'equip' && i.rar <= 1)}>{t('bulk.uncommon')}</button>
                     <button className="small" onClick={() => markAll((i) => ITEMS[i.base].kind === 'material')}>{t('bulk.materials')}</button>
                     <button className="small" onClick={() => setMarks(new Set())}>{t('bulk.clear')}</button>
                   </div>
-                  <p role="status"><b>{marked.length}</b> {t(marked.length === 1 ? 'bulk.marked1' : 'bulk.markedN')} · <b className="gold">{t('common.gold', { n: total })}</b></p>
+                  <p role="status" className="bulktotal"><b>{marked.length}</b> {t(marked.length === 1 ? 'bulk.marked1' : 'bulk.markedN')} · <b className="gold">{t('common.gold', { n: total })}</b></p>
                   <div className="actions">
                     <button onClick={() => setMarks(null)}>{t('common.cancel')}</button>
                     <SellButton key={marked.map((i) => i.uid).join()} n={marked.length} total={total} onConfirm={() => { game.invOp('sellall', { uids: marked.map((i) => i.uid) }); setMarks(null); setSel(''); }} />
                   </div>
                 </div>
-              )}
-              {SHOP_STOCK.map((id) => <BuyRow key={id} id={id} hud={hud} game={game} />)}
-              <div className="shoprow">
-                <Icon base="upgrade_stone" size={24} /><span>{t('shop.daily', { n: DAILY_STONES })}<small> {t('shop.dailyHelp')}</small></span>
-                <button className="small primary" disabled={hud.journal.s.sd === dayOf(Date.now())} onClick={() => game.invOp('dailystone')}>{hud.journal.s.sd === dayOf(Date.now()) ? t('shop.dailyDone') : t('shop.dailyTake')}</button>
-              </div>
-              <h3>{t('shop.companions')}</h3>
-              <p className="sub">{t('shop.companionsHelp')}</p>
-              {SHOP_COMPANIONS.map((id) => {
-                const done = hud.journal.s.b.includes(SHOP_ONCE[id]);
-                return (
-                  <div key={id} className="shoprow">
-                    <Icon base={id} size={24} /><span>{ITEMS[id].name}<small> {t('shop.once')}</small></span>
-                    <button className="small" disabled={done || hud.gold < ITEMS[id].price} onClick={() => game.invOp('buy', { base: id, qty: 1 })} aria-label={t('shop.buy', { name: ITEMS[id].name, g: ITEMS[id].price })}>{done ? t('shop.bought') : `${ITEMS[id].price}g`}</button>
+              ) : (
+                <div className="wares">
+                  <div className="ware daily">
+                    <span className="wareicon"><Icon base="upgrade_stone" size={36} /></span>
+                    <span className="warename"><b>{t('shop.daily', { n: DAILY_STONES })}</b><small>{t('shop.dailyHelp')}</small></span>
+                    <button className="small primary" disabled={hud.journal.s.sd === dayOf(Date.now())} onClick={() => game.invOp('dailystone')}>{hud.journal.s.sd === dayOf(Date.now()) ? t('shop.dailyDone') : t('shop.dailyTake')}</button>
                   </div>
-                );
-              })}
+                  {SHOP_STOCK.map((id) => <BuyRow key={id} id={id} hud={hud} game={game} />)}
+                  <h4 className="statsh">{t('shop.companions')}</h4>
+                  <p className="sub">{t('shop.companionsHelp')}</p>
+                  {SHOP_COMPANIONS.map((id) => {
+                    const done = hud.journal.s.b.includes(SHOP_ONCE[id]), poor = hud.gold < ITEMS[id].price;
+                    return (
+                      <div key={id} className={'ware' + (done ? ' sold' : '')}>
+                        <span className="wareicon" tabIndex={0} {...tip(() => <ItemTip base={id} hud={hud} price={ITEMS[id].price} />)}><Icon base={id} size={36} /></span>
+                        <span className="warename"><b>{ITEMS[id].name}</b><small>{done ? t('shop.bought') : t('shop.once')}</small></span>
+                        <button className={'small' + (done ? '' : ' primary')} disabled={done || poor} onClick={() => game.invOp('buy', { base: id, qty: 1 })} aria-label={t('shop.buy', { name: ITEMS[id].name, g: ITEMS[id].price })}>{done ? '✓' : <span className={poor ? 'worse' : ''}>{ITEMS[id].price}g</span>}</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ) : <p className="sub">{t('shop.away')}</p>}
+          ) : <><h3>{t('shop.title')}</h3><p className="sub">{t('shop.away')}</p></>}
         </div>
       </div>}
     </div>
@@ -291,13 +352,26 @@ export function LootFeed({ hud }: { hud: Hud }) {
 function BuyRow({ id, hud, game }: { id: string; hud: Hud; game: Game }) {
   const [qty, setQty] = useState(1) as [number, (n: number) => void];
   const b = ITEMS[id], afford = Math.floor(hud.gold / b.price), n = Math.max(1, Math.min(SHOP_BUY_MAX, Math.floor(qty) || 1));
+  const own = hud.inv.reduce((k, i) => k + (i.base === id ? i.qty : 0), 0), cost = b.price * n, poor = hud.gold < cost;
+  const step = (d: number) => setQty(Math.max(1, Math.min(SHOP_BUY_MAX, n + d)));
   return (
-    <div className="shoprow">
-      <Icon base={id} size={24} /><span>{b.name}<small> {b.desc} · {b.price}g</small></span>
+    <div className="ware">
+      <span className="wareicon" tabIndex={0} {...tip(() => <ItemTip base={id} hud={hud} price={b.price} />)}><Icon base={id} size={36} /></span>
+      <span className="warename"><b>{b.name}</b><small>{b.desc}</small><small className="sub">{t('shop.own', { n: own })} · <em className="gold">{t('shop.each', { g: b.price })}</em></small></span>
       <span className="buyqty">
-        <input type="number" min={1} max={SHOP_BUY_MAX} value={qty} onChange={(e: any) => setQty(Number(e.target.value))} aria-label={t('shop.qty', { name: b.name })} />
-        <button className="small" onClick={() => setQty(Math.max(1, Math.min(SHOP_BUY_MAX, afford)))}>{t('shop.max')}</button>
-        <button className="small primary" disabled={hud.gold < b.price * n} onClick={() => game.invOp('buy', { base: id, qty: n })} aria-label={t('shop.buy', { name: b.name, g: b.price * n })}>{t('shop.buyN', { n, g: b.price * n })}</button>
+        <span className="stepper">
+          <button className="small" onClick={() => step(-1)} aria-label={t('shop.less')} disabled={n <= 1}>−</button>
+          <input type="number" min={1} max={SHOP_BUY_MAX} value={qty} onChange={(e: any) => setQty(Number(e.target.value))} aria-label={t('shop.qty', { name: b.name })} />
+          <button className="small" onClick={() => step(1)} aria-label={t('shop.more')}>+</button>
+        </span>
+        <span className="quick">
+          {[10, 50].map((k) => <button key={k} className="small link" onClick={() => setQty(k)}>×{k}</button>)}
+          <button className="small link" onClick={() => setQty(Math.max(1, Math.min(SHOP_BUY_MAX, afford)))}>{t('shop.max')}</button>
+        </span>
+        <button className="small primary" disabled={poor} onClick={() => game.invOp('buy', { base: id, qty: n })} aria-label={t('shop.buy', { name: b.name, g: cost })}>
+          {t('shop.buyN', { n, g: cost })}
+        </button>
+        {poor && <small className="worse">{t('shop.short', { g: cost - hud.gold })}</small>}
       </span>
     </div>
   );

@@ -64,6 +64,8 @@ import { TalentPicker } from './talentsUi';
 import { StatusBar } from './statusUi';
 import { FinderPanel } from './finderUi';
 import { toTop } from './rail';
+import { TipLayer } from './tooltip';
+import { tip as tipOn } from './tooltip';
 
 interface Character {
   id: number;
@@ -526,9 +528,22 @@ function Slot({ def: base, hotkey, hud, game, locked, combo, gauge }: { def: Abi
   const def = game.ability(base.id);
   const s = hud.stats!, cost = costOf(def, s), cd = hud.cds[def.id];
   const running = cd && performance.now() - cd[0] < cd[1];
-  const tip = `${def.name}\n${def.desc}\n${def.costAll ? t('skill.allRage') : cost ? t(def.job === 'berserker' ? 'skill.costRage' : 'skill.costMana', { n: cost }) : t('skill.free')} · ${t('skill.cd', { s: def.cdMs / 1000 })}${def.castMs ? ` · ${t('skill.cast', { s: def.castMs / 1000 })}` : ''}${def.range ? ` · ${t('skill.range', { n: def.range })}` : ''}${locked ? `\n${locked}` : ''}`;
+  const rank = hud.build?.skills[def.id] ?? 0;
+  const card = () => (
+    <div className="tipcard skilltip">
+      <div className="tiphead"><img className="skillicon" src={skillIcon(def.id)} alt="" /><div><b className="tipname">{def.name}</b><div className="sub">{def.kind === 'rune' ? t('tip.rune') : rank ? t('tip.rank', { n: rank }) : t('tip.skill')} · {hotkey}</div></div></div>
+      <div className="tipstats">
+        <span>{def.costAll ? t('skill.allRage') : cost ? t(def.job === 'berserker' ? 'skill.costRage' : 'skill.costMana', { n: cost }) : t('skill.free')}</span>
+        <span>{t('skill.cd', { s: def.cdMs / 1000 })}</span>
+        {def.castMs ? <span>{t('skill.cast', { s: def.castMs / 1000 })}</span> : null}
+        {def.range ? <span>{t('skill.range', { n: def.range })}</span> : null}
+      </div>
+      <p className="tipdesc">{def.desc}</p>
+      {locked && <p className="err">{locked}</p>}
+    </div>
+  );
   return (
-    <button className={'slot' + (locked ? ' locked' : '') + (!locked && hud.res < cost ? ' nores' : '') + (combo ? ' combo' : '') + (gauge !== undefined && gauge >= 1 ? ' ultready' : '')} title={tip} aria-label={`${def.name} (${hotkey})`} aria-disabled={!!locked} onClick={() => game.useAbility(def.id)}>
+    <button className={'slot' + (locked ? ' locked' : '') + (!locked && hud.res < cost ? ' nores' : '') + (combo ? ' combo' : '') + (gauge !== undefined && gauge >= 1 ? ' ultready' : '')} {...tipOn(card)} aria-label={`${def.name} (${hotkey})`} aria-disabled={!!locked} onClick={() => game.useAbility(def.id)}>
       <span className="glyph"><img className="skillicon" src={skillIcon(def.id)} alt="" /></span>
       <span className="key">{hotkey}</span>
       {running && <CdMask key={cd[0]} at={cd[0]} ms={cd[1]} />}
@@ -752,6 +767,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       <Guard><DuelStatus hud={hud} game={game} /></Guard>
       <Guard><MatchBar hud={hud} game={game} /></Guard>
       <Guard><MatchReady hud={hud} game={game} /></Guard>
+      <TipLayer />
       <Guard><PvpZoneBadge hud={hud} game={game} /></Guard>
       <Guard><TraitBadge hud={hud} /></Guard>
       <Guard><StatusBar hud={hud} /></Guard>

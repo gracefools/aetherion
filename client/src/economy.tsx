@@ -8,6 +8,8 @@ import { ITEMS, itemName, RARITIES, RARITY_COLOR, type Item } from '../../shared
 import type { Game, Hud } from './game/Game';
 import { Icon, rarName } from './inventory';
 import { t, useT, type Key } from './i18n';
+import { tip } from './tooltip';
+import { ItemTip } from './inventory';
 
 const BANK_OP: Record<string, Key> = { deposit: 'bank.op.deposit', withdraw: 'bank.op.withdraw', depgold: 'bank.op.depgold', wdgold: 'bank.op.wdgold' };
 const left = (ms: number) => {
@@ -205,7 +207,7 @@ function Sell({ hud, game }: { hud: Hud; game: Game }) {
       <p className="sub">{t('ah.sellHelp')}</p>
       <div className="grid" aria-label={t('ah.sellable')}>
         {sellable.map((i) => (
-          <button key={i.uid} className={'slot' + (i.uid === uid ? ' on' : '')} onClick={() => { setUid(i.uid); setQty(''); setPrice(price || String(Math.max(1, (ITEMS[i.base].price || 10)))); }} aria-label={t('ah.sellName', { name: nameOf(i) })} aria-pressed={i.uid === uid}>
+          <button key={i.uid} className={'slot' + (i.uid === uid ? ' on' : '')} onClick={() => { setUid(i.uid); setQty(''); setPrice(price || String(Math.max(1, (ITEMS[i.base].price || 10)))); }} aria-label={t('ah.sellName', { name: nameOf(i) })} aria-pressed={i.uid === uid} {...tip(() => <ItemTip item={i} hud={hud} />)}>
             <Icon item={i} size={32} />{i.qty > 1 && <span className="qty">{i.qty}</span>}
           </button>
         ))}

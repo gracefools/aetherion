@@ -584,6 +584,30 @@
   .iconbtn { width: 28px; height: 26px; padding: 0; font-size: 15px; line-height: 1; display: grid; place-items: center; }
   .sorttools .sortsel { width: 34px; padding: 2px; }
   .baggrid { max-height: min(46vh, 380px); overflow-y: auto; align-content: start; overscroll-behavior: contain; padding-right: 4px; }
+  /* the rich hover card */
+  .richtip { position: fixed; z-index: 50; pointer-events: none; width: max-content; max-width: min(320px, calc(100vw - 16px)); }
+  .tipcard { --rar: #c9a24a; background: linear-gradient(180deg, rgba(24,28,44,.98), rgba(14,16,26,.98)); border: 1px solid var(--rar); border-radius: 10px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.6), 0 0 14px color-mix(in srgb, var(--rar) 30%, transparent); font-size: 12px; display: grid; gap: 6px; }
+  .tiphead { display: flex; gap: 10px; align-items: center; } .tiphead img, .tiphead .icon { flex: none; border-radius: 6px; background: #0e111a; border: 1px solid #343a52; }
+  .tipname { color: var(--rar); font: 600 14px Georgia, serif; }
+  .tipcard .statgrid { gap: 2px 12px; } .tipcard .statsh { margin: 2px 0; font-size: 11px; }
+  .tipcompare { display: flex; flex-wrap: wrap; gap: 2px 10px; padding-top: 4px; border-top: 1px dashed #343a52; } .tipcompare small { flex-basis: 100%; }
+  .tipdesc { margin: 0; color: #c8ccd8; font-style: italic; }
+  .tipfoot { display: flex; justify-content: space-between; gap: 10px; padding-top: 4px; border-top: 1px solid #262b3d; color: #aab0c4; }
+  .skilltip { --rar: #7fb8ff; } .skilltip .skillicon { width: 36px; height: 36px; image-rendering: pixelated; }
+  .tipstats { display: flex; flex-wrap: wrap; gap: 4px; } .tipstats span { padding: 1px 7px; border-radius: 9px; background: #20263a; border: 1px solid #343a52; }
+  /* the merchant: wares as cards with a stepper, quick amounts and a running total */
+  .merchant { display: grid; gap: 8px; } .merchhead { display: flex; align-items: center; justify-content: space-between; } .merchhead h3 { margin: 0; }
+  .purse { padding: 2px 10px; border-radius: 12px; background: #2a2416; border: 1px solid #6a5a2a; }
+  .wares { display: grid; gap: 6px; }
+  .ware { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid #2c3348; border-radius: 10px; background: linear-gradient(160deg, #1b2032, #141826); }
+  .ware:hover { border-color: #4a5068; } .ware.sold { opacity: .6; }
+  .ware.daily { border-color: #6a5a2a; background: linear-gradient(160deg, #2a2416, #17140c); }
+  .wareicon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: radial-gradient(circle at 50% 40%, #2a3048, #10131c); border: 1px solid #343a52; cursor: help; }
+  .warename { display: grid; gap: 1px; min-width: 0; } .warename small { font-size: 11px; color: #aab0c4; }
+  .ware .buyqty { display: grid; justify-items: end; gap: 3px; }
+  .stepper { display: inline-flex; align-items: center; gap: 2px; } .stepper input { width: 52px; text-align: center; padding: 2px; } .stepper button { width: 24px; padding: 0; }
+  .ware .quick { display: inline-flex; gap: 6px; } .ware .quick button { padding: 0; font-size: 11px; }
+  .bulktotal { margin: 4px 0; }
 </style>
 </head>
 <body>

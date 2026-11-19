@@ -502,7 +502,10 @@ try {
     w.relocate(pl, pl.room, boss.x - 170, boss.y + 20);
     const bar = p1.getByRole('status', { name: 'Boss: Ancient Rune Guardian' });
     await bar.waitFor();
-    assert.ok(await bar.getByText('Phase 1: Dormant Seals').isVisible());
+    if (!(await bar.getByText('Phase 1: Dormant Seals').isVisible())) {
+      await p1.screenshot({ path: '.run/fail-phase.png' });
+      throw new Error(`phase 1 text: bar says ${JSON.stringify(await bar.innerText().catch(() => '?'))}; top stack ${JSON.stringify(await p1.locator('.topstack').innerHTML().catch(() => '?')).slice(0, 1500)}`);
+    }
     w.hurt(boss, Math.ceil(boss.maxHp * 0.45), 0, pl);
     // two players share the machine: bring this one to the front so its frames are not throttled
     await p1.bringToFront();
@@ -511,7 +514,10 @@ try {
       const d = await p1.evaluate(() => { const g = (window as any).__game.debug(); return { boss: g.hud.boss, dead: g.hud.dead, zone: g.hud.zoneId, conn: g.hud.conn, chat: g.hud.chat.slice(-4).map((c: any) => c.text) }; }).catch((x) => String(x));
       throw new Error(`boss phase: client ${JSON.stringify(d)}; server phase ${boss.phase} hp ${boss.hp}/${boss.maxHp} dead ${boss.dead} state ${(boss as any).state}; player hp ${pl.hp} dead ${pl.dead} room ${pl.room.zoneId}; ${e}`);
     });
-    await bar.getByText('Phase 2: Seals Unbound').waitFor();
+    await bar.getByText('Phase 2: Seals Unbound').waitFor().catch(async (e) => {
+      await p1.screenshot({ path: '.run/fail-phase.png' });
+      throw new Error(`phase text: bar says ${JSON.stringify(await bar.innerText().catch(() => '?'))}, ${await p1.getByRole('status', { name: /^Boss:/ }).count()} boss bars; ${e}`);
+    });
     // the announcement: a banner for a few seconds, and a line that stays in the chat
     await p1.locator('.chatlog').getByText(/seals shatter/).first().waitFor();
     await p1.waitForTimeout(900);
@@ -1465,10 +1471,14 @@ try {
     await branch.getByRole('button', { name: 'Learn Lucid Flow' }).click();
     await branch.getByText('Now: -12% cost', { exact: false }).waitFor();
     // the hotbar shows the cheaper bolt (6 mana -> 5)
-    const tip = await p1.getByRole('toolbar', { name: 'Abilities' }).getByRole('button', { name: /^Arcane Bolt/ }).getAttribute('title');
-    assert.match(tip ?? '', /5 mana/);
     await p1.screenshot({ path: '.run/subskills.png' });
     await p1.keyboard.press('Escape');
+    // its card says so: keyboard focus shows it like a hover (the chat box sits over the first slot at this window size)
+    const boltBtn = p1.getByRole('toolbar', { name: 'Abilities' }).getByRole('button', { name: /^Arcane Bolt/ });
+    await boltBtn.focus();
+    const tip = await p1.getByRole('tooltip').innerText();
+    assert.match(tip, /5 mana/);
+    await boltBtn.blur();
     console.log('sub-skills ok: branches shown under each active skill, learned with skill points, numbers follow the ranks');
   }
 

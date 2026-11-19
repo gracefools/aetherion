@@ -6,6 +6,8 @@ import { TRADE_MAX_ITEMS, type TradeOffer } from '../../shared/src/protocol';
 import type { Game, Hud } from './game/Game';
 import { Icon, rarName } from './inventory';
 import { t, useT } from './i18n';
+import { tip } from './tooltip';
+import { ItemTip } from './inventory';
 
 function Offered({ offer, onRemove }: { offer: TradeOffer; onRemove?: (uid: string) => void }) {
   return (
@@ -53,7 +55,7 @@ export function TradePanel({ hud, game }: { hud: Hud; game: Game }) {
         {bag.length === 0 && <p className="sub">{t('trade.empty')}</p>}
         {bag.map((it) => (
           <span key={it.uid} className="bagitem">
-            <button className="cell" style={{ borderColor: ITEMS[it.base].kind === 'equip' ? RARITY_COLOR[it.rar] : undefined }} onClick={() => offer(it)} aria-label={t('trade.offer', { name: `${itemName(it)}${it.qty > 1 ? ` ×${it.qty}` : ''}` })} title={itemName(it)}>
+            <button className="cell" style={{ borderColor: ITEMS[it.base].kind === 'equip' ? RARITY_COLOR[it.rar] : undefined }} onClick={() => offer(it)} aria-label={t('trade.offer', { name: `${itemName(it)}${it.qty > 1 ? ` ×${it.qty}` : ''}` })} {...tip(() => <ItemTip item={it} hud={hud} />)}>
               <Icon item={it} />{it.qty > 1 && <span className="qty">{it.qty}</span>}{it.up > 0 && <span className="up">+{it.up}</span>}
             </button>
             {it.qty > 1 && <input type="number" className="qtyin" aria-label={t('trade.qty', { name: itemName(it) })} min={1} max={it.qty} placeholder={String(it.qty)} value={qty[it.uid] ?? ''} onChange={(e: any) => setQty({ ...qty, [it.uid]: e.target.value })} />}

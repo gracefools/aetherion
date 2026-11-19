@@ -306,6 +306,14 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   partyInDng: m('A party member is in a dungeon', 'Ada anggota party yang berada di dungeon'),
   partyLined: m('{a} put your party in line for the Shrine Clash. You will fight on the same team.', '{a} memasukkan party-mu ke antrean Bentrok Altar. Kalian akan bertarung di tim yang sama.'),
   partyUnlined: m('{a} took your party out of the line.', '{a} mengeluarkan party-mu dari antrean.'),
+  r2Party: m('Only a party of two can join the rated 2v2 together', 'Hanya party berdua yang bisa ikut 2v2 berperingkat bersama'),
+  r2Lined: m('{a} put your party in line for the rated 2v2. You will fight on the same team.', '{a} memasukkan party-mu ke antrean 2v2 berperingkat. Kalian akan bertarung di tim yang sama.'),
+  r2Line: m('You are in line for a rated 2v2. A partner and opponents are found for you; you may go about your business meanwhile.', 'Kamu mengantre 2v2 berperingkat. Rekan dan lawan dicarikan untukmu; lanjutkan kegiatanmu sementara itu.'),
+  r2Begins: m('A rated 2v2: you and {a} against {b}. It begins in {c} seconds. The fallen stay down until it is decided.', '2v2 berperingkat: kamu dan {a} melawan {b}. Dimulai dalam {c} detik. Yang tumbang tetap tumbang sampai laga diputuskan.'),
+  r2Draw: m('The rated 2v2 ended in a draw.', '2v2 berperingkat berakhir seri.'),
+  r2Won: m('Your team won the rated 2v2: rating +{a}, +{b} honour.', 'Timmu memenangkan 2v2 berperingkat: rating +{a}, +{b} kehormatan.'),
+  r2Lost: m('Your team lost the rated 2v2: rating -{a}, +{b} honour.', 'Timmu kalah dalam 2v2 berperingkat: rating -{a}, +{b} kehormatan.'),
+  r2Left: m('You left the rated 2v2 and lost it: rating -{a}.', 'Kamu meninggalkan 2v2 berperingkat dan kalah: rating -{a}.'),
   matchWon: m('Victory!', 'Menang!'), matchLost: m('Defeat.', 'Kalah.'), matchDraw: m('A draw.', 'Seri.'),
 
   // ---- companions ----

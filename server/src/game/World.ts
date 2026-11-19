@@ -1533,6 +1533,7 @@ export class World implements CombatCtx {
   }
   /** Back to the zone's spawn point at full health, with a short protective ward. No EXP or item penalty. */
   private respawn(p: Player) {
+    if (this.pvp.matches.keepDown(p)) return; // a rated 2v2: the fallen stay down until it is decided
     const sp = p.room.map.def.spawn, at = this.pvp.spawnFor(p) ?? { x: tileCenter(sp.tx), y: tileCenter(sp.ty) };
     p.dead = false;
     p.x = at.x;

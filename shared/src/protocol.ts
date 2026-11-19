@@ -298,7 +298,7 @@ export type ServerMsg =
   | { t: 'duel'; with: string; id: number; starts: number; ends: number; result?: string }
   | { t: 'pvprank'; rows: any[]; me: any }
   /** G8: the matchmaking line you are in (null: none), and the match you are in (null: it is over for you). */
-  | { t: 'mq'; mode: 'ranked' | 'bg' | null }
+  | { t: 'mq'; mode: 'ranked' | 'ranked2' | 'bg' | null }
   | { t: 'match'; v: MatchView | null }
   | { t: 'comp'; comp: Companions }
   | { t: 'pong'; c: number }

@@ -3,7 +3,7 @@
 // where they were when it ends. Rated duels change rating; the battleground pays honour to both sides.
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
 import {
-  BG, BG_BASES, BG_SHRINE, MATCH_DROP_MS, MATCH_END_MS, MATCH_ZONE, pairRanked, pickBattleground, RANKED, RANKED_HALL,
+  BG, BG_BASES, BG_SHRINE, MATCH_DROP_MS, MATCH_END_MS, MATCH_ZONE, isRated, pairRanked, pickBattleground, pickRanked2, RANKED, RANKED_HALL,
   shrineHolder, type MatchMode, type MatchView, type QueueEntry,
 } from '../../../shared/src/matches';
 import { ratingDelta } from '../../../shared/src/pvp';
@@ -71,13 +71,14 @@ export class Matches {
     return '';
   }
   join(p: Player, mode: unknown): string {
-    if (mode !== 'ranked' && mode !== 'bg') return 'Unknown command';
+    if (mode !== 'ranked' && mode !== 'ranked2' && mode !== 'bg') return 'Unknown command';
     if (this.of.has(p.id)) return 'You are already in a match';
     if ((ZONES[p.room.zoneId].kind === 'dungeon' && !this.pvp.isArena(p.room)) || this.w.life.isHome(p.room)) return 'Leave the dungeon first';
     const party = p.party && p.party.members.length > 1 ? p.party : null;
-    if (mode === 'bg' && party) {
-      // a party goes into the Shrine Clash together, on one team
-      if (party.members.length > BG.maxPerTeam) return `A party of at most ${BG.maxPerTeam} can join the Shrine Clash together`;
+    if (mode !== 'ranked' && party) {
+      // a party goes in together, on one team
+      if (mode === 'bg' && party.members.length > BG.maxPerTeam) return `A party of at most ${BG.maxPerTeam} can join the Shrine Clash together`;
+      if (mode === 'ranked2' && party.members.length !== 2) return 'Only a party of two can join the rated 2v2 together';
       const all = party.members.map((id) => this.w.online.get(id));
       if (all.some((x) => !x || !x.conn)) return 'Every party member must be online';
       if (all.some((x) => this.of.has(x!.id))) return 'A party member is already in a match';
@@ -86,13 +87,13 @@ export class Matches {
       for (const x of all as Player[]) {
         this.queue.set(x.id, { mode, since: now, group: party.id });
         this.w.send(x, { t: 'mq', mode });
-        this.w.send(x, { t: 'sys', text: `${p.name} put your party in line for the Shrine Clash. You will fight on the same team.` });
+        this.w.send(x, { t: 'sys', text: mode === 'bg' ? `${p.name} put your party in line for the Shrine Clash. You will fight on the same team.` : `${p.name} put your party in line for the rated 2v2. You will fight on the same team.` });
       }
       return '';
     }
     this.queue.set(p.id, { mode, since: Date.now(), group: 0 });
     this.w.send(p, { t: 'mq', mode });
-    this.w.send(p, { t: 'sys', text: mode === 'ranked' ? 'You are in line for a rated duel. You may go about your business until it is found.' : 'You are in line for the Shrine Clash. You may go about your business until it is found.' });
+    this.w.send(p, { t: 'sys', text: mode === 'ranked' ? 'You are in line for a rated duel. You may go about your business until it is found.' : mode === 'ranked2' ? 'You are in line for a rated 2v2. A partner and opponents are found for you; you may go about your business meanwhile.' : 'You are in line for the Shrine Clash. You may go about your business until it is found.' });
     return '';
   }
   leaveQueue(p: Player): string {
@@ -133,6 +134,7 @@ export class Matches {
       return out.filter((e) => !e.group || !short.has(e.group));
     };
     for (const [a, b] of pairRanked(fit('ranked'), now)) this.start('ranked', [[a], [b]], now);
+    for (let r2 = fit('ranked2'), t = pickRanked2(r2, now); t; r2 = r2.filter((e) => !t![0].includes(e.id) && !t![1].includes(e.id)), t = pickRanked2(r2, now)) this.start('ranked2', t, now);
     const bg = pickBattleground(fit('bg'), now);
     if (bg) this.start('bg', bg, now);
   }
@@ -141,10 +143,10 @@ export class Matches {
     const id = this.nextId++, room = new ZoneRoom(MATCH_ZONE, 910_000 + id);
     this.w.addRoom(room);
     this.rooms.add(room);
-    const lead = mode === 'ranked' ? RANKED.countdownMs : BG.countdownMs;
+    const lead = isRated(mode) ? RANKED.countdownMs : BG.countdownMs;
     const m: Match = {
       id, mode, room, side: new Map(), fighters: new Set(), names: [[], []], ids: [[], []], score: [0, 0],
-      startsAt: now + lead, endsAt: now + lead + (mode === 'ranked' ? RANKED.maxMs : BG.durationMs), overAt: 0, winner: -1, shrine: -1,
+      startsAt: now + lead, endsAt: now + lead + (isRated(mode) ? RANKED.maxMs : BG.durationMs), overAt: 0, winner: -1, shrine: -1,
       nextHold: now + lead + BG.holdEveryMs, away: new Map(),
     };
     this.matches.add(m);
@@ -167,7 +169,8 @@ export class Matches {
       p.hp = p.maxHp;
       p.sver++;
       this.w.send(p, { t: 'mq', mode: null });
-      this.w.send(p, { t: 'ann', text: mode === 'ranked' ? `A rated duel against ${this.names(m, 1 - m.side.get(p.id)!)}. It begins in ${Math.round(lead / 1000)} seconds.` : `The Shrine Clash begins in ${Math.round(lead / 1000)} seconds. Hold the shrine between the bases and defeat the other team: the first to ${BG.target} points wins.`, cue: 'pvp' });
+      const mates = m.names[m.side.get(p.id)!].filter((n) => n !== p.name).join(', ');
+      this.w.send(p, { t: 'ann', text: mode === 'ranked2' ? `A rated 2v2: you and ${mates} against ${this.names(m, 1 - m.side.get(p.id)!)}. It begins in ${Math.round(lead / 1000)} seconds. The fallen stay down until it is decided.` : mode === 'ranked' ? `A rated duel against ${this.names(m, 1 - m.side.get(p.id)!)}. It begins in ${Math.round(lead / 1000)} seconds.` : `The Shrine Clash begins in ${Math.round(lead / 1000)} seconds. Hold the shrine between the bases and defeat the other team: the first to ${BG.target} points wins.`, cue: 'pvp' });
     }
     this.broadcast(m, now);
   }
@@ -177,9 +180,19 @@ export class Matches {
   /** Where a fighter starts or comes back. */
   private spot(m: Match, p: Player) {
     const side = m.side.get(p.id) ?? 0, j = () => (this.w.rnd() - 0.5) * TILE * 3;
-    if (m.mode === 'ranked') return { x: tileCenter(RANKED_HALL.tx + (side ? RANKED.apart : -RANKED.apart)), y: tileCenter(RANKED_HALL.ty) + j() };
+    if (isRated(m.mode)) return { x: tileCenter(RANKED_HALL.tx + (side ? RANKED.apart : -RANKED.apart)), y: tileCenter(RANKED_HALL.ty) + j() };
     const b = BG_BASES[side];
     return { x: tileCenter(b.tx) + j(), y: tileCenter(b.ty) + j() };
+  }
+  /** In a rated 2v2 still being fought, the fallen stay down. */
+  keepDown(p: Player) {
+    const m = this.matchOf(p);
+    return !!m && m.mode === 'ranked2' && !m.overAt;
+  }
+  /** Whether a side has nobody left standing. */
+  private beaten(m: Match, side: number, falling?: Player) {
+    // the one falling right now is not marked dead yet
+    return ![...m.fighters].some((x) => m.side.get(x.id) === side && !x.dead && x !== falling);
   }
   spawnFor(p: Player) {
     const m = this.matchOf(p);
@@ -242,6 +255,11 @@ export class Matches {
     const m = this.matchOf(v), now = Date.now();
     if (!m || m.overAt || m !== this.matchOf(k)) return;
     if (m.mode === 'ranked') return this.finish(m, m.side.get(k.id) as 0 | 1, now);
+    if (m.mode === 'ranked2') {
+      this.pvp.bump(k, { arena_kills: 1 });
+      if (this.beaten(m, m.side.get(v.id)!, v)) return this.finish(m, m.side.get(k.id) as 0 | 1, now);
+      return this.broadcast(m, now);
+    }
     m.score[m.side.get(k.id)!] += BG.killPoints;
     v.pvpShieldUntil = now + BG.respawnMs + 3000;
     this.pvp.bump(k, { arena_kills: 1 });
@@ -263,6 +281,17 @@ export class Matches {
       const [a, b] = [...m.fighters].sort((x, y) => m.side.get(x.id)! - m.side.get(y.id)!);
       if (winner >= 0 && a && b) this.payRanked(winner === 0 ? a : b, winner === 0 ? b : a, false);
       else for (const p of m.fighters) this.w.send(p, { t: 'sys', text: 'The rated duel ended in a draw.' });
+    } else if (m.mode === 'ranked2') {
+      if (winner < 0) for (const p of m.fighters) this.w.send(p, { t: 'sys', text: 'The rated 2v2 ended in a draw.' });
+      else {
+        const delta = this.teamDelta(m, winner);
+        for (const p of m.fighters) {
+          const won = m.side.get(p.id) === winner;
+          this.pvp.bump(p, won ? { duels_won: 1, rating: delta, honor: RANKED.winHonor } : { duels_lost: 1, rating: -delta, honor: RANKED.loseHonor });
+          if (won) this.w.journals.add(p, 'duel');
+          this.w.send(p, { t: 'sys', text: won ? `Your team won the rated 2v2: rating +${delta}, +${RANKED.winHonor} honour.` : `Your team lost the rated 2v2: rating -${delta}, +${RANKED.loseHonor} honour.`, cue: won ? 'pvp' : undefined });
+        }
+      }
     } else {
       for (const p of m.fighters) {
         const side = m.side.get(p.id)!, won = side === winner;
@@ -277,6 +306,11 @@ export class Matches {
       }
     }
     this.broadcast(m, now);
+  }
+  /** The rating a team gains for beating the other: from the two teams' average ratings (everyone who started). */
+  private teamDelta(m: Match, winner: number) {
+    const avg = (s: number) => m.ids[s].reduce((t, id) => t + (this.pvp.rating.get(id) ?? 1000), 0) / Math.max(1, m.ids[s].length);
+    return ratingDelta(avg(winner), avg(1 - winner));
   }
   private payRanked(win: Player, lose: Player, forfeit: boolean) {
     const delta = ratingDelta(this.pvp.rating.get(win.id) ?? 1000, this.pvp.rating.get(lose.id) ?? 1000);
@@ -299,6 +333,13 @@ export class Matches {
         m.winner = (1 - m.side.get(p.id)!) as 0 | 1;
         if (other) this.payRanked(other, p, true);
         this.broadcast(m, now);
+      } else if (m.mode === 'ranked2') {
+        // whoever leaves loses, and their partner fights on alone
+        const delta = this.teamDelta(m, 1 - m.side.get(p.id)!);
+        this.pvp.bump(p, { duels_lost: 1, rating: -delta });
+        this.w.send(p, { t: 'sys', text: `You left the rated 2v2 and lost it: rating -${delta}.` });
+        if (this.beaten(m, m.side.get(p.id)!)) this.finish(m, (1 - m.side.get(p.id)!) as 0 | 1, now);
+        else this.broadcast(m, now);
       } else {
         this.w.send(p, { t: 'sys', text: 'You left the Shrine Clash before the end: no reward.' });
         if (![...m.fighters].some((x) => m.side.get(x.id) === m.side.get(p.id))) this.finish(m, (1 - m.side.get(p.id)!) as 0 | 1, now);

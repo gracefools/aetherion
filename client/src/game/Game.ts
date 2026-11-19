@@ -183,7 +183,7 @@ export interface Hud {
   dready: { id: string; diff: string; from: string; until: number; ok: string[]; wait: string[] } | null;
   pvprank: { rows: any[]; me: any } | null;
   /** G8: the matchmaking line you are in, and the match you are in (start and end as Date.now() times). */
-  mq: 'ranked' | 'bg' | null;
+  mq: 'ranked' | 'ranked2' | 'bg' | null;
   match: (MatchView & { startsAt: number; endsAt: number }) | null;
   /** G9: the dungeon finder (null until the server has sent it). */
   finder: FinderState | null;
@@ -867,7 +867,7 @@ export class Game {
     if (enter) this.sendMsg({ t: 'depth', op: 'enter' });
     else this.depthQuietUntil = performance.now() + 4000; // time to walk off the portal
   }
-  pvpOp(op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy' | 'queue' | 'unqueue', a: { id?: number; by?: string; base?: string; mode?: 'ranked' | 'bg' } = {}) {
+  pvpOp(op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy' | 'queue' | 'unqueue', a: { id?: number; by?: string; base?: string; mode?: 'ranked' | 'ranked2' | 'bg' } = {}) {
     if (op === 'accept' || op === 'decline') this.setHud({ dinv: null });
     this.sendMsg({ t: 'pvp', op, ...a });
   }

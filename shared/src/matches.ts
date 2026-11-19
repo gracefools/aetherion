@@ -3,8 +3,10 @@
 // The rules here are pure so the server and the tests share them; the server runs the matches.
 import { CHAMBERS, BOSS_ROOM, DUNGEON_MID } from './world';
 
-export type MatchMode = 'ranked' | 'bg';
-export const MATCH_MODES: MatchMode[] = ['ranked', 'bg'];
+export type MatchMode = 'ranked' | 'ranked2' | 'bg';
+export const MATCH_MODES: MatchMode[] = ['ranked', 'ranked2', 'bg'];
+/** Rated matches (one against one, two against two): rating changes, and the fallen stay down. */
+export const isRated = (m: MatchMode) => m === 'ranked' || m === 'ranked2';
 
 /** A rated duel: first to fall loses. */
 export const RANKED = {
@@ -92,10 +94,13 @@ function split(gs: Group[], k: number): [number[], number[]] | null {
   return best;
 }
 /** The earliest groups in line whose players make up two teams of k (null if they cannot). */
-function choose(gs: Group[], k: number): [number[], number[]] | null {
+function choose(gs: Group[], k: number, ok: (t: [number[], number[]]) => boolean = () => true): [number[], number[]] | null {
   const pick: Group[] = [];
   const go = (i: number, n: number): [number[], number[]] | null => {
-    if (n === 2 * k) return split(pick, k);
+    if (n === 2 * k) {
+      const t = split(pick, k);
+      return t && ok(t) ? t : null;
+    }
     if (i >= gs.length) return null;
     if (gs[i].ids.length <= k && n + gs[i].ids.length <= 2 * k) {
       pick.push(gs[i]);
@@ -112,6 +117,17 @@ function choose(gs: Group[], k: number): [number[], number[]] | null {
  * teams start at once; smaller (but equal) ones once the first in line has waited long enough.
  * Teams are balanced by rating; those earliest in line go first.
  */
+/**
+ * The next rated two-against-two, if one can be made: a party of two is one team, players alone are
+ * paired. The two teams' average ratings must be within the rating window of everyone in it.
+ */
+export function pickRanked2(q: QueueEntry[], now: number): [number[], number[]] | null {
+  const by = new Map(q.map((e) => [e.id, e]));
+  const avg = (ids: number[]) => ids.reduce((s, id) => s + by.get(id)!.rating, 0) / ids.length;
+  return choose(groupsOf(q).filter((g) => g.ids.length <= 2).slice(0, 12), 2, (t) =>
+    Math.abs(avg(t[0]) - avg(t[1])) <= Math.min(...[...t[0], ...t[1]].map((id) => ratingWindow(now - by.get(id)!.since))));
+}
+
 export function pickBattleground(q: QueueEntry[], now: number): [number[], number[]] | null {
   const gs = groupsOf(q).slice(0, 12);
   if (!gs.length) return null;

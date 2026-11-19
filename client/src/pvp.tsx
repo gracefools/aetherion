@@ -34,7 +34,7 @@ export function PvpZoneBadge({ hud, game }: { hud: Hud; game: Game }) {
     <div className={'hud pvpzone ' + hud.pvpZone} title={t(tip, { n: Math.round((DEPTH_MONSTER.exp - 1) * 100) })} role="status" aria-label={t('pvp.zone.label', { name: t(label) })}>
       {t(label)}
       {hud.arena && !hud.match && <button className="small" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveArena')}</button>}
-      {hud.mq && <span className="mq">{t(hud.mq === 'ranked' ? 'mm.inLineRanked' : 'mm.inLineBg')} <button className="small" onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button></span>}
+      {hud.mq && <span className="mq">{t(hud.mq === 'ranked' ? 'mm.inLineRanked' : hud.mq === 'ranked2' ? 'mm.inLineRanked2' : 'mm.inLineBg')} <button className="small" onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button></span>}
     </div>
   );
 }
@@ -79,9 +79,10 @@ export function MatchBar({ hud, game }: { hud: Hud; game: Game }) {
   const mine = m.teams[m.side], theirs = m.teams[1 - m.side];
   const clock = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
   return (
-    <div className="hud duelbar matchbar panel" role="status" aria-label={t(m.mode === 'ranked' ? 'mm.ranked' : 'mm.bg')}>
+    <div className="hud duelbar matchbar panel" role="status" aria-label={t(m.mode === 'ranked' ? 'mm.ranked' : m.mode === 'ranked2' ? 'mm.ranked2' : 'mm.bg')}>
       {m.mode === 'bg' && <b className="score"><span className="us" title={mine.names.join(', ')}>{mine.score}</span> : <span className="them" title={theirs.names.join(', ')}>{theirs.score}</span></b>}
       {m.mode === 'ranked' && <b>{t('mm.vs', { name: theirs.names.join(', ') })}</b>}
+      {m.mode === 'ranked2' && <b>{t('mm.vs2', { mates: mine.names.join(' & '), name: theirs.names.join(' & ') })}</b>}
       {m.result ? <b className="count">{t(m.result === 'won' ? 'mm.won' : m.result === 'lost' ? 'mm.lost' : 'mm.draw')}</b>
         : starts > 0 ? <b className="count">{t('mm.startsIn', { n: starts })}</b> : <span>{clock}</span>}
       {m.mode === 'bg' && !m.result && <small className="sub">{t(m.shrine < 0 ? 'mm.shrineFree' : m.shrine === m.side ? 'mm.shrineUs' : 'mm.shrineThem')}</small>}
@@ -147,6 +148,7 @@ export function ArenaMaster({ hud, game }: { hud: Hud; game: Game }) {
       <div className="actions">
         {hud.mq ? <button onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button> : !hud.match && <>
           <button className="primary" onClick={() => game.pvpOp('queue', { mode: 'ranked' })}>{t('mm.queueRanked')}</button>
+          <button className="primary" onClick={() => game.pvpOp('queue', { mode: 'ranked2' })}>{t('mm.queueRanked2')}</button>
           <button className="primary" onClick={() => game.pvpOp('queue', { mode: 'bg' })}>{t('mm.queueBg')}</button>
         </>}
       </div>

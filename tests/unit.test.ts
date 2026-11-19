@@ -4989,7 +4989,7 @@ test('M15 arena: entered at the Arena Master, everyone fights everyone (teams by
   assert.equal(world.pvpOp(A.p, { op: 'leave' }), 'You are not in the arena');
 });
 
-import { BG, BG_SHRINE, MATCH_END_MS, pairRanked, pickBattleground, RANKED, ratingWindow } from '../shared/src/matches';
+import { BG, BG_SHRINE, MATCH_END_MS, pairRanked, pickBattleground, pickRanked2, RANKED, ratingWindow } from '../shared/src/matches';
 
 test('G8 matchmaking rules: rating windows widen with waiting, teams are balanced, a battleground fills or waits', () => {
   assert.equal(ratingWindow(0), 100);
@@ -5096,6 +5096,48 @@ test('G8 Shrine Clash: two balanced teams, team-mates are safe, kills and the sh
   mm.tick(Date.now());
   assert.ok(ps.every((p) => p.room.zoneId === 'eldoria'), 'everyone goes home');
   assert.ok(RANKED.winHonor > 0);
+});
+
+test('G8 rated 2v2: a party of two or two alone, close ratings, the fallen stay down, the last standing team wins', () => {
+  const now = 1e6;
+  const solo = (id: number, rating: number, wait = 0) => ({ id, rating, since: now - wait });
+  const t = pickRanked2([{ ...solo(1, 1000), group: 9 }, { ...solo(2, 1000), group: 9 }, solo(3, 1000), solo(4, 1000)], now)!;
+  assert.ok(t.some((x) => x.includes(1) && x.includes(2)), 'the party is one team');
+  assert.equal(pickRanked2([solo(1, 1000), solo(2, 1000), solo(3, 1900), solo(4, 1900)], now)!.flat().length, 4, 'teams balance: high with low');
+  assert.equal(pickRanked2([{ ...solo(1, 1600), group: 9 }, { ...solo(2, 1600), group: 9 }, solo(3, 1000), solo(4, 1000)], now), null, 'a strong party does not meet weak players at once');
+  assert.ok(pickRanked2([{ ...solo(1, 1600, 120_000), group: 9 }, { ...solo(2, 1600, 120_000), group: 9 }, solo(3, 1000, 120_000), solo(4, 1000, 120_000)], now), 'but does after a long wait');
+  assert.equal(pickRanked2([solo(1, 1000), solo(2, 1000), solo(3, 1000)], now), null, 'three is not enough');
+
+  const h = harness({ capacity: 10 }), { world } = h, mm = world.pvp.matches as any;
+  const ps = [h.join(0, 0, 'knight', 30), h.join(30, 0, 'mage', 30), h.join(60, 0, 'cleric', 30), h.join(90, 0, 'ranger', 30)].map((x) => x.p);
+  group(world, ps[0], ps[1]);
+  assert.equal(world.pvpOp(ps[0], { op: 'queue', mode: 'ranked2' }), '');
+  assert.equal(mm.queued(ps[1]), 'ranked2', 'the partner is in line too');
+  world.pvpOp(ps[2], { op: 'queue', mode: 'ranked2' });
+  world.pvpOp(ps[3], { op: 'queue', mode: 'ranked2' });
+  mm.tick(Date.now());
+  const m = mm.of.get(ps[0].id);
+  assert.ok(m && m.mode === 'ranked2' && ps.every((p) => mm.of.get(p.id) === m));
+  assert.equal(m.side.get(ps[0].id), m.side.get(ps[1].id), 'the party on one team');
+  m.startsAt = Date.now() - 1;
+  for (const p of ps) p.pvpShieldUntil = 0;
+  const [a, b] = [ps[2], ps[3]], ra = world.pvp.rating.get(ps[0].id) ?? 1000;
+  world.hurt(a, 1e9, 0, ps[0]);
+  assert.ok(a.dead && !m.overAt, 'one down, the match goes on');
+  a.deadTick -= 1000;
+  world.requestRespawn(a);
+  h.step(2);
+  assert.ok(a.dead, 'the fallen stay down');
+  world.hurt(b, 1e9, 0, ps[1]);
+  assert.ok(m.overAt && m.winner === m.side.get(ps[0].id), 'the last one down decides it');
+  assert.ok((world.pvp.rating.get(ps[0].id) ?? 0) > ra && (world.pvp.rating.get(ps[1].id) ?? 0) > ra, 'both winners gain');
+  assert.ok((world.pvp.rating.get(a.id) ?? 0) < 1000 && (world.pvp.rating.get(b.id) ?? 0) < 1000, 'both losers lose');
+  m.overAt -= MATCH_END_MS;
+  mm.tick(Date.now());
+  assert.ok(ps.every((p) => p.room.zoneId === 'eldoria' && !p.dead), 'everyone home on their feet');
+  // a party of three cannot join a 2v2
+  group(world, ps[0], ps[2]);
+  assert.equal(world.pvpOp(ps[0], { op: 'queue', mode: 'ranked2' }), 'Only a party of two can join the rated 2v2 together');
 });
 
 test('G8 Shrine Clash with a party: one queues the whole party, it fights on one team, and leaves the line together', () => {

@@ -323,6 +323,7 @@ try {
   await p2.keyboard.press('KeyS'); // resync p2's prediction after the server-side move
   await p1.waitForFunction((x) => { const r = (window as any).__game.debug().remoteList[0]; return !!r && Math.abs(r.x - x) < 12; }, me2.x);
   const v3 = await dbg(p1), other = v3.remoteList[0];
+  await p1.bringToFront(); // the clicking page renders at full rate
   await p1.mouse.click((other.x - v3.camX) * v3.zoom, (other.y - 10 - v3.camY) * v3.zoom);
   await p1.getByRole('status', { name: 'Ally' }).getByRole('button', { name: 'Invite to party' }).click();
   const ask = p2.getByRole('alertdialog', { name: 'Party invitation' });
@@ -487,10 +488,13 @@ try {
     await bar.waitFor();
     assert.ok(await bar.getByText('Phase 1: Dormant Seals').isVisible());
     w.hurt(boss, Math.ceil(boss.maxHp * 0.45), 0, pl);
+    // two players share the machine: bring this one to the front so its frames are not throttled
+    await p1.bringToFront();
     // the page polled here is the one in the background: wait on the game state, then on what it shows
     await p1.waitForFunction(() => (window as any).__game.debug().hud.boss?.phase === 1);
     await bar.getByText('Phase 2: Seals Unbound').waitFor();
-    await p1.locator('.banner').getByText(/seals shatter/).waitFor();
+    // the announcement: a banner for a few seconds, and a line that stays in the chat
+    await p1.locator('.chatlog').getByText(/seals shatter/).first().waitFor();
     await p1.waitForTimeout(900);
     await p1.screenshot({ path: '.run/m7-boss.png' });
     w.hurt(boss, 1e9, 0, pl);

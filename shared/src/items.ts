@@ -163,6 +163,12 @@ export interface Item {
   qty: number;
   /** Sigils: the class skill they raise and by how many ranks (+1 to +3). */
   sk?: [skill: string, plus: number];
+  /**
+   * Bound to its character (equipment only): it has been worn, or it came as a reward (quests,
+   * caches and chests, bosses, raids, events, shops for honour or reputation). A bound item cannot be
+   * traded, mailed or listed on the auction house; it can still be sold to a merchant or banked.
+   */
+  bd?: 1;
   /** Sigils: every skill it raises (from tier 3 on, more than one), and its tier (1-6). */
   sks?: [skill: string, plus: number][];
   st?: number;
@@ -322,6 +328,11 @@ export function rollLoot(rng: () => number, level: number, elite: boolean, job: 
 }
 
 // ---------------- stored-data validation ----------------
+/** A reward: equipment in it comes bound to whoever receives it. */
+export const bindSpec = <T extends { base: string; bd?: 1 }>(s: T): T => (ITEMS[s.base]?.kind === 'equip' ? { ...s, bd: 1 } : s);
+/** Why an item cannot leave its owner ('' if it can). */
+export const boundWhy = (it: { bd?: 1 }, what: 'trade' | 'market' | 'mail'): string =>
+  !it.bd ? '' : what === 'trade' ? 'Bound items cannot be traded' : what === 'market' ? 'Bound items cannot be sold on the market' : 'Bound items cannot be sent by mail';
 export function cleanItem(raw: any, seen: Set<string>): Item | null {
   if (!raw || typeof raw !== 'object' || typeof raw.uid !== 'string' || raw.uid.length > 40 || seen.has(raw.uid)) return null;
   const b = ITEMS[raw.base];
@@ -332,6 +343,7 @@ export function cleanItem(raw: any, seen: Set<string>): Item | null {
     it.ilvl = int(raw.ilvl, 1, MAX_ILVL, 1);
     it.rar = b.unique ? b.unique.rar : int(raw.rar, 0, 5, 0);
     it.up = int(raw.up, 0, MAX_UPGRADE, 0);
+    if (raw.bd) it.bd = 1;
     const used = new Set<string>();
     if (Array.isArray(raw.aff))
       for (const a of raw.aff.slice(0, RARITY_AFFIXES[it.rar])) {
@@ -368,7 +380,7 @@ export function cleanInventory(job: Job, level: number, rawInv: unknown, rawEq: 
   const e = (rawEq && typeof rawEq === 'object' ? rawEq : {}) as any;
   for (const s of SLOTS) {
     const it = cleanItem(e[s], seen);
-    if (it && ITEMS[it.base].slot === s && !equipBlock(it, job, level)) eq[s] = it;
+    if (it && ITEMS[it.base].slot === s && !equipBlock(it, job, level)) eq[s] = { ...it, bd: 1 }; // worn gear is bound
     else if (it && inv.length < INVENTORY_SIZE) inv.push(it);
   }
   if (Array.isArray(rawInv))

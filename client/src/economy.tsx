@@ -199,7 +199,7 @@ function Sell({ hud, game }: { hud: Hud; game: Game }) {
   const it = hud.inv.find((i) => i.uid === uid);
   const p = Math.floor(Number(price)), n = Math.floor(Number(qty)) || it?.qty || 1;
   const rates = hud.ah?.rates ?? DEFAULT_AUCTION_RATES, fee = p > 0 ? listingFee(p, hours, rates) : 0;
-  const sellable = hud.inv.filter((i) => categoryOf(i.base));
+  const sellable = hud.inv.filter((i) => categoryOf(i.base) && !i.bd); // bound items stay with their owner
   return (
     <>
       <p className="sub">{t('ah.sellHelp')}</p>

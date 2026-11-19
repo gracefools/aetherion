@@ -3833,6 +3833,38 @@ test('inventory sorting: merges stacks and orders the bag on the server', () => 
   assert.equal(p.inv.reduce((n, i) => n + i.qty, 0), 3 + 1 + 9 + 1 + 1, 'sorting never creates or destroys anything');
 });
 
+test('bound items: worn or rewarded equipment stays with its owner; monster drops trade until worn', () => {
+  const { world, join } = harness({ capacity: 10 });
+  const A = join(0, 0, 'knight', 30), B = join(60, 0, 'mage', 30), a = A.p, b = B.p;
+  a.inv.length = 0;
+  // a monster drop is tradable; a reward is bound
+  award(world, a, 0, [spec('longsword', { rar: 2, ilvl: 20 })], true);
+  award(world, a, 0, [spec('longsword', { rar: 2, ilvl: 20 }), spec('upgrade_stone', { qty: 2 })]);
+  const [drop, reward] = a.inv.filter((i) => i.base === 'longsword');
+  assert.ok(!drop.bd, 'dropped by a monster: tradable');
+  assert.equal(reward.bd, 1, 'a reward is bound');
+  assert.ok(!a.inv.find((i) => i.base === 'upgrade_stone')!.bd, 'only equipment binds');
+  // bound: no trade, no market; the free one trades
+  assert.equal(world.trade(a, { op: 'invite', id: b.id }), '');
+  assert.equal(world.trade(b, { op: 'accept' }), '');
+  assert.equal(world.trade(a, { op: 'offer', uid: reward.uid }), 'Bound items cannot be traded');
+  assert.equal(world.trade(a, { op: 'offer', uid: drop.uid }), '');
+  world.trade(a, { op: 'cancel' });
+  // wearing it binds it, and it stays bound when taken off
+  assert.equal(world.inventory(a, { op: 'equip', uid: drop.uid }), '');
+  assert.equal(a.eq.weapon!.bd, 1);
+  world.inventory(a, { op: 'unequip', slot: 'weapon' });
+  assert.equal(a.inv.find((i) => i.uid === drop.uid)!.bd, 1, 'still bound in the bag');
+  // the flag survives saving and loading; worn gear loads bound
+  assert.equal(cleanItem({ ...reward }, new Set())!.bd, 1);
+  assert.ok(!cleanItem({ ...reward, bd: 0 }, new Set())!.bd);
+  const loaded = cleanInventory('knight', 30, [], { weapon: { uid: 'w9', base: 'longsword', rar: 1, ilvl: 10, aff: [], up: 0, qty: 1 } });
+  assert.equal(loaded.eq.weapon!.bd, 1, 'whatever is worn is bound');
+  assert.equal(boundWhy(reward, 'market'), 'Bound items cannot be sold on the market');
+  assert.equal(boundWhy(reward, 'mail'), 'Bound items cannot be sent by mail');
+  assert.equal(boundWhy({}, 'trade'), '');
+});
+
 test('trading: invitation, offers, confirmation reset on change, atomic exchange, audit record', () => {
   const { world, join, trades } = harness({ capacity: 10 });
   const A = join(0, 0, 'knight', 10), B = join(60, 0, 'mage', 10), C = join(0, 60, 'ranger', 10), a = A.p, b = B.p;
@@ -6856,6 +6888,7 @@ import { petStage, PET_MAX_LEVEL as PETMAX } from '../shared/src/companions';
 import { FURNITURE, GROW_MS, profExpToNext, SEASON_XP, seasonReward } from '../shared/src/life';
 import { gearTier } from '../shared/src/items';
 import { appearanceKey } from '../shared/src/appearance';
+import { boundWhy, cleanItem } from '../shared/src/items';
 
 test('pets evolve at 20, 40 and 60 with a stronger bonus; flying mounts pass over water and trees, never walls or the map edge', () => {
   assert.equal(PETMAX, 60);

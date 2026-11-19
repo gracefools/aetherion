@@ -79,7 +79,7 @@ export function MailPanel({ game, onClose }: { game: Game; onClose: () => void }
           <label>{t('mail.gold')} <input type="number" min={0} value={gold} onChange={(e: any) => setGold(Math.max(0, Math.floor(Number(e.target.value) || 0)))} /></label>
           <div className="sub">{t('mail.attach', { n: items.length, max: MAIL_MAX_ITEMS })}</div>
           <div className="mailitems">
-            {hud.inv.map((i) => (
+            {hud.inv.filter((i) => !i.bd).map((i) => (
               <button type="button" key={i.uid} className={items.includes(i.uid) ? 'on' : ''} onClick={() => toggleItem(i.uid)} style={{ color: RARITY_COLOR[i.rar] }} aria-pressed={items.includes(i.uid)}>
                 {ITEMS[i.base].name}{i.qty > 1 ? ` ×${i.qty}` : ''}
               </button>

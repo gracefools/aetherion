@@ -32,7 +32,7 @@ export function TradePanel({ hud, game }: { hud: Hud; game: Game }) {
   useEffect(() => setGold(String(tr?.mine.gold ?? 0)), [tr?.mine.gold, !tr]);
   if (!tr) return null;
   const mine = new Map(tr.mine.items.map((i) => [i.uid, i.qty]));
-  const bag = hud.inv.filter((i) => !mine.has(i.uid));
+  const bag = hud.inv.filter((i) => !mine.has(i.uid) && !i.bd); // bound items cannot be traded
   const offer = (it: Item) => game.tradeOp('offer', { uid: it.uid, qty: Math.max(1, Math.min(it.qty, Number(qty[it.uid]) || it.qty)) });
   return (
     <div className="hud trade panel" role="dialog" aria-label={t('trade.with', { name: tr.with.name })}>

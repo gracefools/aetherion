@@ -13,6 +13,7 @@ import { INVENTORY_SIZE, ITEMS, type Item, type ItemSpec } from '../../../shared
 import { TRADE_GOLD_MAX, TRADE_INVITE_MS, TRADE_MAX_ITEMS, TRADE_RANGE, type TradeOffer, type TradeState } from '../../../shared/src/protocol';
 import { give, sendInv } from './Inventory';
 import type { Player, World } from './World';
+import { boundWhy } from '../../../shared/src/items';
 
 interface Side {
   p: Player;
@@ -107,6 +108,7 @@ export class Trades {
       case 'offer': {
         const it = typeof m.uid === 'string' ? p.inv.find((x) => x.uid === m.uid) : undefined;
         if (!it) return 'Item not found in your bag';
+        if (it.bd) return boundWhy(it, 'trade');
         const qty = Number.isInteger(m.qty) && m.qty > 0 ? Math.min(m.qty as number, it.qty) : it.qty;
         if (!me.items.has(it.uid) && me.items.size >= TRADE_MAX_ITEMS) return `At most ${TRADE_MAX_ITEMS} items per trade`;
         me.items.set(it.uid, qty);

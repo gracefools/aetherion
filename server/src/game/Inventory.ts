@@ -4,7 +4,7 @@
 import { ARM_MAX, ARMAMENT_LEVEL, armChance, armCost, armFallback, SIGIL_LEVEL, sigilBase } from '../../../shared/src/gear';
 import crypto from 'node:crypto';
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
-import {
+import { bindSpec,
   equipBlock, INVENTORY_SIZE, ITEMS, MAX_UPGRADE, POTION_CD_MS, rollLoot, sellValue, SHOP_RANGE, SHOP_STOCK, SHOP_BUY_MAX, SHOP_COMPANIONS, SHOP_ONCE, HP_POTION, MANA_POTION, RAGE_POTION, DAILY_STONES, SLOTS, SLOT_NAMES, starterKit,
   UPGRADE_CHANCE, upgradeCost, type Item, type ItemSpec, type Slot,
 } from '../../../shared/src/items';
@@ -114,6 +114,7 @@ export function invOp(w: World, p: Player, m: any): string {
       const old = p.eq[slot];
       p.inv.splice(p.inv.indexOf(it), 1);
       if (old) p.inv.push(old);
+      it.bd = 1; // worn once, it is bound to this character
       p.eq[slot] = it;
       gearChanged(w, p);
       break;
@@ -421,6 +422,8 @@ export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunt
     p.autoStats.skipped += items.length - keep.length;
     items = keep;
   }
+  // rewards (anything but what monsters drop) come bound
+  if (!hunted) items = items.map(bindSpec);
   const left: ItemSpec[] = [];
   for (const s of items) (give(p, s) ? got : ((full = true), left)).push(s);
   if (hunted && p.autoOn) {

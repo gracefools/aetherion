@@ -9,6 +9,7 @@ import { ITEMS, type ItemSpec } from '../../../shared/src/items';
 import { award, consume, count, give, sendInv } from './Inventory';
 import type { Monster } from './Monster';
 import type { Player, World } from './World';
+import { bindSpec } from '../../../shared/src/items';
 
 const TALK_RANGE = INTERACT_RANGE * 2.2;
 const spec = (base: string, qty: number): ItemSpec => ({ base, rar: 0, ilvl: 1, aff: [], up: 0, qty });
@@ -126,7 +127,7 @@ export class Quests {
         const [base, price, need] = line, have = repLevel(p.rep[f.id] ?? 0);
         if (have < need) return `Requires ${REP_LEVELS[need].name} reputation with ${f.name}`;
         if (p.gold < price) return 'Not enough gold';
-        if (!give(p, spec(base, 1))) return 'Inventory is full';
+        if (!give(p, bindSpec(spec(base, 1)))) return 'Inventory is full';
         p.gold -= price;
         p.invDirty = true;
         sendInv(this.w, p);

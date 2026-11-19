@@ -278,6 +278,8 @@ export class Player implements Ent {
       if (look.armor !== undefined) (ap.armor = look.armor), (ap.armorColor = look.color ?? ap.armorColor);
       if (look.helmet !== undefined) (ap.helmet = look.helmet), (ap.helmetColor = look.color ?? ap.helmetColor);
     }
+    // whatever is worn is bound to this character (also gear put on directly, like the starter kit)
+    for (const it of Object.values(this.eq)) if (it && ITEMS[it.base]?.kind === 'equip') it.bd = 1;
     // better gear looks grander: the tier of the armour (or helmet, whichever is better) and of the weapon
     const gt = Math.max(gearTier(this.eq.armor), gearTier(this.eq.helmet)), gw = gearTier(this.eq.weapon);
     if (gt) ap.gt = gt; // only when above 0: plain gear sends nothing extra

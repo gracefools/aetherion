@@ -317,6 +317,8 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   mAnswer: m('A match is waiting for your answer', 'Ada laga yang menunggu jawabanmu'), mNoAnswer: m('No match is waiting for your answer', 'Tidak ada laga yang menunggu jawabanmu'),
   mDropped: m('The match was not accepted in time: you have left the line.', 'Laga tidak diterima tepat waktu: kamu keluar dari antrean.'),
   mBack: m('Someone did not accept the match: you are back in line, in your place.', 'Ada yang tidak menerima laga: kamu kembali mengantre, di tempatmu semula.'),
+  boundTrade: m('Bound items cannot be traded', 'Barang terikat tidak bisa diperdagangkan'), boundMarket: m('Bound items cannot be sold on the market', 'Barang terikat tidak bisa dijual di pasar'),
+  boundMail: m('Bound items cannot be sent by mail', 'Barang terikat tidak bisa dikirim lewat surat'),
   matchWon: m('Victory!', 'Menang!'), matchLost: m('Defeat.', 'Kalah.'), matchDraw: m('A draw.', 'Seri.'),
 
   // ---- companions ----

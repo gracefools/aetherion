@@ -7,6 +7,7 @@ import { inTown } from '../../../shared/src/pvp';
 import type { Repo } from '../db/repo';
 import { give, sendInv } from './Inventory';
 import type { Player, World } from './World';
+import { boundWhy } from '../../../shared/src/items';
 
 const userError = (msg: string) => Object.assign(new Error(msg), { user: true });
 const clean = (s: unknown, max: number) => (typeof s === 'string' ? s.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
@@ -102,6 +103,7 @@ export class Mail {
           for (const uid of uids) {
             const it = p.inv.find((i) => i.uid === uid);
             if (!it) return 'Item not found in your bag';
+            if (it.bd) return boundWhy(it, 'mail');
             if (this.w.trades.locked(p, uid)) return 'That item is in your trade offer';
             items.push(it);
           }

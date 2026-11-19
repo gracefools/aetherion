@@ -15,6 +15,7 @@ import { TICK_MS } from '../../../shared/src/protocol';
 import type { Repo } from '../db/repo';
 import { give, newUid, sendInv } from './Inventory';
 import type { Player, World } from './World';
+import { boundWhy } from '../../../shared/src/items';
 
 export const BANKER_RANGE = 160;
 const userError = (msg: string) => Object.assign(new Error(msg), { user: true });
@@ -121,6 +122,7 @@ export class Economy {
     return this.atomic(p, async () => {
       const it = typeof m.uid === 'string' ? p.inv.find((i) => i.uid === m.uid) : undefined;
       if (!it) return 'Item not found in your bag';
+      if (it.bd) return boundWhy(it, 'market');
       if (this.w.trades.locked(p, it.uid)) return 'That item is in your trade offer';
       const qty = Number.isInteger(m.qty) && m.qty >= 1 ? Math.min(m.qty, it.qty) : it.qty;
       const price = m.price, hours = AUCTION_HOURS.includes(m.hours) ? m.hours : 24;

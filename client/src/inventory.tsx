@@ -30,11 +30,12 @@ function Cell({ item, sel, onClick, onUse, mark = false }: { item?: Item; sel: b
   return (
     <button
       className={'cell' + (sel ? ' sel' : '') + (mark ? ' marked' : '')} style={{ borderColor: b.kind === 'equip' ? RARITY_COLOR[item.rar] : undefined }}
-      onClick={onClick} onDoubleClick={onUse} aria-label={`${b.kind === 'equip' ? rarName(item.rar) + ' ' : ''}${itemName(item)}${item.qty > 1 ? ` ×${item.qty}` : ''}`} aria-pressed={sel}
+      onClick={onClick} onDoubleClick={onUse} aria-label={`${b.kind === 'equip' ? rarName(item.rar) + ' ' : ''}${itemName(item)}${item.qty > 1 ? ` ×${item.qty}` : ''}${item.bd ? ` (${t('item.bound')})` : ''}`} aria-pressed={sel}
     >
       <Icon item={item} />
       {item.qty > 1 && <span className="qty">{item.qty}</span>}
       {item.up > 0 && <span className="up">+{item.up}</span>}
+      {item.bd && <span className="bd" aria-hidden="true">⛓</span>}
     </button>
   );
 }
@@ -53,6 +54,7 @@ function Details({ item, worn, hud, game, askRead = false }: { item: Item; worn:
         <div>
           <b style={{ color: b.kind === 'equip' ? RARITY_COLOR[item.rar] : undefined }}>{itemName(item)}</b>
           <div className="sub">{b.kind === 'equip' ? t('item.equipLine', { rar: rarName(item.rar), slot: slotName(b.slot!), ilvl: item.ilvl, req: reqLevel(item) }) : t(KIND_LINE[b.kind] ?? 'item.kind.material', { key: keyOf('panel.companions') })}</div>
+          {b.kind === 'equip' && <div className={'boundline' + (item.bd ? ' on' : '')} title={t(item.bd ? 'item.boundTip' : 'item.tradableTip')}>{item.bd ? `⛓ ${t('item.bound')}` : t('item.tradable')}</div>}
         </div>
       </div>
       {b.kind === 'equip' && <StatBlocks item={item} hud={hud} worn={!!worn} />}

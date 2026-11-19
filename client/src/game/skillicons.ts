@@ -185,6 +185,7 @@ const STATUS_ICON: Record<string, IconDef> = {
   shock: { bg: '#a89a2a', layers: [['bolt', '#fff06a'], ['ringA', '#fffbd0', 0, 0, 0, 1.1, 3]] },
   death_mark: { bg: '#5a1c7a', layers: [['eye', '#f0d0ff'], ['shard', '#b03ad0', 0, 0, 0, 0.55]] },
   rested: { bg: '#3a6a8a', layers: [['crescent', '#fff0b0', 0, 0, 0, 0.8], ['star', '#ffffff', 12, -12, 0, 0.3]] },
+  null_phase: { bg: '#2a1240', layers: [['eye', '#c84aff'], ['star', '#f0d0ff', 0, 0, 0, 0.4]] },
 };
 
 /** Basic attack, one per weapon kind. */

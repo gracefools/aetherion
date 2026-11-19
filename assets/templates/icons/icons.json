@@ -1074,6 +1074,15 @@
    "height": 64
   },
   {
+   "id": "status/null_phase",
+   "kind": "status",
+   "ref": "null_phase",
+   "name": "Phased Out",
+   "file": "icons/status/null_phase.png",
+   "width": 64,
+   "height": 64
+  },
+  {
    "id": "attack/sword_shield",
    "kind": "attack",
    "ref": "sword_shield",

@@ -15,6 +15,7 @@ import type { Game, Hud } from './game/Game';
 import { settings } from './settings';
 import { t, useT, type Key } from './i18n';
 import { Icon } from './ui/icons';
+import { traitOf } from '../../shared/src/traits';
 
 type Kind = 'you' | 'party' | 'town' | 'waystone' | 'dungeon' | 'hunt' | 'elite' | 'boss' | 'exit' | 'marker' | 'pvp';
 interface Pin { kind: Kind; x: number; y: number; label: string; id?: string; r?: number }
@@ -147,6 +148,7 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
                   {(d.gates?.length ?? 0) > 0 && <i title={t('map.legend.dungeon')}>{GLYPH.dungeon}</i>}
                   {[...WORLD_BOSSES, ...DEPTH_BOSSES].some((b) => b.zone === r) && <i title={t('map.legend.boss')}>{GLYPH.boss}</i>}
                   {d.depth && <i title={t('pvp.zone.open')}>{GLYPH.pvp}</i>}
+                  {traitOf(r) && <i className="traitpin" style={{ color: traitOf(r)!.color }} title={`${traitOf(r)!.name}: ${traitOf(r)!.desc}`}>◆</i>}
                   {hud.wevent?.zone === r && <i className="evpin" title={t(`ev.${hud.wevent.kind}` as any)}>✦</i>}
                   {hud.territory.held.filter((x) => x.zone === r).map((x) => <i key="g" className="guildpin" title={t('map.heldBy', { name: x.name })}><Icon name="castle" size={12} className="inl" />{x.tag}</i>)}
                   {hud.territory.factions[r] && <i className="facpin" title={t('map.factionHolds', { name: hud.factions.find((f) => f.id === hud.territory.factions[r])?.name ?? hud.territory.factions[r] })}>⚑</i>}

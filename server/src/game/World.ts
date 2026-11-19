@@ -57,6 +57,7 @@ import { applyStatus, clearStatuses, emit, NO_MODS, pushDmg, removeStatus, tickS
 import { Monster, type CombatCtx, type MonsterScale } from './Monster';
 import { Parties, type Party } from './Party';
 import { SpatialGrid } from './SpatialGrid';
+import { Traits } from './Traits';
 
 export interface Conn {
   send(data: string): void;
@@ -384,6 +385,11 @@ export class World implements CombatCtx {
     });
   });
   readonly quests = new Quests(this);
+  readonly traits = new Traits(this);
+  /** A monster's blow landed: the region trait reacts (CombatCtx). */
+  traitHit(m: Monster, p: Player, dealt: number) {
+    this.traits.onHit(m, p, dealt);
+  }
   readonly guilds: Guilds;
   readonly economy: Economy;
   readonly pvp: Pvp;
@@ -1123,6 +1129,11 @@ export class World implements CombatCtx {
     if (target.dead) return;
     if (amount > 0 && src instanceof Player && src !== target && !(flags & Dmg.Heal)) chargeUlt(this, src, ULT_PER_HIT);
     if (amount > 0 && target instanceof Player && src && src !== target && !(flags & Dmg.Heal)) chargeUlt(this, target, ULT_PER_HURT);
+    // Null Field (region trait): a phased-out monster takes nothing
+    if (target instanceof Monster && amount > 0 && !(flags & Dmg.Heal) && target.mods.invuln) {
+      amount = 0;
+      flags |= Dmg.Absorb;
+    }
     if (target instanceof Player && amount > 0) {
       const m = target.mods;
       if (m.invuln) {
@@ -1262,6 +1273,7 @@ export class World implements CombatCtx {
     m.die(this.tick);
     this.dismiss(m);
     this.dungeons.onKill(m);
+    this.traits.onDeath(m);
     this.events.onKill(m);
     this.rifts.onKill(m);
     this.raids.onKill(m);
@@ -1482,7 +1494,7 @@ export class World implements CombatCtx {
     for (const list of this.rooms.values()) for (const room of list) {
       this.simulate(room);
       if (room.fields.length) updateFields(this, room);
-      if (room.players.size) for (const m of room.monsters.values()) m.update(this);
+      if (room.players.size) { for (const m of room.monsters.values()) m.update(this); this.traits.tick(room); }
       // developer overlay: AI state of the monsters around each developer, four times a second
       if (this.opts.debugOverlay && this.tick % 5 === 0)
         for (const p of room.players.values())

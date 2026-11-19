@@ -5,6 +5,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { allDiscoveries, isNpc, NODE_RESPAWN_MS, objById, RECIPES, REGION_RES, teleportCost, WAYSTONE_RANGE, zoneObjects } from '../shared/src/places';
 import { speakerName, STORY, STORY_REGIONS } from '../shared/src/story';
+import { traitOf, TRAITS } from '../shared/src/traits';
+import { statusNames } from '../shared/src/combat';
 import { FACTIONS, LORE } from '../shared/src/lore';
 import { validateDir, validateSheet, type SheetEntry } from '../scripts/assets';
 import { decodePng, encodePng, type Image } from '../scripts/png';
@@ -4265,6 +4267,101 @@ test('G3 the main story: a chapter in every region, three chained steps, dialogu
   assert.deepEqual(p.quests.active.story_eldoria_2.p, [loot.n], 'recovered, and no more than needed');
   assert.equal(world.quest(p, { op: 'turnin', id: 'story_eldoria_2' }), '');
   for (const junk of [{ op: 'talk' }, { op: 'talk', npc: 5 }, { op: 'talk', npc: 'nobody' }]) assert.equal(world.quest(p, junk), '', 'unknown townsfolk are ignored quietly');
+});
+
+test('G4 region traits: every region past level 45 has its own mechanic, and each works on the server', () => {
+  assert.deepEqual(EXPANSION.map((e) => !!traitOf(e.id)), EXPANSION.map(() => true), 'every expansion region has a trait');
+  assert.equal(new Set(Object.values(TRAITS).map((t) => t.id)).size, EXPANSION.length, 'all different');
+  for (const z of ['eldoria', 'verdant', 'astral']) assert.equal(traitOf(z), undefined, 'the early regions stay as they are');
+  const has = (p: Player, name: string) => statusNames(p.mask).includes(name);
+  const setup = (zone: string, rng: number, level = 100) => {
+    const h = harness({ rng: () => rng, capacity: 10 }), a = h.join(0, 0, 'knight', level, -1, zone);
+    const mobs = EXPANSION.find((e) => e.id === zone)!.mobs;
+    const fight = (type: string, dx: number, dy = 0) => {
+      const m = h.world.spawn(a.p.room, type, a.p.x + dx, a.p.y + dy);
+      m.noRespawn = true;
+      m.addThreat(a.p.id, 5);
+      m.state = 'chase';
+      return m;
+    };
+    return { h, p: a.p, mobs, fight };
+  };
+  // blows that root, chill and arc
+  {
+    const { h, p, mobs, fight } = setup('thornwild', 0.1);
+    h.world.traitHit(fight(mobs[0].id, 30), p, 40);
+    assert.ok(has(p, 'Rooted'), 'Thornbound roots');
+  }
+  {
+    const { h, p, mobs, fight } = setup('glacierdeep', 0.1);
+    h.world.traitHit(fight(mobs[0].id, 30), p, 40);
+    assert.ok(has(p, 'Slowed'), 'Deep Chill slows');
+  }
+  {
+    const { h, p, mobs, fight } = setup('stormspire', 0.1), other = h.join(20, 0, 'mage', 100, -1, 'stormspire').p;
+    const hp0 = other.hp;
+    h.world.traitHit(fight(mobs[0].id, 30), p, 200);
+    assert.ok(other.hp < hp0 && has(other, 'Shocked'), 'Static arcs to a player standing close');
+    // and lightning marks the ground under the target, then strikes
+    let struck = false;
+    for (let i = 0; i < 140 && !struck; i++) { h.step(); struck = (h.world.traits as any).hazards.length > 0; }
+    assert.ok(struck, 'a lightning strike is on its way');
+  }
+  // deaths that burn and burst
+  for (const [zone, label] of [['emberwaste', 'Ember Trail'], ['cinderdeep', 'Volatile']] as const) {
+    const { h, p, mobs } = setup(zone, 0.5);
+    const hp0 = p.hp;
+    kill(h.world, p, mobs[0].id);
+    h.step(4);
+    assert.equal(p.hp, hp0, `${label}: a warning first, no damage yet`);
+    h.step(30);
+    assert.ok(p.hp < hp0, `${label}: standing in it hurts`);
+    if (zone === 'emberwaste') assert.ok(statusNames(p.mask).includes('Burning'));
+  }
+  // the dead rise once
+  {
+    const { h, p, mobs } = setup('hollowfen', 0.1);
+    const m = kill(h.world, p, mobs[0].id);
+    assert.ok(m.dead);
+    h.step(22);
+    assert.ok(!m.dead && m.hp === Math.ceil(m.maxHp * 0.33) && m.risen, 'Restless Dead: it gets back up, weakened');
+    h.world.hurt(m, 1e9, 0, p);
+    h.step(40);
+    assert.ok(m.dead, 'but only once');
+  }
+  // over time: blink, rally, regrow, phase out
+  {
+    const { h, p, mobs, fight } = setup('riftlands', 0.7);
+    const m = fight(mobs[0].id, 420);
+    h.step(21);
+    assert.ok(Math.hypot(m.x - p.x, m.y - p.y) < 80, 'Phase Step: it appears beside a target that keeps its distance');
+  }
+  {
+    const { h, p, mobs, fight } = setup('crownfall', 0.5);
+    const line = [fight(mobs[0].id, 60), fight(mobs[0].id, 60, 40), fight(mobs[0].id, 60, -40)];
+    h.step(21);
+    assert.ok(line.every((m) => statusNames(m.mask).includes('Rallying Cry')), 'Banner Line: side by side, they rally');
+    void p;
+  }
+  {
+    const { h, mobs, fight } = setup('elderwood', 0.5);
+    const a = fight(mobs[0].id, 200), b = fight(mobs[0].id, 230);
+    b.hp = Math.round(b.maxHp / 2);
+    const before = b.hp;
+    h.step(61);
+    assert.ok(b.hp > before, 'Regrowth: a fighting monster heals the one beside it');
+    void a;
+  }
+  {
+    const { h, mobs, fight } = setup('voidreach', 0.1);
+    const m = fight(mobs[0].id, 250);
+    let phased = false;
+    for (let i = 0; i < 190 && !phased; i++) { h.step(); phased = statusNames(m.mask).includes('Phased Out'); }
+    assert.ok(phased, 'Null Field: it phases out of reach');
+    const hp = m.hp;
+    h.world.hurt(m, 1000, 0, null);
+    assert.equal(m.hp, hp, 'and cannot be hurt meanwhile');
+  }
 });
 
 test('M13 accepting: level, prerequisites, reputation, once, daily reset at midnight UTC, and the active limit', () => {

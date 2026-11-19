@@ -444,6 +444,9 @@
   .quest.story { border-left: 3px solid var(--gold); padding-left: 8px; } .quest.story .qtype { color: #ffe08a; }
   .npcquests { z-index: 4; left: 10px; top: 160px; width: min(360px, calc(100% - 24px)); max-height: calc(100% - 420px); overflow: auto; padding: 12px !important; font-size: 13px; }
   .npc ~ .npcquests, .npc .npcquests { position: static; width: auto; max-height: none; margin-top: 8px; padding: 0 !important; border: 0; background: none; box-shadow: none; }
+  .rail .traitbadge { order: 1; width: 240px; display: grid; gap: 2px; font-size: 12px; padding: 7px 10px !important; border-width: 1px; border-style: solid; }
+  .traitbadge b { font: 600 14px Georgia, serif; } .traitbadge small { color: var(--dim); } .traitpin { font-style: normal; }
+  @media (max-width: 600px) { .rail .traitbadge span, .rail .traitbadge small { display: none; } .rail .traitbadge { width: auto; } }
   /* chat tabs with unread counts */
   .chattabs { display: flex; gap: 2px; margin: -2px 0 6px; overflow-x: auto; scrollbar-width: none; }
   .chattab { position: relative; padding: 3px 9px; font-size: 12px; border-radius: 5px 5px 0 0; background: rgba(255,255,255,.04); border: 1px solid transparent; border-bottom-color: var(--line); color: var(--dim); white-space: nowrap; transition: color .12s, background .12s; }

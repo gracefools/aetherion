@@ -57,6 +57,7 @@ import { HD_MOUNT_H, HD_MOUNT_W, hdMountSprite, hdPetSprite } from './hdcomp';
 import { Stage3D, stageSupported } from './stage3d';
 import { darkness } from '../../../shared/src/events';
 import { buildBuildings } from './buildings3d';
+import { traitOf } from '../../../shared/src/traits';
 
 export interface ChatLine {
   id: number;
@@ -1210,6 +1211,8 @@ export class Game {
       this.stage?.reset();
       this.miniBase = null;
       this.pushChat({ text: `You have entered ${ZONES[m.zone].name}.` });
+      const trait = traitOf(m.zone);
+      if (trait) this.pushChat({ text: `${trait.name}: ${trait.desc} ${trait.tip}` });
     }
     this.setHud({ status: 'playing', zone: ZONES[m.zone].name, channel: m.channel, self: m.self, stats: m.stats, hp: m.hp, res: m.res, exp: m.exp, next: m.next, target: null, attacking: false, build: m.build, points: freePoints(m.self.level, m.build), cast: null, ally: null, inv: m.inv, eq: m.eq, gold: m.gold, boss: null, gate: null, level: ZONES[m.zone].level, near: null, talk: null, disc: m.disc, zoneId: m.zone, trade: null, tradeInvite: null, factions: m.factions?.length ? m.factions : DEFAULT_FACTIONS,
       comp: m.comp ?? emptyCompanions(), bank: m.bank ?? emptyBank(), gear: m.gear ?? emptyGear(), arena: !!m.arena, duel: null, dinv: null,

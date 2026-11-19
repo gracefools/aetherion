@@ -53,11 +53,13 @@ export const STATUS: StatusDef[] = [
   { id: 'shock', name: 'Shocked', debuff: true, ms: 700, maxStacks: 1, stun: true },
   { id: 'death_mark', name: 'Death Mark', debuff: true, ms: 6000, maxStacks: 1 },
   { id: 'rested', name: 'Rested', debuff: false, ms: 30 * 60_000, maxStacks: 1, atkMul: 1.05, defMul: 1.05 },
+  // --- G4 region traits ---
+  { id: 'null_phase', name: 'Phased Out', debuff: false, ms: 1800, maxStacks: 1, invuln: true },
 ];
 export type StatusId =
   | 'poison' | 'slow' | 'stun' | 'weaken' | 'bleed' | 'enrage' | 'ward'
   | 'burn' | 'root' | 'mark' | 'guard' | 'rally' | 'blessing' | 'haste' | 'frenzy' | 'surge' | 'last_stand'
-  | 'aegis' | 'stealth' | 'mana_shield' | 'barrier' | 'retribution' | 'shock' | 'death_mark' | 'rested';
+  | 'aegis' | 'stealth' | 'mana_shield' | 'barrier' | 'retribution' | 'shock' | 'death_mark' | 'rested' | 'null_phase';
 export const STATUS_INDEX = Object.fromEntries(STATUS.map((s, i) => [s.id, i])) as Record<StatusId, number>;
 
 export interface StatusInst {

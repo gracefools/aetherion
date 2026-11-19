@@ -20,6 +20,8 @@ export interface CombatCtx {
   announce(room: ZoneRoom, text: string, cue?: Cue): void;
   /** Banner for every player online (world boss news). */
   announceAll(text: string, cue?: Cue): void;
+  /** A monster's blow landed (region traits react to it). */
+  traitHit(m: Monster, p: Player, dealt: number): void;
   /** Spawns helpers next to a monster; they vanish when their summoner resets or dies. */
   summon(by: Monster, type: string, count: number): void;
   dismiss(by: Monster): void;
@@ -91,6 +93,9 @@ export class Monster implements Ent {
   phase = 0;
   /** Tick the current fight started; 0 while idle. */
   engagedAt = 0;
+  /** Restless Dead (region trait): rises at this tick; has already risen once this life. */
+  riseAt = 0;
+  risen = false;
   /** Hard enrage reached. */
   fury = false;
   atkScale = 1;
@@ -193,6 +198,8 @@ export class Monster implements Ent {
         this.phase = 0;
         this.fury = false;
         this.pat = 0;
+        this.risen = false;
+        this.riseAt = 0;
         if (def.boss?.world) c.announceAll(`${def.name} has returned to ${room.map.def.name}!`, 'worldboss');
         this.ver++;
         this.sver++;
@@ -539,6 +546,7 @@ export class Monster implements Ent {
     }
     const dealt = Math.max(1, Math.round(dmg));
     c.hurt(p, dealt, flags, this);
+    c.traitHit(this, p, dealt);
     // Thorns (unique passive): melee attackers take part of the blow back.
     if (!atk.ranged && !atk.magic && p.passives.includes('thorns') && !this.dead) c.hurt(this, Math.max(1, Math.round(dealt * 0.2)), 0, p);
     if (atk.status && !p.dead && c.rnd() * 100 < atk.status.chance) applyStatus(p, STATUS_INDEX[atk.status.id], c.tick, power, this.id);

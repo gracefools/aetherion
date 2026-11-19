@@ -38,3 +38,22 @@ Langkah 1 butuh quest `main_<region>`; setiap langkah butuh langkah sebelumnya. 
 - Tombol **Listen** pada quest cerita memutar dialog: potret pembicara (sprite warga, atau Sera), teks yang diketik, lalu **Accept**.
 - Saat langkah cerita diserahkan, dialog penutupnya diputar otomatis.
 - Penanda: `!` di atas siapa pun yang menawarkan quest, `?` untuk penyerahan, `…` untuk orang yang harus diajak bicara, cincin emas di minimap untuk tempat tujuan.
+
+# Sifat region (G4)
+
+Mulai level 45, tiap region punya satu mekanik khas yang dipakai semua monsternya (`shared/src/traits.ts`, server di `server/src/game/Traits.ts`). Bahaya yang tertunda (tanah terbakar, ledakan, petir) selalu diawali lingkaran peringatan.
+
+| Region | Sifat | Efek |
+|---|---|---|
+| Emberwaste | Ember Trail | Monster yang mati meninggalkan tanah terbakar (3 denyut, status Burning). |
+| Thornwild | Thornbound | Pukulan monster 20% mengakar (root) pemain. |
+| Glacierdeep | Deep Chill | Pukulan monster 35% memperlambat pemain. |
+| Hollowfen | Restless Dead | 35% monster bangkit sekali lagi dengan 33% HP. |
+| Riftlands | Phase Step | Monster berteleportasi ke samping target yang menjaga jarak. |
+| Crownfall | Banner Line | Monster dengan dua kawan di dekatnya mendapat Rallying Cry (pertahanan +30%). |
+| Cinderdeep | Volatile | Monster meledak saat mati (setelah peringatan 0,9 detik). |
+| Elderwood | Regrowth | Monster yang bertarung menyembuhkan kawan di dekatnya 5% tiap 3 detik. |
+| Stormspire | Static | Petir menandai tanah di bawah target lalu menyambar; pukulan bisa menyambar ke pemain lain di dekatnya. |
+| Voidreach | Null Field | Monster sesekali "Phased Out" selama 1,8 detik dan kebal. |
+
+Klien menampilkan lencana sifat di kolom kanan HUD, baris obrolan saat masuk region, dan penanda di peta dunia.

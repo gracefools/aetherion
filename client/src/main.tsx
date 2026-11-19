@@ -59,6 +59,7 @@ import { TradeInvite, TradePanel } from './trade';
 import { GuildInvite, GuildPanel } from './guild';
 import { CompanionsPanel, DepthAsk, DuelInvite, DuelStatus, PvpZoneBadge } from './pvp';
 import { toRail } from './rail';
+import { TraitBadge } from './traitsUi';
 
 interface Character {
   id: number;
@@ -716,6 +717,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       <Guard><DepthAsk hud={hud} game={game} /></Guard>
       <Guard><DuelStatus hud={hud} game={game} /></Guard>
       <Guard><PvpZoneBadge hud={hud} game={game} /></Guard>
+      <Guard><TraitBadge hud={hud} /></Guard>
       <Guard><LootFeed hud={hud} /></Guard>
       <Guard><BossBar hud={hud} /></Guard>
       <Guard><Banner hud={hud} /></Guard>

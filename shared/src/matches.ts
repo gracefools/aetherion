@@ -47,7 +47,8 @@ export const RANKED_HALL = { tx: CHAMBERS[BOSS_ROOM].cx, ty: DUNGEON_MID };
 /** How far apart in rating two players may be matched after waiting this long: it widens with time. */
 export const ratingWindow = (waitMs: number) => Math.min(1000, 100 + 50 * Math.floor(Math.max(0, waitMs) / 10_000));
 
-export interface QueueEntry { id: number; rating: number; since: number }
+/** One player in line; `group` (a party) goes in together, on the same team. */
+export interface QueueEntry { id: number; rating: number; since: number; group?: number }
 
 /** Pairs rated-duel players: closest ratings first, within both players' windows. Returns id pairs. */
 export function pairRanked(q: QueueEntry[], now: number): [number, number][] {
@@ -62,22 +63,64 @@ export function pairRanked(q: QueueEntry[], now: number): [number, number][] {
   return out;
 }
 
-/**
- * Who goes into the next battleground, if one can start: a full match at once, otherwise as many
- * as are waiting once the first in line has waited long enough. Earliest in line first.
- */
-export function pickBattleground(q: QueueEntry[], now: number): QueueEntry[] | null {
-  const s = [...q].sort((a, b) => a.since - b.since), full = BG.maxPerTeam * 2;
-  if (s.length >= full) return s.slice(0, full);
-  if (s.length >= BG.minPerTeam * 2 && now - s[0].since >= BG.fillWaitMs) return s.slice(0, s.length - (s.length % 2));
-  return null;
+interface Group { ids: number[]; rating: number; since: number }
+/** Queue entries gathered into the groups that go in together: a party, or one player alone. Earliest in line first. */
+function groupsOf(q: QueueEntry[]): Group[] {
+  const by = new Map<number, Group>();
+  for (const e of q) {
+    const key = e.group ? e.group : -e.id - 1, g = by.get(key);
+    if (g) {
+      g.ids.push(e.id);
+      g.rating += e.rating;
+      g.since = Math.min(g.since, e.since);
+    } else by.set(key, { ids: [e.id], rating: e.rating, since: e.since });
+  }
+  return [...by.values()].sort((x, y) => x.since - y.since || x.ids[0] - y.ids[0]);
 }
-
-/** Splits players into two teams of near-equal strength: best first, in the order A B B A A B... */
-export function formTeams(players: QueueEntry[]): [number[], number[]] {
-  const s = [...players].sort((a, b) => b.rating - a.rating || a.id - b.id), t: [number[], number[]] = [[], []];
-  s.forEach((p, i) => t[i % 4 === 0 || i % 4 === 3 ? 0 : 1].push(p.id));
-  return t;
+/** The fairest split of whole groups into two teams of exactly k players each (null if none). */
+function split(gs: Group[], k: number): [number[], number[]] | null {
+  let best: [number[], number[]] | null = null, bestGap = Infinity;
+  for (let mask = 0; mask < 1 << gs.length; mask++) {
+    let n = 0, ra = 0, rb = 0;
+    gs.forEach((g, i) => (mask & (1 << i) ? ((n += g.ids.length), (ra += g.rating)) : (rb += g.rating)));
+    if (n !== k || !(mask & 1)) continue; // the first group always on the first team: each split is counted once
+    if (Math.abs(ra - rb) < bestGap) {
+      bestGap = Math.abs(ra - rb);
+      best = [gs.filter((_, i) => mask & (1 << i)).flatMap((g) => g.ids), gs.filter((_, i) => !(mask & (1 << i))).flatMap((g) => g.ids)];
+    }
+  }
+  return best;
+}
+/** The earliest groups in line whose players make up two teams of k (null if they cannot). */
+function choose(gs: Group[], k: number): [number[], number[]] | null {
+  const pick: Group[] = [];
+  const go = (i: number, n: number): [number[], number[]] | null => {
+    if (n === 2 * k) return split(pick, k);
+    if (i >= gs.length) return null;
+    if (gs[i].ids.length <= k && n + gs[i].ids.length <= 2 * k) {
+      pick.push(gs[i]);
+      const r = go(i + 1, n + gs[i].ids.length);
+      pick.pop();
+      if (r) return r;
+    }
+    return go(i + 1, n);
+  };
+  return go(0, 0);
+}
+/**
+ * The next battleground's two teams, if one can start. A party always fights on one team. Full
+ * teams start at once; smaller (but equal) ones once the first in line has waited long enough.
+ * Teams are balanced by rating; those earliest in line go first.
+ */
+export function pickBattleground(q: QueueEntry[], now: number): [number[], number[]] | null {
+  const gs = groupsOf(q).slice(0, 12);
+  if (!gs.length) return null;
+  for (let k = BG.maxPerTeam; k >= BG.minPerTeam; k--) {
+    if (k < BG.maxPerTeam && now - gs[0].since < BG.fillWaitMs) break;
+    const t = choose(gs, k);
+    if (t) return t;
+  }
+  return null;
 }
 
 /** Which team alone holds the shrine: 0 or 1, or -1 when nobody or both are on it. */

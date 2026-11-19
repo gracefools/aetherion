@@ -4989,7 +4989,7 @@ test('M15 arena: entered at the Arena Master, everyone fights everyone (teams by
   assert.equal(world.pvpOp(A.p, { op: 'leave' }), 'You are not in the arena');
 });
 
-import { BG, BG_SHRINE, formTeams, MATCH_END_MS, pairRanked, pickBattleground, RANKED, ratingWindow } from '../shared/src/matches';
+import { BG, BG_SHRINE, MATCH_END_MS, pairRanked, pickBattleground, RANKED, ratingWindow } from '../shared/src/matches';
 
 test('G8 matchmaking rules: rating windows widen with waiting, teams are balanced, a battleground fills or waits', () => {
   assert.equal(ratingWindow(0), 100);
@@ -4997,14 +4997,24 @@ test('G8 matchmaking rules: rating windows widen with waiting, teams are balance
   const now = 1e6;
   assert.deepEqual(pairRanked([{ id: 1, rating: 1000, since: now }, { id: 2, rating: 1500, since: now }, { id: 3, rating: 1050, since: now }], now), [[1, 3]], 'the closest pair, the far one waits');
   assert.equal(pairRanked([{ id: 1, rating: 1000, since: now - 120_000 }, { id: 2, rating: 1500, since: now - 120_000 }], now).length, 1, 'after a long wait the gap is bridged');
-  const t = formTeams([1600, 1500, 1400, 1300, 1200, 1100].map((rating, i) => ({ id: i + 1, rating, since: now })));
+  const t = pickBattleground([1600, 1500, 1400, 1300, 1200, 1100].map((rating, i) => ({ id: i + 1, rating, since: now })), now)!;
   const sum = (ids: number[]) => ids.reduce((s, id) => s + 1700 - id * 100, 0);
   assert.equal(t[0].length, 3);
+  assert.equal(t[1].length, 3);
   assert.ok(Math.abs(sum(t[0]) - sum(t[1])) <= 100, 'the strongest are spread across the teams');
   const q = (n: number, wait: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1, rating: 1000, since: now - wait }));
-  assert.equal(pickBattleground(q(6, 0), now)!.length, 6, 'a full match starts at once');
+  const size = (x: [number[], number[]] | null) => (x ? x[0].length + x[1].length : 0);
+  assert.equal(size(pickBattleground(q(6, 0), now)), 6, 'a full match starts at once');
   assert.equal(pickBattleground(q(3, 0), now), null, 'a short line waits');
-  assert.equal(pickBattleground(q(3, BG.fillWaitMs), now)!.length, 2, 'then starts with an even number');
+  assert.equal(size(pickBattleground(q(3, BG.fillWaitMs), now)), 2, 'then starts with even teams');
+  // parties stay together, on one team
+  const party = [{ id: 1, rating: 1000, since: now, group: 7 }, { id: 2, rating: 1000, since: now, group: 7 }, { id: 3, rating: 1000, since: now, group: 7 }];
+  const solos = [4, 5, 6].map((id) => ({ id, rating: 1000, since: now + id }));
+  const pt = pickBattleground([...party, ...solos], now)!;
+  assert.ok(pt.some((team) => [1, 2, 3].every((id) => team.includes(id))), 'the party of three makes one team');
+  const two = pickBattleground([party[0], party[1], { ...solos[0], since: now - BG.fillWaitMs }, solos[1]], now)!;
+  assert.ok(two.some((team) => team.includes(1) && team.includes(2)) && two[0].length === 2 && two[1].length === 2, 'a party of two against two others');
+  assert.equal(pickBattleground([...party, { ...solos[0], since: now - BG.fillWaitMs }], now), null, 'a party of three never faces one player alone');
 });
 
 test('G8 rated duel: queued anywhere, matched by rating, fought in a private hall, rating changes, everyone goes home', () => {
@@ -5086,6 +5096,29 @@ test('G8 Shrine Clash: two balanced teams, team-mates are safe, kills and the sh
   mm.tick(Date.now());
   assert.ok(ps.every((p) => p.room.zoneId === 'eldoria'), 'everyone goes home');
   assert.ok(RANKED.winHonor > 0);
+});
+
+test('G8 Shrine Clash with a party: one queues the whole party, it fights on one team, and leaves the line together', () => {
+  const h = harness({ capacity: 10 }), { world } = h, mm = world.pvp.matches as any;
+  const ps = [h.join(0, 0, 'knight', 30), h.join(30, 0, 'mage', 30), h.join(60, 0, 'cleric', 30), h.join(90, 0, 'ranger', 30)].map((x) => x.p);
+  group(world, ps[0], ps[1]);
+  assert.equal(world.pvpOp(ps[0], { op: 'queue', mode: 'bg' }), '');
+  assert.equal(mm.queued(ps[1]), 'bg', 'the whole party is in line');
+  assert.equal(world.pvpOp(ps[1], { op: 'unqueue' }), '');
+  assert.ok(!mm.queued(ps[0]) && !mm.queued(ps[1]), 'and leaves it together');
+  world.pvpOp(ps[1], { op: 'queue', mode: 'bg' });
+  world.pvpOp(ps[2], { op: 'queue', mode: 'bg' });
+  world.pvpOp(ps[3], { op: 'queue', mode: 'bg' });
+  for (const p of ps) mm.queue.get(p.id).since -= BG.fillWaitMs;
+  mm.tick(Date.now());
+  const m = mm.of.get(ps[0].id);
+  assert.ok(m && ps.every((p) => mm.of.get(p.id) === m), 'a two-against-two');
+  assert.equal(m.side.get(ps[0].id), m.side.get(ps[1].id), 'the party on one team');
+  assert.notEqual(m.side.get(ps[2].id), m.side.get(ps[0].id));
+  // a party larger than a team cannot go in together
+  const big = [h.join(0, 60, 'knight', 30), h.join(30, 60, 'mage', 30), h.join(60, 60, 'mage', 30), h.join(90, 60, 'mage', 30)].map((x) => x.p);
+  for (const p of big.slice(1)) group(world, big[0], p);
+  assert.equal(world.pvpOp(big[0], { op: 'queue', mode: 'bg' }), `A party of at most ${BG.maxPerTeam} can join the Shrine Clash together`);
 });
 
 test('M15 pets: whistles join the collection, a summoned pet gives its bonus, follows the owner on screen, levels up, can be named', () => {

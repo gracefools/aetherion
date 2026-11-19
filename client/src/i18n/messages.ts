@@ -301,6 +301,11 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   rankedLeft: m('You left the rated duel and lost it: rating -{a}.', 'Kamu meninggalkan duel berperingkat dan kalah: rating -{a}.'),
   rankedLost: m('You lost the rated duel against {a}: rating -{b}, +{c} honour.', 'Kamu kalah dalam duel berperingkat melawan {a}: rating -{b}, +{c} kehormatan.'),
   bgDeserted: m('You left the Shrine Clash before the end: no reward.', 'Kamu meninggalkan Bentrok Altar sebelum usai: tanpa hadiah.'),
+  bgParty: m('A party of at most {a} can join the Shrine Clash together', 'Paling banyak {a} anggota party bisa ikut Bentrok Altar bersama'),
+  partyOnline: m('Every party member must be online', 'Semua anggota party harus daring'), partyInMatch: m('A party member is already in a match', 'Ada anggota party yang sedang dalam laga'),
+  partyInDng: m('A party member is in a dungeon', 'Ada anggota party yang berada di dungeon'),
+  partyLined: m('{a} put your party in line for the Shrine Clash. You will fight on the same team.', '{a} memasukkan party-mu ke antrean Bentrok Altar. Kalian akan bertarung di tim yang sama.'),
+  partyUnlined: m('{a} took your party out of the line.', '{a} mengeluarkan party-mu dari antrean.'),
   matchWon: m('Victory!', 'Menang!'), matchLost: m('Defeat.', 'Kalah.'), matchDraw: m('A draw.', 'Seri.'),
 
   // ---- companions ----

@@ -3,7 +3,7 @@
 // where they were when it ends. Rated duels change rating; the battleground pays honour to both sides.
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
 import {
-  BG, BG_BASES, BG_SHRINE, formTeams, MATCH_DROP_MS, MATCH_END_MS, MATCH_ZONE, pairRanked, pickBattleground, RANKED, RANKED_HALL,
+  BG, BG_BASES, BG_SHRINE, MATCH_DROP_MS, MATCH_END_MS, MATCH_ZONE, pairRanked, pickBattleground, RANKED, RANKED_HALL,
   shrineHolder, type MatchMode, type MatchView, type QueueEntry,
 } from '../../../shared/src/matches';
 import { ratingDelta } from '../../../shared/src/pvp';
@@ -38,7 +38,7 @@ interface Match {
 
 export class Matches {
   /** player id -> what they queued for and since when */
-  private queue = new Map<number, { mode: MatchMode; since: number }>();
+  private queue = new Map<number, { mode: MatchMode; since: number; group: number }>();
   private matches = new Set<Match>();
   private of = new Map<number, Match>();
   private rooms = new Set<ZoneRoom>();
@@ -74,14 +74,39 @@ export class Matches {
     if (mode !== 'ranked' && mode !== 'bg') return 'Unknown command';
     if (this.of.has(p.id)) return 'You are already in a match';
     if ((ZONES[p.room.zoneId].kind === 'dungeon' && !this.pvp.isArena(p.room)) || this.w.life.isHome(p.room)) return 'Leave the dungeon first';
-    this.queue.set(p.id, { mode, since: Date.now() });
+    const party = p.party && p.party.members.length > 1 ? p.party : null;
+    if (mode === 'bg' && party) {
+      // a party goes into the Shrine Clash together, on one team
+      if (party.members.length > BG.maxPerTeam) return `A party of at most ${BG.maxPerTeam} can join the Shrine Clash together`;
+      const all = party.members.map((id) => this.w.online.get(id));
+      if (all.some((x) => !x || !x.conn)) return 'Every party member must be online';
+      if (all.some((x) => this.of.has(x!.id))) return 'A party member is already in a match';
+      if (all.some((x) => (ZONES[x!.room.zoneId].kind === 'dungeon' && !this.pvp.isArena(x!.room)) || this.w.life.isHome(x!.room))) return 'A party member is in a dungeon';
+      const now = Date.now();
+      for (const x of all as Player[]) {
+        this.queue.set(x.id, { mode, since: now, group: party.id });
+        this.w.send(x, { t: 'mq', mode });
+        this.w.send(x, { t: 'sys', text: `${p.name} put your party in line for the Shrine Clash. You will fight on the same team.` });
+      }
+      return '';
+    }
+    this.queue.set(p.id, { mode, since: Date.now(), group: 0 });
     this.w.send(p, { t: 'mq', mode });
     this.w.send(p, { t: 'sys', text: mode === 'ranked' ? 'You are in line for a rated duel. You may go about your business until it is found.' : 'You are in line for the Shrine Clash. You may go about your business until it is found.' });
     return '';
   }
   leaveQueue(p: Player): string {
-    if (!this.queue.delete(p.id)) return 'You are not in line';
-    this.w.send(p, { t: 'mq', mode: null });
+    const q = this.queue.get(p.id);
+    if (!q) return 'You are not in line';
+    // a party leaves the line together
+    for (const [id, o] of [...this.queue]) {
+      if (id !== p.id && !(q.group && o.group === q.group)) continue;
+      this.queue.delete(id);
+      const x = this.w.online.get(id);
+      if (!x) continue;
+      this.w.send(x, { t: 'mq', mode: null });
+      if (x !== p) this.w.send(x, { t: 'sys', text: `${p.name} took your party out of the line.` });
+    }
     return '';
   }
 
@@ -89,6 +114,7 @@ export class Matches {
     for (const [id, q] of this.queue) {
       const p = this.w.online.get(id);
       if (!p || !p.conn) this.queue.delete(id);
+      else if (q.group && p.party?.id !== q.group) q.group = 0; // left the party: in line alone from now on
     }
     this.findMatches(now);
     for (const m of this.matches) this.run(m, now);
@@ -99,13 +125,16 @@ export class Matches {
       const out: QueueEntry[] = [];
       for (const [id, q] of this.queue) {
         const p = this.w.online.get(id);
-        if (q.mode === mode && p && !this.unfit(p)) out.push({ id, rating: this.pvp.rating.get(id) ?? 1000, since: q.since });
+        if (q.mode === mode && p && !this.unfit(p)) out.push({ id, rating: this.pvp.rating.get(id) ?? 1000, since: q.since, group: q.group });
       }
-      return out;
+      // a party goes only when all of it can
+      const short = new Set<number>();
+      for (const [id, q] of this.queue) if (q.group && !out.some((e) => e.id === id)) short.add(q.group);
+      return out.filter((e) => !e.group || !short.has(e.group));
     };
     for (const [a, b] of pairRanked(fit('ranked'), now)) this.start('ranked', [[a], [b]], now);
     const bg = pickBattleground(fit('bg'), now);
-    if (bg) this.start('bg', formTeams(bg), now);
+    if (bg) this.start('bg', bg, now);
   }
 
   private start(mode: MatchMode, teams: [number[], number[]], now: number) {

@@ -248,7 +248,7 @@ export type ServerMsg =
   | { t: 'disc'; list: string[] }
   | { t: 'nodes'; cd: [id: string, ms: number][] }
   | { t: 'dbg'; mobs: (number | string)[][] }
-  | { t: 'auto'; on: boolean; cfg: AutoConfig; stats: AutoStats; why?: string }
+  | { t: 'auto'; on: boolean; cfg: AutoConfig; stats: AutoStats; why?: string; /** experience multiplier while hunting (G5) */ xp?: number }
   | { t: 'trade'; trade: TradeState | null; done?: boolean }
   | { t: 'tinv'; from: string; id: number; ms: number }
   /** A rune was obtained (new) or strengthened (already owned) by a scroll or a purchase. */
@@ -291,4 +291,8 @@ export type ServerMsg =
   | { t: 'pvprank'; rows: any[]; me: any }
   | { t: 'comp'; comp: Companions }
   | { t: 'pong'; c: number }
+  /** G5 Battle Rhythm: the streak of kills made by hand, and how long it lasts without another. */
+  | { t: 'rhythm'; n: number; ms: number }
+  /** G2 talents: time taken off every skill cooldown. */
+  | { t: 'cdcut'; ms: number }
   | { t: 'kick'; reason: string };

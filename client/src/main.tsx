@@ -60,6 +60,8 @@ import { GuildInvite, GuildPanel } from './guild';
 import { CompanionsPanel, DepthAsk, DuelInvite, DuelStatus, PvpZoneBadge } from './pvp';
 import { toRail } from './rail';
 import { TraitBadge } from './traitsUi';
+import { RhythmMeter } from './grindUi';
+import { TalentPicker } from './talentsUi';
 
 interface Character {
   id: number;
@@ -552,11 +554,12 @@ function SkillBook({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () =
         <div className="tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'skills'} className={tab === 'skills' ? 'on' : ''} onClick={() => setTab('skills')}>{t('book.skills')}</button>
           <button role="tab" aria-selected={tab === 'runes'} className={tab === 'runes' ? 'on' : ''} onClick={() => setTab('runes')}>{t('book.runes')}</button>
+          <button role="tab" aria-selected={tab === 'talents'} className={tab === 'talents' ? 'on' : ''} onClick={() => setTab('talents')}>{t('talent.tab')}</button>
         </div>
         <div className="sub" aria-label={t('book.points')}>{t('book.points')}: <b>{hud.points}</b></div>
         <button className="link panelx" onClick={onClose} aria-label={t('book.close')}>{t('common.close')}</button>
       </div>
-      {tab === 'skills' ? (
+      {tab === 'talents' ? <TalentPicker hud={hud} game={game} /> : tab === 'skills' ? (
         <>
           {[1, 2, 3].map((tier) => (
             <div key={tier} className="tier">
@@ -718,6 +721,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       <Guard><DuelStatus hud={hud} game={game} /></Guard>
       <Guard><PvpZoneBadge hud={hud} game={game} /></Guard>
       <Guard><TraitBadge hud={hud} /></Guard>
+      <Guard><RhythmMeter hud={hud} /></Guard>
       <Guard><LootFeed hud={hud} /></Guard>
       <Guard><BossBar hud={hud} /></Guard>
       <Guard><Banner hud={hud} /></Guard>

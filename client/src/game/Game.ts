@@ -134,7 +134,9 @@ export interface Hud {
   disc: string[];
   zoneId: string;
   /** Auto hunting: whether it is running, what it is doing, its configuration and the session's figures. */
-  auto: { on: boolean; status: string; target: string; cfg: AutoConfig; stats: AutoStats };
+  auto: { on: boolean; status: string; target: string; cfg: AutoConfig; stats: AutoStats; /** experience multiplier while hunting */ xp?: number };
+  /** G5 Battle Rhythm: the current streak and when it runs out (performance.now ms). */
+  rhythm: { n: number; until: number } | null;
   /** The trade in progress, if any, and a pending trade request. */
   trade: TradeState | null;
   tradeInvite: { from: string; id: number; until: number } | null;
@@ -295,7 +297,7 @@ export class Game {
   hud: Hud = {
     status: 'connecting', reason: '', zone: '', channel: 1, ping: 0, fps: 0, nearby: 0, chat: [], self: null, stats: null,
     hp: 0, res: 0, exp: 0, next: 1, statuses: [], target: null, attacking: false, dead: 0, canRespawn: false, toast: '',
-    build: null, points: 0, cds: {}, cast: null, ally: null, notice: '', party: null, invite: null,
+    build: null, points: 0, cds: {}, cast: null, ally: null, notice: '', party: null, invite: null, rhythm: null,
     inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, talk: null, disc: [], zoneId: '',
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
@@ -1077,7 +1079,7 @@ export class Game {
         // the server's view of the session: its figures, and its decision when it ends one
         if (!m.on && this.hunter.on) this.hunter.stop(m.why ? `Stopped: ${m.why}` : 'Stopped');
         const cfg = this.me && this.hud.build ? withSkills(m.cfg, this.me.job, this.hud.build) : m.cfg;
-        this.setAuto({ on: this.hunter.on, stats: m.stats, status: this.hunter.status, ...(this.hunter.on ? {} : { cfg }) });
+        this.setAuto({ on: this.hunter.on, stats: m.stats, status: this.hunter.status, xp: m.xp ?? 1, ...(this.hunter.on ? {} : { cfg }) });
         if (m.why) this.pushChat({ text: `Auto hunting stopped: ${m.why}.` });
         return;
       }
@@ -1177,6 +1179,14 @@ export class Game {
         this.dbgMobs = m.mobs;
         return;
       case 'pong': return this.setHud({ ping: Math.round(performance.now() - m.c) });
+      case 'rhythm': return this.setHud({ rhythm: { n: m.n, until: performance.now() + m.ms } });
+      case 'cdcut': {
+        // a talent took time off every cooldown: the local timers follow
+        const now = performance.now(), cds = { ...this.hud.cds };
+        for (const [id, at] of this.cdReady) this.cdReady.set(id, Math.max(now, at - m.ms));
+        for (const [id, [t0, ms]] of Object.entries(cds)) cds[id] = [t0, Math.max(0, ms - m.ms)];
+        return this.setHud({ cds });
+      }
       case 'kick':
         this.setHud({ status: 'kicked', reason: m.reason });
         return;

@@ -58,6 +58,7 @@ import { Monster, type CombatCtx, type MonsterScale } from './Monster';
 import { Parties, type Party } from './Party';
 import { SpatialGrid } from './SpatialGrid';
 import { Traits } from './Traits';
+import { AUTO_EXP, AUTO_REST_MS, AUTO_WEARY_EXP, AUTO_WEARY_MS, RHYTHM_EXP, RHYTHM_MAX, RHYTHM_WINDOW_MS, talentsOf } from '../../../shared/src/talents';
 
 export interface Conn {
   send(data: string): void;
@@ -165,6 +166,20 @@ export class Player implements Ent {
   build: Build;
   buildDirty = false;
   cds = new Map<string, number>(); // ability id -> tick it is ready again
+  /** Talents (G2): Momentum's target and stacks, Bulwark's next ready tick. */
+  momTarget = 0;
+  momStacks = 0;
+  bulwarkAt = 0;
+  /** Battle Rhythm (G5): kills made by hand in quick succession, and when the last one was. */
+  rhythm = 0;
+  rhythmAt = 0;
+  /** Auto hunting: when the current stretch began and when it was last switched off (ms). */
+  autoSince = 0;
+  autoOffAt = 0;
+  /** Whether this character has chosen a talent. */
+  hasTalent(id: string) {
+    return talentsOf(this.build.skills).some((t) => t.id === id);
+  }
   gcd = 0;
   casting: Casting | null = null;
   party: Party | null = null;
@@ -603,21 +618,51 @@ export class World implements CombatCtx {
     }
     if (msg.on === true && !p.autoOn) {
       if (p.dead) return this.sendAuto(p, 'You cannot hunt while dead');
+      // a long enough break clears the weariness; a short one carries the session on
+      const now = this.tick * TICK_MS;
+      if (!p.autoSince || now - p.autoOffAt >= AUTO_REST_MS) p.autoSince = now;
       p.autoOn = true;
       p.autoStats = emptyAutoStats();
       p.autoStart = this.tick;
-    } else if (msg.on !== true) p.autoOn = false;
+    } else if (msg.on !== true) {
+      if (p.autoOn) p.autoOffAt = this.tick * TICK_MS;
+      p.autoOn = false;
+    }
     this.sendAuto(p);
+  }
+  // ---------- G5: active play beats idling ----------
+  /** Experience multiplier for a kill: Battle Rhythm for hand-made kills, less while auto hunting. */
+  grindFactor(p: Player): number {
+    const now = this.tick * TICK_MS;
+    if (p.autoOn) return now - p.autoSince >= AUTO_WEARY_MS ? AUTO_WEARY_EXP : AUTO_EXP;
+    return 1 + RHYTHM_EXP * p.rhythm;
+  }
+  /** After a kill this player is rewarded for: the streak, and kill talents. */
+  afterKill(p: Player) {
+    const now = this.tick * TICK_MS;
+    if (!p.autoOn) {
+      // the streak grows with kills made by hand within the window; experience for this kill used the old value
+      p.rhythm = now - p.rhythmAt <= RHYTHM_WINDOW_MS ? Math.min(RHYTHM_MAX, p.rhythm + 1) : 1;
+      p.rhythmAt = now;
+      this.send(p, { t: 'rhythm', n: p.rhythm, ms: RHYTHM_WINDOW_MS });
+    }
+    if (p.hasTalent('bloodthirst') && !p.dead) this.heal(p, Math.max(1, Math.round(p.maxHp * 0.06)));
+    if (p.hasTalent('arcane_flow') && !p.dead) {
+      p.res = Math.min(p.stats.maxRes, Math.round(p.res + p.stats.maxRes * 0.08));
+      p.selfDirty = true;
+      this.cutCooldowns(p, 1000);
+    }
   }
   /** Ends a session from the server's side (death, leaving the zone, a full bag) and says why. */
   stopAuto(p: Player, why: string) {
     if (!p.autoOn) return;
     p.autoOn = false;
+    p.autoOffAt = this.tick * TICK_MS;
     this.sendAuto(p, why);
   }
   sendAuto(p: Player, why?: string) {
     if (p.autoOn) p.autoStats.secs = Math.round(((this.tick - p.autoStart) * TICK_MS) / 1000);
-    this.send(p, { t: 'auto', on: p.autoOn, cfg: p.autoCfg, stats: p.autoStats, why });
+    this.send(p, { t: 'auto', on: p.autoOn, cfg: p.autoCfg, stats: p.autoStats, why, xp: p.autoOn ? this.grindFactor(p) : 1 });
   }
   /** Quests and faction shops. */
   /** Journal commands: wear a title, claim a mission or the login reward. */
@@ -1134,6 +1179,11 @@ export class World implements CombatCtx {
       amount = 0;
       flags |= Dmg.Absorb;
     }
+    if (target instanceof Player && amount > 0 && !(flags & Dmg.Heal) && target.hp - amount < target.maxHp / 2 && target.hp >= target.maxHp / 2 && this.tick >= target.bulwarkAt && target.hasTalent('bulwark')) {
+      // Bulwark (talent): falling below half health raises a barrier
+      target.bulwarkAt = this.tick + Math.round(20_000 / TICK_MS);
+      applyStatus(target, STATUS_INDEX.barrier, this.tick, Math.round(target.maxHp * 0.15), target.id);
+    }
     if (target instanceof Player && amount > 0) {
       const m = target.mods;
       if (m.invuln) {
@@ -1250,7 +1300,7 @@ export class World implements CombatCtx {
       const who = this.parties.sharers(p.party, m.room, m.x, m.y, (id) => m.dmgBy.has(id));
       const pool = exp * (0.5 + 0.5 * share) * (1 + PARTY_EXP_BONUS * (who.length - 1));
       for (const e of who) {
-        const f = expLevelFactor(e.level, m.level) * this.conquest.expBonus(e);
+        const f = expLevelFactor(e.level, m.level) * this.conquest.expBonus(e) * this.grindFactor(e);
         if (f > 0 && exp > 0) this.grantExp(e, Math.max(1, Math.round((pool / who.length) * f * this.guilds.bonus(e, 'barracks'))));
         looters.push(e);
       }
@@ -1259,6 +1309,7 @@ export class World implements CombatCtx {
     else if (!m.summoner) distributeLoot(this, m, looters);
     // auto hunting sessions: the kill counts for everyone rewarded for it
     if (!m.def.boss) for (const p of looters) this.quests.onKill(p, m);
+    for (const p of looters) this.afterKill(p);
     for (const p of looters) {
       this.journals.onKill(p, m);
       chargeUlt(this, p, ULT_PER_KILL);
@@ -1442,6 +1493,14 @@ export class World implements CombatCtx {
       mul *= STATUS[STATUS_INDEX.retribution].nextMul!;
       removeStatus(p, STATUS_INDEX.retribution);
     }
+    // talents (G2): whom you hit changes how hard
+    if (p.hasTalent('momentum') && !this.echoing) {
+      if (p.momTarget !== m.id) { p.momTarget = m.id; p.momStacks = 0; }
+      mul *= 1 + 0.04 * p.momStacks;
+      p.momStacks = Math.min(5, p.momStacks + 1);
+    }
+    if (p.hasTalent('opportunist') && m.hp > m.maxHp * 0.9) mul *= 1.4;
+    if (p.hasTalent('executioner_eye') && m.hp < m.maxHp * 0.35) mul *= 1.3;
     let dmg = mitigate(power * mul * (0.9 + this.rnd() * 0.2), def), flags = 0;
     if (this.rnd() * 100 < s.crit + critAdd) {
       dmg *= s.critDmg;
@@ -1457,7 +1516,34 @@ export class World implements CombatCtx {
       p.selfDirty = true;
     }
     if (basic && rule.poison && !m.dead && this.rnd() * 100 < rule.poison) applyStatus(m, STATUS_INDEX.poison, this.tick, power, p.id);
+    // talents (G2): what happens after a hit lands
+    if (!this.echoing) {
+      if (!basic && flags & Dmg.Crit && p.hasTalent('overload')) this.cutCooldowns(p, 500);
+      if (!basic && p.hasTalent('echo') && !m.dead && this.rnd() < 0.2) {
+        this.echoing = true;
+        try { this.strike(p, m, mul * 0.5, magic, critAdd, false); } finally { this.echoing = false; }
+      }
+      if (basic && p.hasTalent('cleaving_blows')) {
+        this.echoing = true;
+        try {
+          let n = 0;
+          for (const o of m.room.monsters.values()) {
+            if (o === m || o.dead || Math.hypot(o.x - m.x, o.y - m.y) > 70) continue;
+            this.strike(p, o, mul * 0.4, magic, 0, false);
+            if (++n >= 2) break;
+          }
+        } finally { this.echoing = false; }
+      }
+    }
     return dealt;
+  }
+  /** Echoes and cleaves resolve as extra hits that do not trigger talents again. */
+  private echoing = false;
+  /** Takes time off every skill cooldown (Arcane Flow, Overload); the client is told. */
+  cutCooldowns(p: Player, ms: number) {
+    const t = Math.round(ms / TICK_MS);
+    for (const [id, at] of p.cds) p.cds.set(id, Math.max(this.tick, at - t));
+    this.send(p, { t: 'cdcut', ms });
   }
   private playerAttack(p: Player, m: Monster) {
     dismount(this, p);

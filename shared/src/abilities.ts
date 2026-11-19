@@ -7,6 +7,7 @@ import { JOBS, type Job } from './protocol';
 import { SUBSKILL_LIST, SUBSKILLS } from './subskills';
 import { ULTIMATES } from './ascension';
 import { FUSIONS } from './awakening';
+import { isTalentKey, talentBlock, talentKey, TALENT_TIERS } from './talents';
 
 export const ELEMENTS = ['fire', 'water', 'lightning', 'earth', 'wind'] as const;
 export type Element = (typeof ELEMENTS)[number];
@@ -188,11 +189,12 @@ export interface Build {
   runes: { slots: (Element | null)[]; lv: Partial<Record<Element, number>>; xp: Partial<Record<Element, number>> };
 }
 export const emptyBuild = (job: Job): Build => ({ skills: {}, runes: { slots: Array.from({ length: runeSlots(job) }, () => null), lv: {}, xp: {} } });
-export const spentPoints = (b: Build) => Object.values(b.skills).reduce((n, r) => n + r, 0);
+export const spentPoints = (b: Build) => Object.entries(b.skills).reduce((n, [k, r]) => (isTalentKey(k) ? n : n + r), 0); // talents cost no points
 /** One skill point per character level. */
 export const freePoints = (level: number, b: Build) => level - spentPoints(b);
 /** Why a skill cannot be learned right now, or '' if it can. */
 export function learnBlock(job: Job, level: number, b: Build, id: string): string {
+  if (isTalentKey(id)) return talentBlock(level, b.skills, id);
   const sub = SUBSKILLS[id];
   if (sub) {
     if (sub.job !== job) return 'Not a skill of this job';
@@ -222,6 +224,11 @@ export function cleanBuild(job: Job, level: number, raw: unknown): Build {
     if (sb.job === job && Number.isInteger(r) && r > 0 && b.skills[sb.parent] > 0) b.skills[sb.id] = Math.min(sb.maxRank, r);
   }
   if (spentPoints(b) > level) b.skills = {};
+  // talents: one choice per tier the character has reached
+  TALENT_TIERS.forEach((t, i) => {
+    const c = src.skills?.[talentKey(i + 1)];
+    if (Number.isInteger(c) && c >= 1 && c <= t.options.length && level >= t.level) b.skills[talentKey(i + 1)] = c;
+  });
   for (let i = 0; i < b.runes.slots.length; i++) {
     const el = src.runes?.slots?.[i];
     if (ELEMENTS.includes(el) && !b.runes.slots.includes(el)) b.runes.slots[i] = el;

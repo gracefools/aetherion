@@ -7,6 +7,7 @@ import { allDiscoveries, isNpc, NODE_RESPAWN_MS, objById, RECIPES, REGION_RES, t
 import { speakerName, STORY, STORY_REGIONS } from '../shared/src/story';
 import { traitOf, TRAITS } from '../shared/src/traits';
 import { statusNames } from '../shared/src/combat';
+import { AUTO_EXP, AUTO_REST_MS, AUTO_WEARY_EXP, AUTO_WEARY_MS, RHYTHM_EXP, RHYTHM_MAX, RHYTHM_WINDOW_MS, talentsOf } from '../shared/src/talents';
 import { FACTIONS, LORE } from '../shared/src/lore';
 import { validateDir, validateSheet, type SheetEntry } from '../scripts/assets';
 import { decodePng, encodePng, type Image } from '../scripts/png';
@@ -4362,6 +4363,112 @@ test('G4 region traits: every region past level 45 has its own mechanic, and eac
     h.world.hurt(m, 1000, 0, null);
     assert.equal(m.hp, hp, 'and cannot be hurt meanwhile');
   }
+});
+
+test('G2 talents: one per tier, free, changeable outside combat, and each changes how the character fights', () => {
+  const h = harness({ rng: () => 0.5, capacity: 10 }), { world } = h;
+  const a = h.join(0, 0, 'knight', 15), p = a.p;
+  assert.equal(world.learn(p, 'talent.1.1'), 'Requires level 20');
+  for (const junk of ['talent.9.1', 'talent.1.7', 'talent.x']) assert.equal(world.learn(p, junk), 'Unknown talent');
+  const lv = (n: number) => { p.level = n; p.recalc(); };
+  lv(65);
+  const free = freePoints(p.level, p.build);
+  assert.equal(world.learn(p, 'talent.1.1'), '');
+  assert.equal(freePoints(p.level, p.build), free, 'talents cost no skill points');
+  assert.equal(world.learn(p, 'talent.1.1'), 'Already chosen');
+  assert.equal(world.learn(p, 'talent.1.2'), '', 'changed: one per tier');
+  assert.deepEqual(talentsOf(p.build.skills).map((t) => t.id), ['opportunist']);
+  p.lastCombat = (world as any).tick;
+  assert.equal(world.learn(p, 'talent.1.3'), 'Cannot do that in combat');
+  p.lastCombat = -1e9;
+  assert.deepEqual(cleanBuild('knight', 65, p.build).skills['talent.1'], 2, 'stored with the build');
+  assert.equal(cleanBuild('knight', 15, p.build).skills['talent.1'], undefined, 'not kept below the tier level');
+  // what each does in a fight
+  const mob = (dx = 30, dy = 0) => { const m = world.spawn(p.room, 'boar', p.x + dx, p.y + dy); m.noRespawn = true; m.maxHp = m.hp = 1e7; return m; };
+  const pick = (tier: number, c: number) => { p.build.skills[`talent.${tier}`] = c; };
+  const clearT = () => { for (const k of Object.keys(p.build.skills)) if (k.startsWith('talent.')) delete p.build.skills[k]; };
+  clearT();
+  const base = world.strike(p, mob(), 1);
+  pick(1, 1); // Momentum
+  const m1 = mob(), hits = [1, 2, 3, 4, 5, 6, 7].map(() => world.strike(p, m1, 1));
+  assert.ok(hits[0] === base && hits[1] > hits[0] && hits[5] === hits[6] && hits[6] > hits[0] * 1.15, `Momentum stacks on one target: ${hits}`);
+  assert.equal(world.strike(p, mob(), 1), base, 'and starts over on another');
+  pick(1, 2); // Opportunist
+  const m2 = mob();
+  assert.ok(world.strike(p, m2, 1) > base * 1.3, 'Opportunist: the opening hit is heavy');
+  m2.hp = m2.maxHp * 0.5;
+  assert.equal(world.strike(p, m2, 1), base, 'but not once the target is hurt');
+  pick(1, 3); // Executioner's Eye
+  const m3 = mob();
+  m3.hp = m3.maxHp * 0.2;
+  assert.ok(world.strike(p, m3, 1) > base * 1.2, "Executioner's Eye finishes the wounded");
+  clearT();
+  // kills: Bloodthirst heals, Arcane Flow restores and cuts cooldowns
+  pick(2, 1);
+  p.hp = Math.round(p.maxHp / 2);
+  const hp0 = p.hp;
+  kill(world, p, 'boar');
+  assert.ok(p.hp >= hp0 + Math.round(p.maxHp * 0.06) - 1, 'Bloodthirst');
+  pick(2, 2);
+  p.res = 0;
+  p.cds.set('shield_bash', (world as any).tick + 200);
+  kill(world, p, 'boar');
+  assert.ok(p.res > 0 && p.cds.get('shield_bash')! <= (world as any).tick + 200 - 19, 'Arcane Flow');
+  assert.ok(a.out.some((m) => m.t === 'cdcut' && m.ms === 1000), 'the client is told');
+  pick(2, 3); // Bulwark
+  p.hp = Math.round(p.maxHp * 0.6);
+  const blow = Math.round(p.maxHp * 0.2), hpB = p.hp;
+  world.hurt(p, blow, 0, mob());
+  assert.ok(hpB - p.hp <= blow - Math.round(p.maxHp * 0.15) + 1, 'Bulwark: the barrier rises in time to soak the blow that crosses half health');
+  p.hp = Math.round(p.maxHp * 0.6);
+  world.hurt(p, blow, 0, mob());
+  assert.equal(p.hp, Math.round(p.maxHp * 0.6) - blow, 'and only once every 20 seconds');
+  clearT();
+  // signatures
+  const h2 = harness({ rng: () => 0.1, capacity: 10 }), b = h2.join(0, 0, 'mage', 65).p;
+  const m4 = h2.world.spawn(b.room, 'boar', b.x + 30, b.y); m4.noRespawn = true; m4.maxHp = m4.hp = 1e7;
+  b.build.skills['talent.3'] = 1; // Echo
+  const before = m4.hp, dealt = h2.world.strike(b, m4, 1, true, 0, false);
+  assert.ok(before - m4.hp > dealt * 1.3, 'Echo strikes again');
+  b.build.skills['talent.3'] = 2; // Overload
+  b.cds.set('fireball', (h2.world as any).tick + 100);
+  h2.world.strike(b, m4, 1, true, 100, false);
+  assert.ok(b.cds.get('fireball')! < (h2.world as any).tick + 100, 'Overload: a critical skill hit shortens cooldowns');
+  b.build.skills['talent.3'] = 3; // Cleaving Blows
+  const side = [0, 1].map((i) => { const m = h2.world.spawn(b.room, 'boar', m4.x + 20, m4.y + (i ? 25 : -25)); m.noRespawn = true; m.maxHp = m.hp = 1e7; return m; });
+  h2.world.strike(b, m4, 1);
+  assert.ok(side.every((m) => m.hp < m.maxHp), 'Cleaving Blows: basic attacks strike the enemies beside the target');
+});
+
+test('G5 active play beats idling: Battle Rhythm for kills made by hand, less experience while auto hunting, more less after an hour', () => {
+  const h = harness({ capacity: 10 }), { world } = h, a = h.join(0, 0, 'knight', 10), p = a.p;
+  assert.equal(world.grindFactor(p), 1);
+  kill(world, p, 'boar');
+  kill(world, p, 'boar');
+  kill(world, p, 'boar');
+  assert.equal(p.rhythm, 3, 'kills in quick succession build a streak');
+  assert.ok(Math.abs(world.grindFactor(p) - (1 + RHYTHM_EXP * 3)) < 1e-9);
+  assert.ok(a.out.some((m) => m.t === 'rhythm' && m.n === 3));
+  for (let i = 0; i < 20; i++) kill(world, p, 'boar');
+  assert.equal(p.rhythm, RHYTHM_MAX, 'capped');
+  h.step(Math.round(RHYTHM_WINDOW_MS / TICK_MS) + 2);
+  kill(world, p, 'boar');
+  assert.equal(p.rhythm, 1, 'a pause ends the streak');
+  // auto hunting: less experience, and no streak
+  world.auto(p, { on: true });
+  assert.equal(world.grindFactor(p), AUTO_EXP);
+  kill(world, p, 'boar');
+  assert.equal(p.rhythm, 1, 'auto hunting kills do not build the streak');
+  p.autoSince -= AUTO_WEARY_MS;
+  assert.equal(world.grindFactor(p), AUTO_WEARY_EXP, 'weary after an hour');
+  world.auto(p, { on: false });
+  world.auto(p, { on: true });
+  assert.equal(world.grindFactor(p), AUTO_WEARY_EXP, 'a short break does not reset it');
+  world.auto(p, { on: false });
+  p.autoOffAt -= AUTO_REST_MS;
+  world.auto(p, { on: true });
+  assert.equal(world.grindFactor(p), AUTO_EXP, 'ten minutes away does');
+  assert.ok(a.out.some((m) => m.t === 'auto' && m.xp === AUTO_EXP));
 });
 
 test('M13 accepting: level, prerequisites, reputation, once, daily reset at midnight UTC, and the active limit', () => {

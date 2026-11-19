@@ -17,6 +17,7 @@ import { blocked, stepMove } from '../../../shared/src/world';
 import { applyStatus, cleanse, emit, removeStatus, type Ent } from './entity';
 import { Monster } from './Monster';
 import type { Player, World, ZoneRoom } from './World';
+import { isTalentKey, talentKey } from '../../../shared/src/talents';
 
 const ticks = (ms: number) => Math.ceil(ms / TICK_MS);
 
@@ -524,6 +525,14 @@ export function learn(w: World, p: Player, id: unknown): string {
   if (typeof id !== 'string') return 'Unknown skill';
   const why = learnBlock(p.job, p.level, p.build, id);
   if (why) return why;
+  if (isTalentKey(id)) {
+    // talents are free, one per tier, and can be changed outside combat
+    if ((w.tick - p.lastCombat) * TICK_MS <= COMBAT_TIMEOUT_MS) return 'Cannot do that in combat';
+    const [, tier, choice] = id.split('.');
+    p.build.skills[talentKey(Number(tier))] = Number(choice);
+    buildChanged(w, p);
+    return '';
+  }
   p.build.skills[id] = (p.build.skills[id] ?? 0) + 1;
   buildChanged(w, p);
   return '';

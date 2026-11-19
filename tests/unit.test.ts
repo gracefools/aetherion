@@ -5016,7 +5016,7 @@ test('M15 pets: whistles join the collection, a summoned pet gives its bonus, fo
   assert.deepEqual(c, { pets: [{ uid: 'a', kind: 'ember_kit', name: 'Ember Kit', level: PET_MAX_LEVEL, exp: 0 }], pet: 'a', mounts: ['frost_elk'], riding: '' }, 'nobody logs in riding; bad entries are dropped');
 });
 
-test('M15 mounts: faster movement through the same collision rules, a level to ride, not in combat, dungeons or the arena', () => {
+test('M15 mounts: faster movement through the same collision rules, a level to ride, kept when struck, not in dungeons or the arena', () => {
   const h = harness({ capacity: 10 }), { world } = h;
   const a = h.join(0, 0, 'knight', 25), p = a.p;
   give(p, spec('mount_plains_strider'));
@@ -5038,12 +5038,14 @@ test('M15 mounts: faster movement through the same collision rules, a level to r
   for (let i = 0; i < 20; i++) stepMove(p, 1, 0, map, p.runStep);
   assert.equal(blocked(map, p.x, p.y), false, 'never inside the obstacle');
   assert.ok(p.x < tileCenter(wall![0] + 1), 'and not through it');
-  // taking damage knocks you off
+  // a blow does not knock the rider off
   world.hurt(p, 1, 0, null);
-  assert.equal(p.comp.riding, '');
+  assert.equal(p.comp.riding, 'plains_strider', 'still riding after being struck');
+  // getting off and back on works in a fight too
+  assert.equal(world.companion(p, { op: 'dismount' }), '');
   assert.equal(p.stats.moveMul, mul0);
-  // in combat: refused
-  assert.equal(world.companion(p, { op: 'mount', id: 'plains_strider' }), 'Not while in combat');
+  assert.equal(world.companion(p, { op: 'mount', id: 'plains_strider' }), '', 'mounting in combat is allowed');
+  assert.equal(world.companion(p, { op: 'dismount' }), '');
   p.lastCombat = -1e6;
   // level
   const low = h.join(0, 40, 'mage', 5);

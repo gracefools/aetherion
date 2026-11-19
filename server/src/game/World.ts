@@ -1246,7 +1246,7 @@ export class World implements CombatCtx {
         this.pvp.onHit(src, target);
         amount = this.pvp.limit(src, target, amount);
       }
-      if (amount > 0) dismount(this, target);
+      // a rider who is struck stays mounted (only attacking, casting or entering a dungeon ends a ride)
     }
     target.hp = Math.max(0, target.hp - amount);
     target.sver++;

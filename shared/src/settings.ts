@@ -9,6 +9,7 @@ export const ACTIONS = {
   'move.left': ['KeyA', 'ArrowLeft'],
   'move.right': ['KeyD', 'ArrowRight'],
   walk: ['ShiftLeft', 'ShiftRight'],
+  'mount.toggle': ['Comma'],
   attack: ['Space'],
   target: ['Tab'],
   interact: ['KeyF'],
@@ -44,7 +45,7 @@ export type Action = keyof typeof ACTIONS;
 export const ACTION_LIST = Object.keys(ACTIONS) as Action[];
 /** Groups for the settings screen. */
 export const ACTION_GROUPS: [string, Action[]][] = [
-  ['movement', ['move.up', 'move.down', 'move.left', 'move.right', 'walk']],
+  ['movement', ['move.up', 'move.down', 'move.left', 'move.right', 'walk', 'mount.toggle']],
   ['combat', ['attack', 'target', 'interact', 'potion.hp', 'potion.mp']],
   ['skills', ['ultimate', 'fusion.1', 'fusion.2', 'fusion.3', 'skill.1', 'skill.2', 'skill.3', 'skill.4', 'skill.5', 'skill.6', 'skill.7']],
   ['runes', ['rune.1.1', 'rune.1.2', 'rune.1.3', 'rune.2.1', 'rune.2.2', 'rune.2.3', 'rune.3.1', 'rune.3.2', 'rune.3.3']],

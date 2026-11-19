@@ -519,6 +519,10 @@ export class Game {
         return this.setTarget(0);
       }
       if (act === 'interact') return this.interact();
+      if (act === 'mount.toggle') {
+        e.preventDefault();
+        return this.toggleMount();
+      }
       if (e.code === 'F9' && this.dev) {
         e.preventDefault();
         this.dbgOn = !this.dbgOn;
@@ -793,6 +797,20 @@ export class Game {
     if (op === 'accept') this.tut('quest');
   }
   /** Guilds (M14); the server checks every permission. */
+  /** Gets on the last mount ridden (or the best one this level allows), or off the current one. */
+  private lastMount = '';
+  toggleMount() {
+    const c = this.hud.comp, lv = this.hud.self?.level ?? 0;
+    if (c.riding) {
+      this.lastMount = c.riding;
+      return this.compOp('dismount');
+    }
+    const usable = c.mounts.filter((id) => MOUNTS[id] && lv >= MOUNTS[id].level).sort((a, b) => MOUNTS[b].level - MOUNTS[a].level);
+    const id = usable.includes(this.lastMount) ? this.lastMount : usable[0];
+    if (!id) return this.notice(c.mounts.length ? `Requires level ${Math.min(...c.mounts.map((m) => MOUNTS[m]?.level ?? 1))}` : 'You have no mount yet');
+    this.lastMount = id;
+    this.compOp('mount', { id });
+  }
   /** G9: the dungeon finder. */
   finderOp(op: 'join' | 'leave' | 'state', a: { dungeon?: string; diff?: string } = {}) {
     this.sendMsg({ t: 'finder', op, ...a });

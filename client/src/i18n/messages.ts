@@ -202,6 +202,7 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   goalDone: m('Guild goal complete: {a}! Every member online receives {b} gold and {c} upgrade stones.', 'Target guild tercapai: {a}! Setiap anggota yang daring menerima {b} emas dan {c} batu upgrade.'),
   unknownDiff: m('Unknown difficulty', 'Tingkat kesulitan tidak dikenal'), leaveParty: m('Leave your party first, or go in together from the gate', 'Tinggalkan party-mu dulu, atau masuk bersama dari gerbang'),
   goalLog: m('Weekly goal complete: {a}.', 'Target mingguan tercapai: {a}.'), goalMail: m('Guild goal: {a}', 'Target guild: {a}'),
+  noMountYet: m('You have no mount yet', 'Kamu belum punya tunggangan'),
   rewardMailed: m('Your inventory is full: the rest of your reward was sent to you by mail.', 'Inventarismu penuh: sisa hadiahmu dikirim lewat surat.'),
   abandoned: m('Quest abandoned: {a}.', 'Misi ditinggalkan: {a}.'), accepted: m('Quest accepted: {a}.', 'Misi diterima: {a}.'), questDone: m('Quest complete: {a}. {b} EXP, {c} gold.', 'Misi selesai: {a}. {b} EXP, {c} emas.'),
   repNeed: m('Requires {a} reputation with {b}', 'Butuh reputasi {a} dengan {b}'), returnGiver: m('Return to the quest giver to turn this quest in', 'Kembali ke pemberi misi untuk menyerahkan misi ini'),

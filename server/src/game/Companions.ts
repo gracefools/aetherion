@@ -68,7 +68,6 @@ export function companionOp(w: World, p: Player, m: any): string {
       if (typeof id !== 'string' || !c.mounts.includes(id)) return 'You do not have that mount';
       if (p.level < MOUNTS[id].level) return `Requires level ${MOUNTS[id].level}`;
       if (MOUNT_FORBIDDEN_KINDS.includes(p.room.map.def.kind ?? '')) return 'You cannot ride here';
-      if ((w.tick - p.lastCombat) * TICK_MS <= COMBAT_TIMEOUT_MS) return 'Not while in combat';
       if (p.casting) return 'Not while casting';
       c.riding = c.riding === id ? '' : id;
       break;

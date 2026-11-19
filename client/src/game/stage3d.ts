@@ -300,9 +300,11 @@ export class Stage3D {
     let u0 = sx / W, u1 = (sx + sw) / W;
     const vt = 1 - sy / H, vb = 1 - (sy + sh) / H;
     if (flip) [u0, u1] = [u1, u0];
-    const a = b.uv;
-    a.setXY(0, u0, vt); a.setXY(1, u1, vt); a.setXY(2, u0, vb); a.setXY(3, u1, vb);
-    a.needsUpdate = true;
+    const a = b.uv, arr = a.array as Float32Array;
+    if (arr[0] !== Math.fround(u0) || arr[1] !== Math.fround(vt) || arr[2] !== Math.fround(u1) || arr[5] !== Math.fround(vb)) {
+      a.setXY(0, u0, vt); a.setXY(1, u1, vt); a.setXY(2, u0, vb); a.setXY(3, u1, vb);
+      a.needsUpdate = true;
+    }
     // standing on row footY: screen row y maps to height footY - y
     m.position.set(dx, footY - (dy + dh), footY + order * 0.002);
     m.scale.set(dw, dh, 1);

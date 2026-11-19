@@ -573,12 +573,23 @@ setHDRenderer(renderStyleASheet);
 export function styleAFinish(src: Uint8ClampedArray, W: number, H: number): Uint8ClampedArray<ArrayBuffer> {
   const out = new Uint8ClampedArray(src.length) as Uint8ClampedArray<ArrayBuffer>;
   const a = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : src[(y * W + x) * 4 + 3]);
+  // the figure's top and bottom rows: light falls from above, so it is brighter up there and deeper below
+  let top = H, bot = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (src[(y * W + x) * 4 + 3]) { if (y < top) top = y; if (y > bot) bot = y; }
+  const span = Math.max(1, bot - top);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = (y * W + x) * 4;
     if (src[i + 3]) {
+      // a two-step bevel: the edge pixel and the one inside it, lit on the upper left and shaded on the lower right
       const s = (a(x - 1, y) ? 0 : 1) + (a(x, y - 1) ? 0 : 1) - (a(x + 1, y) ? 0 : 1) - (a(x, y + 1) ? 0 : 1);
-      const k = s > 0 ? 1.18 : s < 0 ? 0.8 : 1, lift = s > 0 ? 14 : 0;
-      out[i] = Math.min(255, src[i] * k + lift); out[i + 1] = Math.min(255, src[i + 1] * k + lift); out[i + 2] = Math.min(255, src[i + 2] * k + lift * 0.6);
+      const s2 = s ? 0 : (a(x - 2, y) ? 0 : 1) + (a(x, y - 2) ? 0 : 1) - (a(x + 2, y) ? 0 : 1) - (a(x, y + 2) ? 0 : 1);
+      const edge = s > 0 ? 1.2 : s < 0 ? 0.76 : s2 > 0 ? 1.1 : s2 < 0 ? 0.86 : 1;
+      const k = edge * (1.12 - 0.3 * ((y - top) / span)), lift = s > 0 ? 14 : 0;
+      // light is warm, shade is cool
+      const warm = k > 1.05 ? 1 : k < 0.92 ? -1 : 0;
+      out[i] = Math.max(0, Math.min(255, src[i] * k + lift + warm * 8));
+      out[i + 1] = Math.max(0, Math.min(255, src[i + 1] * k + lift));
+      out[i + 2] = Math.max(0, Math.min(255, src[i + 2] * k + lift * 0.6 - warm * 12));
       out[i + 3] = src[i + 3];
       continue;
     }

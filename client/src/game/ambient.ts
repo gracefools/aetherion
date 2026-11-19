@@ -26,7 +26,27 @@ const AIR: Record<Theme, { day: number[]; night: number[]; n: number }> = {
 };
 // 0 pollen, 1 leaf, 2 firefly, 3 dust, 4 ember, 5 ice glitter, 6 spore, 7 star mote
 
+/** A soft round glow painted once per colour and size, then stamped (a gradient per particle per frame is far dearer). */
+const glows = new Map<string, HTMLCanvasElement>();
+export function glowSprite(rgb: string, r: number): HTMLCanvasElement {
+  const key = rgb + '/' + r;
+  let c = glows.get(key);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = c.height = r * 2;
+    const g = c.getContext('2d')!, gr = g.createRadialGradient(r, r, 0, r, r, r);
+    gr.addColorStop(0, `rgba(${rgb},0.95)`); gr.addColorStop(0.3, `rgba(${rgb},0.45)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, r * 2, r * 2);
+    glows.set(key, c);
+  }
+  return c;
+}
+
 class Ambient {
+  /** Water tiles of the map last drawn, by row: found once, not searched for every frame. */
+  private waterOf: ZoneMap | null = null;
+  private waterRows: number[][] = [];
   private list: Mote[] = [];
   private theme: Theme | null = null;
 
@@ -34,9 +54,13 @@ class Ambient {
   water(g: CanvasRenderingContext2D, map: ZoneMap, camX: number, camY: number, vw: number, vh: number, now: number) {
     const x0 = Math.max(0, Math.floor(camX / TILE)), y0 = Math.max(0, Math.floor(camY / TILE));
     const x1 = Math.min(map.w - 1, Math.ceil((camX + vw) / TILE)), y1 = Math.min(map.h - 1, Math.ceil((camY + vh) / TILE));
+    if (this.waterOf !== map) {
+      this.waterOf = map;
+      this.waterRows = Array.from({ length: map.h }, (_, ty) => { const row: number[] = []; for (let tx = 0; tx < map.w; tx++) if (map.tiles[tx + ty * map.w] === T.Water) row.push(tx); return row; });
+    }
     g.save();
-    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
-      if (map.tiles[tx + ty * map.w] !== T.Water) continue;
+    for (let ty = y0; ty <= y1; ty++) for (const tx of this.waterRows[ty]) {
+      if (tx < x0 || tx > x1) continue;
       // two glints per tile, each living on its own rhythm
       for (let k = 0; k < 2; k++) {
         const h = ((tx * 73856093) ^ (ty * 19349663) ^ (k * 83492791)) >>> 0;
@@ -94,10 +118,8 @@ class Ambient {
         case 2: { // a firefly: a soft glow that breathes
           const glow = 0.5 + 0.5 * Math.sin(now / 340 + m.s * 30);
           g.globalAlpha = (0.25 + 0.75 * glow) * fade;
-          const r = 5 + glow * 4, gr = g.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
-          gr.addColorStop(0, 'rgba(230,255,140,0.95)'); gr.addColorStop(0.3, 'rgba(190,255,90,0.45)'); gr.addColorStop(1, 'rgba(190,255,90,0)');
-          g.fillStyle = gr;
-          g.fillRect(m.x - r, m.y - r, r * 2, r * 2);
+          const r = 5 + glow * 4;
+          g.drawImage(glowSprite('210,255,110', 9), m.x - r, m.y - r, r * 2, r * 2);
           break;
         }
         case 3: g.globalAlpha = 0.35 * fade; g.fillStyle = '#d8c8a8'; g.fillRect(m.x, m.y, 1.5, 1.5); break;
@@ -152,7 +174,7 @@ class Ambient {
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       const s = this.sparks[i], age = now - s.t0;
       if (age < 0) continue;
-      if (age >= s.life) { this.sparks.splice(i, 1); continue; }
+      if (age >= s.life) { this.sparks[i] = this.sparks[this.sparks.length - 1]; this.sparks.pop(); continue; }
       const t = age / 1000, k = age / s.life;
       const x = s.x + s.vx * t, y = s.y + s.vy * t + 0.5 * s.grav * t * t;
       g.globalAlpha = (1 - k) * (s.grav ? 1 : 0.55);

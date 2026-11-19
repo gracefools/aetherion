@@ -63,7 +63,7 @@ import type { LadderRow } from '../../../shared/src/seasons';
 import { PET_IDS, PET_SKILLS, PETS } from '../../../shared/src/companions';
 import { DODGE } from '../../../shared/src/combat';
 import { BG, BG_BASES, BG_SHRINE, MATCH_ZONE, type MatchView } from '../../../shared/src/matches';
-import { ambient, windOf } from './ambient';
+import { ambient, glowSprite, windOf } from './ambient';
 
 export interface ChatLine {
   id: number;
@@ -2165,11 +2165,9 @@ export class Game {
         if (Math.random() < 0.07) ambient.puff(d.x + 20 + (Math.random() - 0.5) * 4, d.y - 92, Math.random() < 0.5 ? '#d8d8dc' : '#b8b8c0', now, 4, 1700);
         if (dusk > 0.2) {
           const flick = 0.85 + 0.15 * Math.sin(now / 190 + d.x), r = 46;
-          const gl = g.createRadialGradient(d.x, d.y + 8, 2, d.x, d.y + 8, r);
-          gl.addColorStop(0, `rgba(255,196,110,${0.34 * dusk * flick})`);
-          gl.addColorStop(1, 'rgba(255,196,110,0)');
-          g.fillStyle = gl;
-          g.fillRect(d.x - r, d.y + 8 - r * 0.6, r * 2, r * 1.2);
+          g.globalAlpha = 0.4 * dusk * flick;
+          g.drawImage(glowSprite('255,196,110', 46), d.x - r, d.y + 8 - r * 0.6, r * 2, r * 1.2);
+          g.globalAlpha = 1;
         }
       }
     }
@@ -2187,9 +2185,7 @@ export class Game {
       // a slight arc, a glowing head, and a trail of fading embers behind it
       const x = Math.round(s.x + (to.x - s.x) * k), y = Math.round(s.y + (to.y - 10 - s.y) * k - Math.sin(k * Math.PI) * 6);
       ambient.puff(x, y, s.color, now, 2, 240);
-      const gl = g.createRadialGradient(x, y, 0, x, y, 7);
-      gl.addColorStop(0, s.color); gl.addColorStop(1, 'rgba(255,255,255,0)');
-      g.globalAlpha = 0.6; g.fillStyle = gl; g.fillRect(x - 7, y - 7, 14, 14); g.globalAlpha = 1;
+      g.globalAlpha = 0.5; g.drawImage(glowSprite('255,255,255', 8), x - 8, y - 8); g.globalAlpha = 1;
       g.fillStyle = s.color;
       g.fillRect(x - 2, y - 1, 4, 3);
       g.fillStyle = '#ffffff';

@@ -518,6 +518,7 @@ function building(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: nu
   while (tileAt(map, bx - 1, by) === T.Roof) bx--;
   const rf = ramp(p.roofs[hash(bx, by, 7) % p.roofs.length], 1), img = g.getImageData(ox, oy, TS, TS), d = img.data;
   const set = (x: number, y: number, c: RGB) => { const i = (y * TS + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+  const mossC = ramp(p.leaf2, 0.6)[1], ivy = ramp(p.leaf, 0.9);
   if (t === T.Roof) {
     const ridge = at(0, -1) !== T.Roof, eave = at(0, 1) !== T.Roof, L = at(-1, 0) !== T.Roof, Rt = at(1, 0) !== T.Roof;
     for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
@@ -525,7 +526,11 @@ function building(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: nu
       let k = sy === 5 ? 0 : sy === 0 ? 3 : sx === 0 ? 1 : 2;
       if (sy === 4 && (sx === 1 || sx === 7)) k = 1; // rounded shingle ends
       if (k === 2 && Y % 6 < 3) k = 3 - (((X >> 3) + row) % 4 === 0 ? 1 : 0); // light upper half of each shingle
+      const shingle = hash((X + (row & 1) * 4) >> 3, row, 41) % 100;
+      if (shingle < 9 && k > 0) k--; // a weathered shingle here and there
+      else if (shingle > 93 && k < 4 && k > 0) k++; // and a newer, paler one
       let c = rf[k];
+      if (hash(bx, by, 43) % 3 === 0 && h01(X >> 2, Y >> 2, 44) < 0.07 && k > 0) c = mossC; // moss on the older roofs
       if (ridge && y < 6) c = y < 2 ? rf[4] : y === 5 ? rf[0] : rf[3];
       if (eave && y > 25) c = y > 29 ? [40, 28, 34] : y === 26 ? rf[4] : rf[1];
       if (L && x < 2) c = x === 0 ? rf[0] : rf[4];
@@ -552,6 +557,15 @@ function building(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: nu
     if (!topRow && y > 25) c = ramp(p.rock, 0.7)[y === 26 ? 4 : (X + (y > 28 ? 3 : 0)) % 7 === 0 ? 0 : y > 29 ? 1 : 2]; // stone footing
     if ((wx === l && x < 3) || (wx === r && x > 28)) c = tb[x === 0 || x === 31 ? 0 : 2];
     if ((wx - l) % 3 === 0 && wx !== l && x < 3 && !(y > 25 && !topRow)) c = tb[x === 2 ? 0 : 2]; // posts
+    // a diagonal brace in the upper storey's timber frame
+    if (topRow && (wx - l) % 3 === 1 && wx !== r && y > 4 && x > 2 && Math.abs(x - 3 - (y - 4) * 1.05) < 1.3) c = tb[Math.abs(x - 3 - (y - 4) * 1.05) < 0.6 ? 2 : 0];
+    // the eave throws a soft shadow on the wall beneath it
+    if (topRow && y >= 4 && y < 10) { const sh = 1 - 0.2 * ((10 - y) / 6); c = [c[0] * sh, c[1] * sh, c[2] * sh]; }
+    // ivy climbs the corner of some houses, thinning as it spreads
+    if (hash(l, wy - (topRow ? 0 : 1), 21) % 3 === 0 && wx - l < 2) {
+      const reach = (wx - l) * TS + x, dense = 0.62 - reach / 46 - (topRow ? y / 90 : 0);
+      if (h01(X >> 2, Y >> 2, 31) < dense + 0.12 && h01(X, Y, 33) < 0.86) c = ivy[1 + (hash(X >> 1, Y >> 1, 32) % 3)]; // leaves in clumps, with a few gaps
+    }
     set(x, y, c);
   }
   g.putImageData(img, ox, oy);
@@ -560,7 +574,14 @@ function building(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: nu
   else if (!topRow && wx !== l && wx !== r && (wx - l) % 3 === 2) window_(g, ox + 9, oy + 4, p);
 }
 function window_(g: G, x: number, y: number, p: Pal) {
-  const tb = ramp(p.timber, 0.8);
+  const tb = ramp(p.timber, 0.8), sh = ramp(p.roofs[0], 0.8);
+  // shutters folded back on either side, in the colour of the roof
+  for (const sx of [x - 5, x + 15]) {
+    g.fillStyle = css(sh[0]); g.fillRect(sx, y - 1, 4, 14);
+    g.fillStyle = css(sh[2]); g.fillRect(sx + 1, y, 2, 12);
+    g.fillStyle = css(sh[4]); g.fillRect(sx + 1, y, 1, 12);
+    g.fillStyle = css(sh[0]); for (let k = 2; k < 12; k += 3) g.fillRect(sx + 1, y + k, 2, 1);
+  }
   g.fillStyle = css(tb[0]); g.fillRect(x - 1, y - 1, 16, 14);
   g.fillStyle = '#3a5a8a'; g.fillRect(x, y, 14, 12);
   g.fillStyle = '#ffd88a'; g.fillRect(x + 1, y + 1, 5, 4); g.fillRect(x + 8, y + 1, 5, 4); // a warm lit room
@@ -577,6 +598,15 @@ function door(g: G, x: number, y: number, tb: RGB[]) {
   g.fillStyle = css(tb[3]); g.fillRect(x + 1, y + 4, 1, 26);
   g.fillStyle = '#d8b048'; g.fillRect(x + 13, y + 16, 2, 2);
   g.fillStyle = '#9a9488'; g.fillRect(x - 2, y + 28, 22, 3); g.fillStyle = '#c8c0b0'; g.fillRect(x - 2, y + 28, 22, 1);
+  // iron bands and a ring handle
+  g.fillStyle = '#3a3440'; g.fillRect(x, y + 9, 18, 1); g.fillRect(x, y + 23, 18, 1);
+  g.fillStyle = '#f0d070'; g.fillRect(x + 13, y + 15, 2, 1);
+  // a lantern on a bracket beside the door
+  g.fillStyle = '#3a3440'; g.fillRect(x + 20, y + 5, 4, 1); g.fillRect(x + 23, y + 5, 1, 3);
+  g.fillStyle = '#2a2430'; g.fillRect(x + 21, y + 8, 5, 7);
+  g.fillStyle = '#ffd88a'; g.fillRect(x + 22, y + 9, 3, 5);
+  g.fillStyle = '#fff6d8'; g.fillRect(x + 23, y + 10, 1, 2);
+  g.fillStyle = '#3a3440'; g.fillRect(x + 21, y + 7, 5, 1); g.fillRect(x + 22, y + 15, 3, 1);
 }
 
 /** Minimap colour per tile type for a theme (index = tile id). */

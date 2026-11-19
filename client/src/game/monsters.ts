@@ -258,12 +258,19 @@ function quadDraw(body: string, dark: string, chest: string, eye: string, o: { m
     tri(g, b.b, 11, 30, 4, 24 - ph, 9, 33); tri(g, o.glow ?? ch.a, 5, 25 - ph, 4, 24 - ph, 7, 27 - ph);
     blob(g, b, 21, 31, 11, 5);
     blob(g, ch, 27, 34, 4, 2);
+    // fur: a darker ridge along the back, the lines of shoulder and haunch, a ruff at the chest
+    for (let x = 12; x <= 29; x += 2) p1(g, dk.a, x, 26 + ((x >> 1) & 1), 2, 1);
+    for (let x = 13; x <= 28; x += 3) p1(g, b.c, x, 28 + ((x >> 1) & 1), 1, 1);
+    p1(g, b.b, 15, 30, 1, 3); p1(g, b.b, 14, 31, 1, 2); p1(g, b.b, 27, 30, 1, 3);
+    tri(g, ch.c, 29, 30, 32, 31, 30, 35); p1(g, ch.c, 29, 32, 1, 2);
+    for (const [x, off] of [[12, ph], [16, -ph], [27, -ph], [31, ph]]) p1(g, '#f4f0e2', x + off + 2, 41 - Math.max(0, off), 1, 1); // claws
     if (o.mane) for (let x = 14; x <= 30; x += 3) tri(g, o.mane, x, 27, x + 3, 27, x + 1, 22 - (x % 2));
     blob(g, b, 33, 27, 5, 4);
     p1(g, b.a, 37, 28, 4, 3); p1(g, b.b, 37, 30, 4, 1); p1(g, INK, 40, 28, 1, 1);
     tri(g, dk.a, 30, 24, 33, 24, 31, 19); tri(g, b.a, 34, 24, 37, 24, 36, 19);
     if (o.horn) { line(g, '#f4f0e2', 33, 22, 36, 17); line(g, '#f4f0e2', 30, 22, 31, 17); }
     p1(g, eye, 35, 26, 2, 1); p1(g, INK, 36, 26);
+    p1(g, ch.a, 35, 22, 1, 2); p1(g, INK, 34, 25, 3, 1); // the inside of the ear, and a brow that gives it a glare
     if (o.glow) for (const [x, y] of [[16, 29], [22, 28], [26, 31]]) p1(g, o.glow, x, y, 2, 1);
     if (f.open) { p1(g, '#7a2a2a', 37, 31, 4, 2); p1(g, '#f4f0e2', 38, 31); p1(g, '#f4f0e2', 40, 31); }
   };
@@ -324,6 +331,10 @@ function slimeDraw(body: string, core: string): Draw {
     blob(g, b, CX - 2, 29 + sq, 7, 5);
     for (const [x, y] of [[-8, 33], [6, 31], [-3, 27], [9, 36]]) p1(g, b.d, CX + x, y + sq, 2, 1);
     disc(g, core, CX + 1, 33 + sq, 3); p1(g, '#ffffff', CX, 32 + sq, 1, 1);
+    // wet and translucent: a curved gloss on the crown, bubbles inside, a darker rim underneath
+    p1(g, '#ffffff', CX - 6, 26 + sq, 3, 1); p1(g, '#ffffff', CX - 8, 27 + sq, 2, 1); p1(g, '#ffffff', CX - 9, 28 + sq, 1, 2);
+    p1(g, b.c, CX + 6, 36 + sq, 2, 2); p1(g, '#ffffff', CX + 6, 36 + sq, 1, 1); p1(g, b.c, CX - 5, 37 + sq, 1, 1); p1(g, b.c, CX + 9, 33 + sq, 1, 1);
+    for (let x = -w + 3; x <= w - 3; x += 2) p1(g, b.d, CX + x, 41 + (sq ? 1 : 0), 1, 1);
     p1(g, INK, CX - 6, 30 + sq, 2, 2); p1(g, INK, CX + 3, 29 + sq, 2, 2);
     for (const x of [-11, 10]) p1(g, b.b, CX + x + Math.round(f.ph * 2), 40, 3, 2); // drips
     if (f.open) p1(g, INK, CX - 3, 35, 6, 2);

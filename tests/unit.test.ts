@@ -6394,6 +6394,17 @@ test('world events: a meteor shower and a treasure goblin that flees; an event n
   world.events.start(Date.now(), 'goblin', 'ashen');
   const gob = [...world.events.cur!.mobs][0];
   assert.equal(gob.def.id, 'treasure_goblin');
+  // it spawns anywhere; for this check it stands on open ground (against a wall it could not get away)
+  const zm = a.p.room.map, open = (x: number, y: number) => Array.from({ length: 16 }, (_, i) => (i / 16) * 6.283).every((t) => [30, 60, 100, 140, 180].every((r) => !blocked(zm, x + Math.cos(t) * r, y + Math.sin(t) * r)));
+  let spot: [number, number] | null = null;
+  for (let r = 0; r < 60 && !spot; r++) for (let k = 0; k < 8 * Math.max(1, r) && !spot; k++) {
+    const t = (k / (8 * Math.max(1, r))) * 6.283, x = gob.x + Math.cos(t) * r * TILE, y = gob.y + Math.sin(t) * r * TILE;
+    if (open(x, y)) spot = [x, y];
+  }
+  assert.ok(spot, 'open ground near the goblin');
+  gob.x = spot![0];
+  gob.y = spot![1];
+  gob.room.grid.update(gob);
   world.relocate(a.p, a.p.room, gob.x - 60, gob.y);
   const d0 = Math.hypot(gob.x - a.p.x, gob.y - a.p.y);
   world.hurt(gob, 1, 0, a.p);

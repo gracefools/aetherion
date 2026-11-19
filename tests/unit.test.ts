@@ -5142,6 +5142,9 @@ test('G8 rated 2v2: a party of two or two alone, close ratings, the fallen stay 
   assert.ok(a.dead, 'the fallen stay down');
   world.hurt(b, 1e9, 0, ps[1]);
   assert.ok(m.overAt && m.winner === m.side.get(ps[0].id), 'the last one down decides it');
+  const view = (mm as any).view(m, m.side.get(ps[0].id), Date.now()), mine = view.teams[view.side];
+  assert.deepEqual(mine.ids.map((id: number, i: number) => [id, mine.kills[i], mine.deaths[i]]).sort(), [[ps[0].id, 1, 0], [ps[1].id, 1, 0]].sort(), 'the scoreboard counts each kill');
+  assert.deepEqual(view.teams[1 - view.side].deaths, [1, 1]);
   assert.ok((world.pvp.rating.get(ps[0].id) ?? 0) > ra && (world.pvp.rating.get(ps[1].id) ?? 0) > ra, 'both winners gain');
   assert.ok((world.pvp.rating.get(a.id) ?? 0) < 1000 && (world.pvp.rating.get(b.id) ?? 0) < 1000, 'both losers lose');
   m.overAt -= MATCH_END_MS;

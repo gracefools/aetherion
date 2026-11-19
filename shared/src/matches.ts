@@ -160,7 +160,8 @@ export interface MatchView {
   mode: MatchMode;
   /** Your team: 0 or 1. */
   side: number;
-  teams: { ids: number[]; names: string[]; score: number }[];
+  /** Each team's fighters (as placed at the start), its score, and each fighter's kills and deaths in this match. */
+  teams: { ids: number[]; names: string[]; score: number; kills: number[]; deaths: number[] }[];
   /** Milliseconds until the fight begins, and until it ends (from when this was sent). */
   starts: number;
   ends: number;

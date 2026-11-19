@@ -34,6 +34,8 @@ interface Match {
   nextHold: number;
   /** Fighters who are disconnected, since when. */
   away: Map<number, number>;
+  /** Kills and deaths in this match, per fighter. */
+  kd: Map<number, [number, number]>;
 }
 
 export class Matches {
@@ -147,7 +149,7 @@ export class Matches {
     const m: Match = {
       id, mode, room, side: new Map(), fighters: new Set(), names: [[], []], ids: [[], []], score: [0, 0],
       startsAt: now + lead, endsAt: now + lead + (isRated(mode) ? RANKED.maxMs : BG.durationMs), overAt: 0, winner: -1, shrine: -1,
-      nextHold: now + lead + BG.holdEveryMs, away: new Map(),
+      nextHold: now + lead + BG.holdEveryMs, away: new Map(), kd: new Map(),
     };
     this.matches.add(m);
     teams.forEach((ids, side) => {
@@ -202,7 +204,7 @@ export class Matches {
   private view(m: Match, side: number, now: number): MatchView {
     return {
       mode: m.mode, side,
-      teams: [0, 1].map((s) => ({ ids: m.ids[s], names: m.names[s], score: m.score[s] })),
+      teams: [0, 1].map((s) => ({ ids: m.ids[s], names: m.names[s], score: m.score[s], kills: m.ids[s].map((id) => m.kd.get(id)?.[0] ?? 0), deaths: m.ids[s].map((id) => m.kd.get(id)?.[1] ?? 0) })),
       starts: Math.max(0, m.startsAt - now), ends: Math.max(0, m.endsAt - now), shrine: m.shrine,
       result: m.overAt ? (m.winner === -1 ? 'draw' : m.winner === side ? 'won' : 'lost') : undefined,
     };
@@ -254,6 +256,9 @@ export class Matches {
   onKill(k: Player, v: Player) {
     const m = this.matchOf(v), now = Date.now();
     if (!m || m.overAt || m !== this.matchOf(k)) return;
+    const kd = (id: number) => m.kd.get(id) ?? (m.kd.set(id, [0, 0]), m.kd.get(id)!);
+    kd(k.id)[0]++;
+    kd(v.id)[1]++;
     if (m.mode === 'ranked') return this.finish(m, m.side.get(k.id) as 0 | 1, now);
     if (m.mode === 'ranked2') {
       this.pvp.bump(k, { arena_kills: 1 });

@@ -482,8 +482,14 @@ try {
       await p1.waitForFunction((n) => (window as any).__game.debug().hud.dungeon?.stage === n, st + 1, { timeout: 8000 });
     }
     const boss = [...run.alive][0];
-    (boss as any).def = { ...boss.def, aggro: 0, atk: 0 }; // hold still for the screenshot, and do no harm: a death here resets the boss
-    (boss as any).atkScale = 0;
+    (boss as any).def = { ...boss.def, aggro: 0 }; // hold still for the screenshot
+    // while the phase change is watched the player must live: a death empties the room and resets the boss.
+    // Phase two calls sentries, so they are cleared and the player kept whole until the boss falls.
+    const guard = setInterval(() => {
+      if (pl.dead) return;
+      pl.hp = pl.maxHp;
+      for (const mo of [...pl.room.monsters.values()]) if (mo !== boss && !mo.dead) w.hurt(mo, 1e9, 0, null);
+    }, 100);
     w.relocate(pl, pl.room, boss.x - 170, boss.y + 20);
     const bar = p1.getByRole('status', { name: 'Boss: Ancient Rune Guardian' });
     await bar.waitFor();
@@ -502,6 +508,7 @@ try {
     await p1.waitForTimeout(900);
     await p1.screenshot({ path: '.run/m7-boss.png' });
     w.hurt(boss, 1e9, 0, pl);
+    clearInterval(guard);
     await tracker.getByText(/Cleared in/).waitFor();
     await p1.locator('.lootfeed').getByText(/Epic|Legendary|Mythic/).first().waitFor();
     assert.ok(pl.inv.some((i) => i.rar >= 3), 'a boss item is in the bag');

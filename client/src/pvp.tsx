@@ -87,6 +87,16 @@ export function MatchBar({ hud, game }: { hud: Hud; game: Game }) {
         : starts > 0 ? <b className="count">{t('mm.startsIn', { n: starts })}</b> : <span>{clock}</span>}
       {m.mode === 'bg' && !m.result && <small className="sub">{t(m.shrine < 0 ? 'mm.shrineFree' : m.shrine === m.side ? 'mm.shrineUs' : 'mm.shrineThem')}</small>}
       {!m.result && <button className="small" onClick={() => game.pvpOp('leave')}>{t('mm.leave')}</button>}
+      {m.result && m.mode !== 'ranked' && (
+        <table className="kd" aria-label={t('mm.scoreboard')}>
+          <thead><tr><th>{t('mm.fighter')}</th><th title={t('mm.killsLong')}>{t('mm.kills')}</th><th title={t('mm.deathsLong')}>{t('mm.deaths')}</th></tr></thead>
+          <tbody>
+            {[m.side, 1 - m.side].flatMap((s) => m.teams[s].names.map((n, i) => (
+              <tr key={s + ':' + i} className={s === m.side ? 'us' : 'them'}><td>{n}</td><td>{m.teams[s].kills[i] ?? 0}</td><td>{m.teams[s].deaths[i] ?? 0}</td></tr>
+            )))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -491,7 +491,10 @@ try {
     // two players share the machine: bring this one to the front so its frames are not throttled
     await p1.bringToFront();
     // the page polled here is the one in the background: wait on the game state, then on what it shows
-    await p1.waitForFunction(() => (window as any).__game.debug().hud.boss?.phase === 1);
+    await p1.waitForFunction(() => (window as any).__game.debug().hud.boss?.phase === 1).catch(async (e) => {
+      const d = await p1.evaluate(() => { const g = (window as any).__game.debug(); return { boss: g.hud.boss, dead: g.hud.dead, zone: g.hud.zoneId, conn: g.hud.conn, chat: g.hud.chat.slice(-4).map((c: any) => c.text) }; }).catch((x) => String(x));
+      throw new Error(`boss phase: client ${JSON.stringify(d)}; server phase ${boss.phase} hp ${boss.hp}/${boss.maxHp} dead ${boss.dead} state ${(boss as any).state}; player hp ${pl.hp} dead ${pl.dead} room ${pl.room.zoneId}; ${e}`);
+    });
     await bar.getByText('Phase 2: Seals Unbound').waitFor();
     // the announcement: a banner for a few seconds, and a line that stays in the chat
     await p1.locator('.chatlog').getByText(/seals shatter/).first().waitFor();

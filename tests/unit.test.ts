@@ -5025,6 +5025,10 @@ test('G8 rated duel: queued anywhere, matched by rating, fought in a private hal
   assert.equal(world.pvpOp(A.p, { op: 'queue', mode: 'nope' }), 'Unknown command');
   assert.equal(world.pvpOp(B.p, { op: 'queue', mode: 'ranked' }), '');
   assert.ok(A.out.some((m) => m.t === 'mq' && m.mode === 'ranked'));
+  B.p.lastCombat = A.p.lastCombat = world.tick; // in combat a moment: not matched yet, but told who waits
+  mm.tick(Date.now());
+  assert.ok(A.out.some((m) => m.t === 'mq' && m.mode === 'ranked' && m.n === 2 && m.waited >= 0), 'the line says how many wait');
+  B.p.lastCombat = A.p.lastCombat = -1000;
   mm.tick(Date.now());
   assert.ok(mm.isMatch(A.p.room) && A.p.room === B.p.room, 'both taken to the same hall');
   assert.ok(A.p.room.monsters.size === 0);

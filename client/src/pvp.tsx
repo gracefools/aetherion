@@ -28,13 +28,20 @@ const ZONE_LABEL: Record<Hud['pvpZone'], [Key, Key]> = {
 };
 export function PvpZoneBadge({ hud, game }: { hud: Hud; game: Game }) {
   useT();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!hud.mq) return;
+    const id = setInterval(() => tick((x: number) => x + 1), 1000);
+    return () => clearInterval(id);
+  }, [hud.mq]);
+  const waited = hud.mq && hud.mqSince ? Math.max(0, Math.floor((Date.now() - hud.mqSince) / 1000)) : 0;
   if (!hud.self) return null;
   const [label, tip] = ZONE_LABEL[hud.pvpZone];
   return toRail(
     <div className={'hud pvpzone ' + hud.pvpZone} title={t(tip, { n: Math.round((DEPTH_MONSTER.exp - 1) * 100) })} role="status" aria-label={t('pvp.zone.label', { name: t(label) })}>
       {t(label)}
       {hud.arena && !hud.match && <button className="small" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveArena')}</button>}
-      {hud.mq && <span className="mq">{t(hud.mq === 'ranked' ? 'mm.inLineRanked' : hud.mq === 'ranked2' ? 'mm.inLineRanked2' : 'mm.inLineBg')} <button className="small" onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button></span>}
+      {hud.mq && <span className="mq">{t(hud.mq === 'ranked' ? 'mm.inLineRanked' : hud.mq === 'ranked2' ? 'mm.inLineRanked2' : 'mm.inLineBg')} <small className="sub">{t('mm.waiting', { n: hud.mqN || 1, t: `${Math.floor(waited / 60)}:${String(waited % 60).padStart(2, '0')}` })}</small> <button className="small" onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button></span>}
     </div>
   );
 }

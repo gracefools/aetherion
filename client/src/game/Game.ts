@@ -184,6 +184,9 @@ export interface Hud {
   pvprank: { rows: any[]; me: any } | null;
   /** G8: the matchmaking line you are in, and the match you are in (start and end as Date.now() times). */
   mq: 'ranked' | 'ranked2' | 'bg' | null;
+  /** How many wait in that line, and since when you have (Date.now() time). */
+  mqN: number;
+  mqSince: number;
   match: (MatchView & { startsAt: number; endsAt: number }) | null;
   /** G9: the dungeon finder (null until the server has sent it). */
   finder: FinderState | null;
@@ -320,7 +323,7 @@ export class Game {
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
     guild: null, grank: 3, ginv: null, bank: emptyBank(), ah: null, ahhist: [], banklog: [],
-    comp: emptyCompanions(), duel: null, dinv: null, dready: null, pvprank: null, finder: null, season: null, mq: null, match: null, arena: false, pvpZone: 'safe', depthAsk: null, depthBosses: [], bounty: [], gear: emptyGear(),
+    comp: emptyCompanions(), duel: null, dinv: null, dready: null, pvprank: null, finder: null, season: null, mq: null, mqN: 0, mqSince: 0, match: null, arena: false, pvpZone: 'safe', depthAsk: null, depthBosses: [], bounty: [], gear: emptyGear(),
   };
   private objs: WorldObj[] = [];
   /** Gathered nodes: object id -> local time it is ready again. */
@@ -1218,7 +1221,7 @@ export class Game {
         this.pushChat({ text: `Duel with ${m.with}: it begins in ${Math.max(0, Math.round((m.starts - Date.now()) / 1000))} seconds. Stay close.` });
         return this.setHud({ duel: { with: m.with, id: m.id, starts: m.starts, ends: m.ends }, dinv: null });
       case 'pvprank': return this.setHud({ pvprank: { rows: m.rows, me: m.me } });
-      case 'mq': return this.setHud({ mq: m.mode });
+      case 'mq': return this.setHud({ mq: m.mode, mqN: m.mode ? m.n ?? this.hud.mqN : 0, mqSince: !m.mode ? 0 : m.waited !== undefined ? Date.now() - m.waited : this.hud.mq === m.mode && this.hud.mqSince ? this.hud.mqSince : Date.now() });
       case 'match':
         if (m.v && !this.hud.match) sound.notify();
         if (m.v?.result && !this.hud.match?.result) this.pushChat({ text: m.v.result === 'won' ? 'Victory!' : m.v.result === 'lost' ? 'Defeat.' : 'A draw.' });

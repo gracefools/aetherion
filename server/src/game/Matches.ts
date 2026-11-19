@@ -45,6 +45,8 @@ export class Matches {
   private of = new Map<number, Match>();
   private rooms = new Set<ZoneRoom>();
   private nextId = 1;
+  /** What each player in line was last told about how many are waiting with them. */
+  private told = new Map<number, number>();
   constructor(private w: World, private pvp: Pvp) {}
 
   isMatch(room: ZoneRoom) {
@@ -121,6 +123,16 @@ export class Matches {
     }
     this.findMatches(now);
     for (const m of this.matches) this.run(m, now);
+    // everyone in line hears how many wait in the same line (only when it changes)
+    const count = new Map<MatchMode, number>();
+    for (const q of this.queue.values()) count.set(q.mode, (count.get(q.mode) ?? 0) + 1);
+    for (const id of [...this.told.keys()]) if (!this.queue.has(id)) this.told.delete(id);
+    for (const [id, q] of this.queue) {
+      const n = count.get(q.mode) ?? 0, p = this.w.online.get(id);
+      if (!p || this.told.get(id) === n) continue;
+      this.told.set(id, n);
+      this.w.send(p, { t: 'mq', mode: q.mode, n, waited: now - q.since });
+    }
   }
 
   private findMatches(now: number) {

@@ -164,7 +164,13 @@ try {
   assert.equal(await p2.getByRole('meter', { name: 'rage' }).innerText(), `0 / 100`);
   await p1.keyboard.press('KeyC');
   const sheet = p1.getByRole('dialog', { name: 'Character' });
-  for (const t of ['Arcane Mind', 'Cataclysm', 'Runeweaver', 'Magic Orb', 'Intellect']) assert.ok(await sheet.getByText(t).first().isVisible(), `sheet shows ${t}`);
+  // the sheet has tabs: stats first, then progression, then passives and the skill tree
+  for (const t of ['Magic Orb', 'Intellect', 'Offence']) assert.ok(await sheet.getByText(t).first().isVisible(), `sheet shows ${t}`);
+  await sheet.getByRole('tab', { name: 'Progression' }).click();
+  assert.ok(await sheet.getByText('Runeweaver').first().isVisible(), 'sheet shows Runeweaver');
+  await sheet.getByRole('tab', { name: 'Skill tree' }).click();
+  for (const t of ['Arcane Mind', 'Cataclysm']) assert.ok(await sheet.getByText(t).first().isVisible(), `sheet shows ${t}`);
+  await sheet.getByRole('tab', { name: 'Combat' }).click();
   await p1.screenshot({ path: '.run/m2-sheet.png' });
   await p1.keyboard.press('Escape');
   await p1.waitForTimeout(1500);

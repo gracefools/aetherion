@@ -513,6 +513,16 @@
   .topstack .banner { animation-name: topbannerin; }
   @keyframes topbannerin { from { opacity: 0; scale: 1.15; } to { opacity: 1; scale: 1; } }
   @media (max-width: 760px) { .topstack { width: calc(100% - 140px); min-width: 0; } }
+  /* the character sheet: tabs, and combat stats in groups that open and close inside a scrolling box */
+  .sheet > .tabs { margin: 8px 0 4px; }
+  .sheettab { min-height: 200px; }
+  .statgroupbar { display: flex; justify-content: flex-end; gap: 10px; margin: -4px 0 4px; }
+  .statsrc.scroll { max-height: min(46vh, 420px); overflow-y: auto; padding-right: 4px; display: grid; gap: 4px; overscroll-behavior: contain; }
+  .statgroup { border: 1px solid #2c3348; border-radius: 6px; background: rgba(20,24,38,.5); }
+  .statgrouphead { width: 100%; display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: none; border: 0; color: #ffe08a; font: 600 13px Georgia, serif; cursor: pointer; text-align: left; }
+  .statgrouphead span { flex: none; } .statgrouphead small { flex: 1; text-align: right; color: #aab0c4; font: 12px system-ui, sans-serif; } .statgrouphead i { font-style: normal; color: #aab0c4; }
+  .statgroup.open .statgrouphead { border-bottom: 1px solid #2c3348; }
+  .statgroup [role=list] { padding: 2px 8px 4px; display: grid; gap: 2px; }
 </style>
 </head>
 <body>

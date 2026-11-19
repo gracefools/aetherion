@@ -439,6 +439,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
 function CharacterSheet({ hud, onClose }: { hud: Hud; onClose: () => void }) {
   useT();
   const me = hud.self!, d = JOB_DEFS[me.job], a = attrsAt(me.job, me.level);
+  const [tab, setTab] = useState('stats' as 'stats' | 'prog' | 'skills');
   return (
     <div className="hud sheet panel" role="dialog" aria-label={t('sheet.title')}>
       <div className="sheethead">
@@ -450,13 +451,26 @@ function CharacterSheet({ hud, onClose }: { hud: Hud; onClose: () => void }) {
         </div>
         <button className="link panelx" onClick={onClose} aria-label={t('sheet.close')}>{t('common.close')}</button>
       </div>
-      <div className="sheetcols">
-        <div>
-          <h3>{t('sheet.attributes')}</h3>
-          <div className="statgrid">{ATTRS.map((k) => <div key={k}><span>{tv(ATTR_NAMES[k])}</span><b>{a[k]}</b></div>)}</div>
-          <h3>{t('sheet.combat')}</h3>
-          <p className="sub">{t('src.help')}</p>
-          <StatSources hud={hud} />
+      <div className="tabs" role="tablist" aria-label={t('sheet.title')}>
+        {([['stats', 'sheet.combat'], ['prog', 'sheet.progression'], ['skills', 'sheet.tree']] as const).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t(l)}</button>
+        ))}
+      </div>
+      {tab === 'stats' && (
+        <div className="sheetcols sheettab">
+          <div>
+            <h3>{t('sheet.attributes')}</h3>
+            <div className="statgrid">{ATTRS.map((k) => <div key={k}><span>{tv(ATTR_NAMES[k])}</span><b>{a[k]}</b></div>)}</div>
+          </div>
+          <div>
+            <h3>{t('sheet.combat')}</h3>
+            <p className="sub">{t('src.help')}</p>
+            <StatSources hud={hud} />
+          </div>
+        </div>
+      )}
+      {tab === 'prog' && (
+        <div className="sheettab">
           <h3>{t('sheet.progression')}</h3>
           <div className="tiers">{d.tiers.map((x) => <span key={x.title} className={me.level >= x.level ? 'on' : ''}>{x.title} <small>{t('common.lv', { n: x.level })}</small></span>)}</div>
           <div className="tierbonus" aria-label={t('tier.label')}>
@@ -468,6 +482,9 @@ function CharacterSheet({ hud, onClose }: { hud: Hud; onClose: () => void }) {
             ))}
           </div>
         </div>
+      )}
+      {tab === 'skills' && (
+        <div className="sheetcols sheettab">
         <div>
           <h3>{t('sheet.passives')}</h3>
           {d.passives.map((p) => <div key={p.id} className={'node' + (me.level >= p.level ? ' on' : '')}><b>{p.name}</b> <small>{t('common.lv', { n: p.level })}</small><div>{p.desc}</div></div>)}
@@ -483,7 +500,8 @@ function CharacterSheet({ hud, onClose }: { hud: Hud; onClose: () => void }) {
             </div>
           ))}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -806,7 +806,7 @@ function App() {
 }
 
 // Debug/test hook for the asset pipeline checks (tests/browser.smoke.ts).
-(window as any).__art = { iconManifest, iconCanvas, skillIcon, statusIcon, attackIcon, runeIcon, renderSheet, LAYERS, defaultAppearance, randomAppearance, getMonsterSheet, MONSTER_TYPES, monsterScale, propSprite, PROP_KINDS, imported };
+(window as any).__art = { iconManifest, iconCanvas, skillIcon, statusIcon, attackIcon, runeIcon, renderSheet, LAYERS, defaultAppearance, randomAppearance, getMonsterSheet, MONSTER_TYPES, monsterScale, propSprite, PROP_KINDS, imported, getHDSheet, itemIcon };
 
 // Audio: the manifest loads in the background; sound itself waits for the first user interaction.
 (window as any).__audio = audio;

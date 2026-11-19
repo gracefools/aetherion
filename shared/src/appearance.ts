@@ -18,7 +18,11 @@ export const AP_LIMITS = {
 } as const;
 export type ApField = keyof typeof AP_LIMITS;
 export const AP_FIELDS = Object.keys(AP_LIMITS) as ApField[];
-export type Appearance = { v: 2 } & Record<ApField, number>;
+/**
+ * `gt` and `gw` are not chosen by the player: the server sets them from the equipped armour and
+ * weapon (gearTier in items.ts, 0 to 5) so better gear looks grander. Absent means 0.
+ */
+export type Appearance = { v: 2; gt?: number; gw?: number } & Record<ApField, number>;
 
 export const AP_LABELS: Partial<Record<ApField, string[]>> = {
   body: ['Masculine', 'Feminine'],
@@ -74,7 +78,7 @@ export function randomAppearance(job: Job, rnd: () => number = Math.random): App
 }
 
 /** Stable cache key for sprite sheets. */
-export const appearanceKey = (ap: Appearance, job: Job) => job + ':' + AP_FIELDS.map((f) => ap[f]).join('.');
+export const appearanceKey = (ap: Appearance, job: Job) => job + ':' + AP_FIELDS.map((f) => ap[f]).join('.') + ':' + (ap.gt ?? 0) + (ap.gw ?? 0);
 
 // ---- animation sheet layout (shared so tests and the asset pipeline agree with the renderer) ----
 export const ANIMS = {

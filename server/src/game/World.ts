@@ -12,7 +12,7 @@ import {
   RESPAWN_AUTO_MS, RESPAWN_MIN_MS, STATUS, STATUS_INDEX, weaponRule, type WeaponRule,
 } from '../../../shared/src/combat';
 import { cleanBuild, type Build } from '../../../shared/src/abilities';
-import { applyGear, cleanInventory, ITEMS, RARITIES, rollBossItem, SECOND_WIND_CD_MS, type Equipment, type Item, type ItemSpec } from '../../../shared/src/items';
+import { gearTier, applyGear, cleanInventory, ITEMS, RARITIES, rollBossItem, SECOND_WIND_CD_MS, type Equipment, type Item, type ItemSpec } from '../../../shared/src/items';
 import { award, distributeLoot, grantStarterKit, invOp, sendInv, consume, count } from './Inventory';
 import { Dungeons } from './Dungeon';
 import { Journals } from './Journal';
@@ -278,6 +278,10 @@ export class Player implements Ent {
       if (look.armor !== undefined) (ap.armor = look.armor), (ap.armorColor = look.color ?? ap.armorColor);
       if (look.helmet !== undefined) (ap.helmet = look.helmet), (ap.helmetColor = look.color ?? ap.helmetColor);
     }
+    // better gear looks grander: the tier of the armour (or helmet, whichever is better) and of the weapon
+    const gt = Math.max(gearTier(this.eq.armor), gearTier(this.eq.helmet)), gw = gearTier(this.eq.weapon);
+    if (gt) ap.gt = gt; // only when above 0: plain gear sends nothing extra
+    if (gw) ap.gw = gw;
     this.ap = ap;
     // sigils raise learned skills; armament boosts the main stats of each slot's item; sigil sets come last
     this.stats = computeStats(this.job, this.level, wslot, effectiveRanks(this.job, this.level, this.gear, this.build.skills));

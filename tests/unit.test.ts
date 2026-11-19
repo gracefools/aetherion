@@ -1651,6 +1651,24 @@ test('M6 stored inventories are sanitised: duplicates, forged values and illegal
   assert.equal(cleanInventory('knight', 1, Array.from({ length: 100 }, (_, i) => ({ uid: 'x' + i, base: 'ring' })), {}).inv.length, INVENTORY_SIZE);
 });
 
+test('gear tiers: better armour and weapons make the character look grander, plain gear sends nothing', () => {
+  assert.equal(gearTier(null), 0);
+  assert.equal(gearTier({ ilvl: 5, rar: 0 }), 0);
+  assert.equal(gearTier({ ilvl: 50, rar: 1 }), 2);
+  assert.equal(gearTier({ ilvl: 150, rar: 2 }), 5);
+  assert.equal(gearTier({ ilvl: 120, rar: 5 }), 5, 'a mythic adds a step, up to 5');
+  const h = harness({ capacity: 10 }), p = h.join(0, 0, 'knight', 120).p;
+  p.eq.armor = undefined as any; p.eq.helmet = undefined as any; p.eq.weapon = undefined as any;
+  p.recalc();
+  assert.ok(p.ap.gt === undefined && p.ap.gw === undefined, 'nothing worn: no tier sent');
+  p.eq.armor = { uid: 'a1', base: 'plate_cuirass', rar: 4, ilvl: 110, aff: [], up: 0, qty: 1 } as any;
+  p.eq.weapon = { uid: 'w1', base: 'longsword', rar: 1, ilvl: 75, aff: [], up: 0, qty: 1 } as any;
+  p.recalc();
+  assert.equal(p.ap.gt, 5, 'legendary level 110 armour');
+  assert.equal(p.ap.gw, 3, 'a level 75 weapon');
+  assert.notEqual(appearanceKey(p.ap, 'knight'), appearanceKey({ ...p.ap, gt: 0 }, 'knight'), 'a new look, a new sprite sheet');
+});
+
 test('M6 starter kit is granted once; equipped gear changes stats, weapon specialisation and appearance', () => {
   const { world, join, step, items } = harness({ kit: true });
   const a = join(0, 0, 'knight', 5), b = join(40, 0, 'mage');
@@ -6836,6 +6854,8 @@ test('faction conquest: kills score for the faction a player follows; the leader
 // ---------------------------------------------------------------------------------------------
 import { petStage, PET_MAX_LEVEL as PETMAX } from '../shared/src/companions';
 import { FURNITURE, GROW_MS, profExpToNext, SEASON_XP, seasonReward } from '../shared/src/life';
+import { gearTier } from '../shared/src/items';
+import { appearanceKey } from '../shared/src/appearance';
 
 test('pets evolve at 20, 40 and 60 with a stronger bonus; flying mounts pass over water and trees, never walls or the map edge', () => {
   assert.equal(PETMAX, 60);

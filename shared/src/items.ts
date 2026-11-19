@@ -144,6 +144,15 @@ export function registerItems(list: ItemBase[]) {
   }
 }
 
+/**
+ * How grand a piece of gear looks on the character, 0 to 5: from its item level (in steps that follow
+ * the regions and the level 100+ endgame) and one step more for legendary and mythic items.
+ */
+export function gearTier(it?: { ilvl: number; rar: number } | null): number {
+  if (!it) return 0;
+  const byLevel = it.ilvl < 20 ? 0 : it.ilvl < 45 ? 1 : it.ilvl < 70 ? 2 : it.ilvl < 100 ? 3 : it.ilvl < 140 ? 4 : 5;
+  return Math.min(5, byLevel + (it.rar >= 4 ? 1 : 0));
+}
 export interface Item {
   uid: string; // unique instance id, assigned by the server
   base: string;

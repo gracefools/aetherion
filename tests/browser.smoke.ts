@@ -138,7 +138,10 @@ try {
   await p2.waitForFunction(() => (window as any).__game.debug().remotes === 1);
   await p2.waitForFunction(() => (window as any).__game.debug().warm, null, { timeout: 60000 }); // the HD art has finished building: short animations are not missed
   const seen = (await dbg(p2)).remoteList[0];
-  assert.deepEqual(seen.ap, want, 'other player renders the exact customised appearance');
+  // the gear tiers (gt, gw) come from equipment, not the creator: a new character has none
+  const { gt, gw, ...look } = seen.ap;
+  assert.deepEqual(look, want, 'other player renders the exact customised appearance');
+  assert.ok(!gt && !gw, 'starting gear has no tier');
 
   // a free swing needs nothing in reach: a wild monster wandering by would turn it into a real attack
   {

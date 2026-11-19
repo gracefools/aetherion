@@ -73,6 +73,8 @@ interface Look {
   armor: number; armorKind: number; helm: number; helmF: number; helmKind: number; cape: number; capeD: number; capeKind: number;
   acc: number; accKind: number; hairKind: number; eyes: number; face: number; fem: boolean; clothing: number; weapon: string;
   glow: number; glowHi: number; magic: number; skinD: number;
+  /** Gear tiers 0-5 (armour, weapon): each step adds trims, pauldrons, gems, runes and radiance. */
+  gt: number; gw: number; rune: number; runeHi: number; gem: number; trim: number;
 }
 function makeLook(ap: Appearance, job: Job): Look {
   const P = new Pal(), w = JOB_DEFS[job].weapons[ap.weapon] ?? JOB_DEFS[job].weapons[0];
@@ -91,6 +93,10 @@ function makeLook(ap: Appearance, job: Job): Look {
     acc: P.tri(COLORS[ap.accessoryColor], 0.9), accKind: ap.accessory, hairKind: ap.hair, eyes: ap.eyes, face: ap.face, fem: ap.body === 1,
     clothing: ap.clothing, weapon: w.kind, glow: P.flat('#ffe08a'), glowHi: P.flat('#fff6c8'),
     magic: w.kind === 'holy_staff' ? P.add([255, 246, 200], [255, 214, 106], [200, 140, 60]) : P.add([228, 196, 255], [176, 106, 255], [110, 60, 190]),
+    gt: Math.max(0, Math.min(5, ap.gt ?? 0)), gw: Math.max(0, Math.min(5, ap.gw ?? 0)),
+    // runes glow cyan, and white-gold at the very top tier
+    rune: P.flat((ap.gt ?? 0) >= 5 || (ap.gw ?? 0) >= 5 ? '#ffe9a0' : '#7fe8ff'), runeHi: P.flat('#f4ffff'),
+    gem: P.add([255, 170, 190], [226, 60, 96], [140, 20, 60]), trim: P.add([255, 236, 160], [232, 186, 84], [160, 108, 40]),
   };
 }
 
@@ -101,10 +107,40 @@ interface Pose {
   atk: number | null; cast: number; hit: boolean;
   /** Attacks: where the swing came from (its trail is drawn between) and how far the body lunges. */
   atkPrev: number | null; lunge: number;
+  /** Attacks: the weapon's own angle, how far each arm reaches (1 = relaxed), the far arm's attack
+   *  angle (two weapons, or the hand drawing a bow), the bow string's pull and a flash at the tip. */
+  wpn: number; reach: number; far: number | null; reachFar: number; wpnFar: number; draw: number; flash: number;
 }
+/** One attack, frame by frame (side view: 0 points down, pi/2 forward, pi straight up). */
+interface AtkSpec { arm: number[]; wpn: number[]; lunge: number[]; reach?: number[]; far?: number[]; farReach?: number[]; farWpn?: number[]; draw?: number[]; flash?: number[]; trail?: boolean }
+const ATTACKS: Record<string, AtkSpec> = {
+  // a diagonal slash from over the shoulder, the shield held in front
+  sword_shield: { arm: [2.7, 3.0, 2.0, 1.1, 0.9], wpn: [3.1, 3.4, 2.2, 1.2, 1.0], lunge: [0, 0, 2, 3, 1], trail: true },
+  // a heavy two-handed swing that starts far behind the head
+  greatsword: { arm: [2.5, 3.0, 2.1, 1.0, 0.7], wpn: [3.6, 3.9, 2.4, 1.0, 0.6], lunge: [0, 0, 2, 4, 2], far: [2.5, 3.0, 2.1, 1.0, 0.7], farReach: [0.85, 0.85, 0.85, 0.85, 0.85], trail: true },
+  // an overhead chop
+  axe: { arm: [2.8, 3.2, 2.3, 1.2, 1.0], wpn: [3.2, 3.6, 2.4, 1.1, 0.9], lunge: [0, 0, 2, 3, 1], far: [2.8, 3.2, 2.3, 1.2, 1.0], farReach: [0.85, 0.85, 0.85, 0.85, 0.85], trail: true },
+  // a smash straight down
+  mace: { arm: [2.8, 3.2, 2.0, 1.0, 0.9], wpn: [3.1, 3.5, 2.0, 0.8, 0.7], lunge: [0, 0, 2, 3, 1], trail: true },
+  // quick stabs, one hand then the other
+  daggers: { arm: [1.3, 1.6, 1.6, 1.2, 1.3], reach: [0.9, 1.4, 1.4, 0.9, 0.9], wpn: [1.5, 1.6, 1.6, 1.4, 1.5], far: [1.1, 1.1, 1.3, 1.6, 1.6], farReach: [0.9, 0.9, 0.95, 1.4, 1.4], farWpn: [1.4, 1.4, 1.5, 1.6, 1.6], lunge: [0, 2, 2, 2, 1] },
+  // two short chops, one axe then the other
+  dual_axe: { arm: [2.4, 1.3, 1.1, 1.6, 1.4], reach: [1, 1.25, 1.2, 1, 1], wpn: [2.8, 1.5, 1.2, 1.9, 1.6], far: [1.6, 1.8, 2.4, 1.3, 1.1], farReach: [1, 1, 1, 1.25, 1.2], farWpn: [1.9, 2.1, 2.8, 1.5, 1.2], lunge: [0, 2, 1, 2, 1] },
+  // the staff is thrust forward and its head flares
+  staff: { arm: [1.2, 1.4, 1.6, 1.6, 1.4], reach: [1, 1.15, 1.3, 1.3, 1.1], wpn: [2.5, 2.2, 1.85, 1.85, 2.1], lunge: [0, 1, 2, 1, 0], flash: [0, 0.4, 1, 0.7, 0] },
+  holy_staff: { arm: [1.2, 1.4, 1.6, 1.6, 1.4], reach: [1, 1.15, 1.3, 1.3, 1.1], wpn: [2.5, 2.2, 1.85, 1.85, 2.1], lunge: [0, 1, 2, 1, 0], flash: [0, 0.4, 1, 0.7, 0] },
+  // the orb is pushed out and bursts with light
+  orb: { arm: [1.1, 1.4, 1.6, 1.6, 1.3], reach: [1, 1.2, 1.4, 1.4, 1.1], wpn: [1.1, 1.4, 1.6, 1.6, 1.3], lunge: [0, 1, 1, 1, 0], flash: [0, 0.3, 1, 0.6, 0] },
+  // the bow arm stays out; the other hand draws the string to the cheek and lets go
+  bow: { arm: [1.57, 1.57, 1.57, 1.57, 1.57], reach: [1.3, 1.3, 1.3, 1.3, 1.3], wpn: [1.57, 1.57, 1.57, 1.6, 1.57], far: [1.57, 1.7, 1.9, 1.6, 1.57], farReach: [1.2, 0.7, 0.4, 1.1, 1.2], draw: [0, 0.5, 1, 0, 0], lunge: [0, 0, 0, -1, 0] },
+  // the crossbow is levelled and kicks back as it fires
+  crossbow: { arm: [1.5, 1.57, 1.57, 1.75, 1.6], reach: [1.15, 1.2, 1.2, 1.05, 1.15], wpn: [1.5, 1.57, 1.57, 1.8, 1.6], far: [1.5, 1.57, 1.57, 1.75, 1.6], farReach: [0.85, 0.9, 0.9, 0.8, 0.85], lunge: [0, 0, 0, -1, 0], flash: [0, 0, 0, 1, 0] },
+};
+/** Thrusting and shooting weapons point at the target; swinging ones arc around the shoulder. */
+const THRUST = new Set(['daggers', 'staff', 'holy_staff', 'orb', 'bow', 'crossbow']);
 const TAU = Math.PI * 2, ease = (t: number) => t * t * (3 - 2 * t);
-function poseFor(a: HdAnim, f: number): Pose {
-  const p: Pose = { bob: 0, liftL: 0, liftR: 0, armL: 0, armR: 0, A: 0, l1: 0, l2: 0, arm: 0.1, bend: 0.3, armFar: -0.05, sway: 0, atk: null, cast: 0, hit: false, atkPrev: null, lunge: 0 };
+function poseFor(a: HdAnim, f: number, kind = 'sword_shield'): Pose {
+  const p: Pose = { bob: 0, liftL: 0, liftR: 0, armL: 0, armR: 0, A: 0, l1: 0, l2: 0, arm: 0.1, bend: 0.3, armFar: -0.05, sway: 0, atk: null, cast: 0, hit: false, atkPrev: null, lunge: 0, wpn: 0, reach: 1, far: null, reachFar: 1, wpnFar: 0, draw: 0, flash: 0 };
   if (a === 'idle') { p.bob = f >= 2 ? 1 : 0; p.sway = p.bob; }
   else if (a === 'walk' || a === 'run') {
     const k = a === 'run' ? 1.4 : 1, ph = (f / 6) * TAU, s = Math.sin(ph), c = Math.cos(ph);
@@ -114,11 +150,14 @@ function poseFor(a: HdAnim, f: number): Pose {
     p.A = s * k; p.l1 = Math.round(Math.max(0, c) * 2 * k); p.l2 = Math.round(Math.max(0, -c) * 2 * k);
     p.arm = -s * 0.6 * k; p.armFar = s * 0.6 * k; p.sway = 1;
   } else if (a === 'attack') {
-    const at = (k: number) => 3.6 + (0.7 - 3.6) * ease(Math.max(0, k) / 4), ang = at(f);
-    p.atk = ang; p.A = 0.6; p.arm = ang; p.bend = 0.25; p.armFar = -0.4; p.sway = 2;
-    // the wind-up, the strike with a bright trail behind the blade, the follow-through
-    p.atkPrev = f >= 1 && f <= 3 ? at(f - 1.4) : null;
-    p.lunge = [0, 1, 3, 2, 1][f];
+    const s = ATTACKS[kind] ?? ATTACKS.sword_shield;
+    p.atk = s.arm[f]; p.arm = s.arm[f]; p.wpn = s.wpn[f]; p.reach = s.reach?.[f] ?? 1;
+    p.A = THRUST.has(kind) ? 0.3 : 0.6; p.bend = THRUST.has(kind) ? 0.05 : 0.25; p.armFar = -0.4; p.sway = THRUST.has(kind) ? 1 : 2;
+    if (s.far) { p.far = s.far[f]; p.reachFar = s.farReach?.[f] ?? 1; p.wpnFar = s.farWpn?.[f] ?? s.wpn[f]; }
+    p.draw = s.draw?.[f] ?? 0; p.flash = s.flash?.[f] ?? 0;
+    // the strike frames leave a bright trail behind a swung blade
+    p.atkPrev = s.trail && (f === 2 || f === 3) ? s.wpn[f - 1] : null;
+    p.lunge = s.lunge[f];
     p.bob = f === 2 ? 1 : 0;
   } else if (a === 'cast') {
     p.cast = [0.3, 0.7, 1, 1, 0.6][f]; p.bob = f === 2 || f === 3 ? -1 : 0; p.arm = 2.2 + p.cast * 0.6; p.armFar = 2 + p.cast * 0.5;
@@ -152,66 +191,117 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
   const plate = L.armorKind >= 2, top = L.armorKind ? L.armor : L.c1, sleeve = plate ? L.armor : L.c1;
   const robe = L.clothing === 1, coat = L.clothing === 3;
 
-  /** A weapon in a hand at (hx, hy) pointing along angle rr (pi = straight up), mirrored by sg. */
-  const weapon = (hx: number, hy: number, rr: number, sg: number, second = false) => {
-    const ux = sg * Math.sin(rr), uy = Math.cos(rr), at = (k: number): [number, number] => [hx + ux * k, hy + uy * k];
-    const k = L.weapon;
-    if (k === 'sword_shield' || k === 'greatsword') {
-      const len = k === 'greatsword' ? 21 : 15, [x0, y0] = at(1.5), [x1, y1] = at(len);
-      l(x0, y0, x1, y1, k === 'greatsword' ? 3 : 2, L.blade);
-      const qx = uy * 2.8, qy = -ux * 2.8;
-      l(x0 - qx, y0 - qy, x0 + qx, y0 + qy, 1, L.goldF);
+  /**
+   * A weapon in a hand at (hx, hy) pointing along angle rr (pi = straight up), mirrored by sg; `fore`
+   * shortens it when it points at the viewer. Better gear (L.gw, 0-5) makes it longer and adds a gold
+   * guard, a gem, a glowing rune along the blade and at the top tier wings and a bright tip.
+   * Returns where its tip is (for the flash of a cast).
+   */
+  const weapon = (hx: number, hy: number, rr: number, sg: number, second = false, fore = 1): [number, number] => {
+    const ux = sg * Math.sin(rr) * fore, uy = Math.cos(rr) * fore, at = (k: number): [number, number] => [hx + ux * k, hy + uy * k];
+    const k = L.weapon, T = L.gw, nx = uy / (fore || 1), ny = -ux / (fore || 1); // (nx, ny): across the weapon
+    const sparkle = (x: number, y: number) => { p(x, y, L.runeHi); p(x - 1, y, L.rune); p(x + 1, y, L.rune); p(x, y - 1, L.rune); p(x, y + 1, L.rune); };
+    if (k === 'sword_shield' || k === 'greatsword' || k === 'daggers') {
+      const len = (k === 'greatsword' ? 21 : k === 'daggers' ? 9 : 15) + (T >= 2 ? 2 : 0) + (T >= 5 ? 2 : 0), wide = k === 'greatsword' ? 3 : 2;
+      const [x0, y0] = at(k === 'daggers' ? 1 : 1.5), [x1, y1] = at(len);
+      l(x0, y0, x1, y1, wide, L.blade);
+      if (T >= 3) { const [a0, b0] = at(4), [a1, b1] = at(len - 2); l(a0, b0, a1, b1, 1, T >= 4 ? L.runeHi : L.rune); } // the rune along the blade
+      if (T >= 4) p(x1, y1, L.runeHi);
+      const g = k === 'daggers' ? 1.8 : 2.8 + (T >= 3 ? 1 : 0), qx = nx * g, qy = ny * g;
+      l(x0 - qx, y0 - qy, x0 + qx, y0 + qy, T >= 3 ? 2 : 1, T >= 1 ? L.trim : L.goldF);
+      if (T >= 2) { const [gx, gy] = at(-1.5); e(gx, gy, 1.3, 1.3, L.gem); } // the pommel gem
+      if (T >= 5) { // wings on the guard and a star at the tip
+        l(x0 - qx, y0 - qy, x0 - qx * 1.6 - ux * 2.5, y0 - qy * 1.6 - uy * 2.5, 1, L.trim);
+        l(x0 + qx, y0 + qy, x0 + qx * 1.6 - ux * 2.5, y0 + qy * 1.6 - uy * 2.5, 1, L.trim);
+        sparkle(x1 + ux * 1.5, y1 + uy * 1.5);
+      }
+      return [x1, y1];
     } else if (k === 'axe' || k === 'dual_axe') {
-      const len = k === 'axe' ? 17 : 12, [x1, y1] = at(len), [xm, ym] = at(len - 3.5);
-      l(hx - ux * 2, hy - uy * 2, x1, y1, 2, L.wood);
-      e(xm + uy * 3 * sg, ym - ux * 3 * sg, k === 'axe' ? 4 : 3, k === 'axe' ? 4.6 : 3.4, L.steel);
+      const len = (k === 'axe' ? 17 : 12) + (T >= 2 ? 2 : 0), [x1, y1] = at(len), [xm, ym] = at(len - 3.5);
+      l(hx - ux * 2, hy - uy * 2, x1, y1, 2, T >= 3 ? L.trim : L.wood);
+      const big = (k === 'axe' ? 4 : 3) + (T >= 4 ? 1 : 0);
+      e(xm + nx * 3 * sg, ym + ny * 3 * sg, big, big + 0.6, L.steel);
+      if (T >= 3) e(xm + nx * 3.6 * sg, ym + ny * 3.6 * sg, 1.2, big - 0.8, L.rune); // the glowing edge
+      if (T >= 5) e(xm - nx * 2.6 * sg, ym - ny * 2.6 * sg, big - 1, big - 0.4, L.steel); // a second blade
+      if (T >= 2) p(x1, y1, L.gem);
+      return [x1, y1];
     } else if (k === 'mace') {
-      const [x1, y1] = at(13);
-      l(hx - ux, hy - uy, x1, y1, 2, L.wood);
-      e(x1, y1, 3.4, 3.4, L.steel);
-      p(x1, y1 - 4.5, L.steel); p(x1 + 4.5, y1, L.steel); p(x1 - 4.5, y1, L.steel); p(x1, y1 + 4.5, L.steel);
-    } else if (k === 'daggers') {
-      const [x0, y0] = at(1), [x1, y1] = at(9);
-      l(x0, y0, x1, y1, 2, L.blade);
-      p(x0, y0, L.goldF);
+      const [x1, y1] = at(13 + (T >= 2 ? 1 : 0)), r0 = 3.4 + (T >= 4 ? 0.8 : 0);
+      l(hx - ux, hy - uy, x1, y1, 2, T >= 3 ? L.trim : L.wood);
+      e(x1, y1, r0, r0, T >= 3 ? L.trim : L.steel);
+      const sp = r0 + 1.1, ink = T >= 3 ? L.steel : L.steel;
+      p(x1, y1 - sp, ink); p(x1 + sp, y1, ink); p(x1 - sp, y1, ink); p(x1, y1 + sp, ink);
+      if (T >= 4) e(x1, y1, 1.4, 1.4, L.rune);
+      if (T >= 5) sparkle(x1, y1);
+      return [x1, y1];
     } else if (k === 'staff' || k === 'holy_staff') {
-      if (second) return;
-      const [x0, y0] = at(-8), [x1, y1] = at(21);
-      l(x0, y0, x1, y1, 2, L.wood);
-      e(x1, y1 - 1, 3.4, 3.4, L.magic);
-      if (k === 'holy_staff') { l(x1, y1 - 6, x1, y1 + 3, 1, L.goldF); l(x1 - 3, y1 - 2, x1 + 3, y1 - 2, 1, L.goldF); }
-      else p(x1 - 1, y1 - 2, L.glowHi);
+      if (second) return [hx, hy];
+      const [x0, y0] = at(-8), [x1, y1] = at(21 + (T >= 2 ? 2 : 0)), hr = 3.4 + (T >= 2 ? 0.8 : 0);
+      l(x0, y0, x1, y1, 2, T >= 3 ? L.trim : L.wood);
+      if (T >= 3) { // prongs cradling the head
+        l(x1 - nx * 2, y1 - ny * 2, x1 - nx * 4 + ux * 4, y1 - ny * 4 + uy * 4, 1, L.trim);
+        l(x1 + nx * 2, y1 + ny * 2, x1 + nx * 4 + ux * 4, y1 + ny * 4 + uy * 4, 1, L.trim);
+      }
+      const [cx, cy] = [x1 + ux * 2, y1 + uy * 2 - 1];
+      e(cx, cy, hr, hr, L.magic);
+      if (k === 'holy_staff') { l(cx, cy - 5, cx, cy + 4, 1, L.goldF); l(cx - 3, cy - 1, cx + 3, cy - 1, 1, L.goldF); }
+      else p(cx - 1, cy - 2, L.glowHi);
+      if (T >= 4) { p(cx - hr - 2, cy, L.rune); p(cx + hr + 2, cy, L.rune); p(cx, cy - hr - 2, L.rune); }
+      if (T >= 5) { sparkle(cx - hr - 3, cy - 3); sparkle(cx + hr + 3, cy + 2); }
+      return [cx, cy];
     } else if (k === 'orb') {
-      if (second) return;
-      e(hx, hy - 6 - pose.cast * 3, 4, 4, L.magic);
-      p(hx - 1, hy - 6 - pose.cast * 3, L.glowHi);
+      if (second) return [hx, hy];
+      const cx = hx + ux * 4, cy = hy - 6 - pose.cast * 3 + uy * 4, rr2 = 4 + (T >= 2 ? 0.8 : 0);
+      e(cx, cy, rr2, rr2, L.magic);
+      p(cx - 1, cy - 1, L.glowHi);
+      if (T >= 3) { for (let a = 0; a < 6.28; a += 0.5) p(cx + Math.cos(a) * (rr2 + 2), cy + Math.sin(a) * (rr2 + 1.4), L.trim); } // a gold ring around it
+      if (T >= 4) p(cx + 1, cy + 1, L.runeHi);
+      if (T >= 5) { sparkle(cx - rr2 - 4, cy - 2); sparkle(cx + rr2 + 4, cy + 3); }
+      return [cx, cy];
     } else if (k === 'bow') {
-      if (second) return;
-      const px = uy, py = -ux; // across the aim
-      for (let t = -1; t <= 1; t += 0.05) { const bx = hx + px * t * 12 + ux * (1 - t * t) * 4.5, by = hy + py * t * 12 + uy * (1 - t * t) * 4.5; p(bx, by, L.wood); p(bx + ux * 0.8, by + uy * 0.8, L.wood); }
-      l(hx + px * 12, hy + py * 12, hx - px * 12, hy - py * 12, 1, L.white);
+      if (second) return [hx, hy];
+      const px = nx, py = ny, half = 12 + (T >= 2 ? 1 : 0), d = pose.draw;
+      const limbInk = T >= 3 ? L.trim : L.wood;
+      for (let t = -1; t <= 1; t += 0.05) { const bx = hx + px * t * half + ux * (1 - t * t) * 4.5, by = hy + py * t * half + uy * (1 - t * t) * 4.5; p(bx, by, limbInk); p(bx + ux * 0.8, by + uy * 0.8, limbInk); }
+      const sx = hx - ux * d * 6, sy = hy - uy * d * 6, str = T >= 3 ? L.rune : L.white;
+      l(hx + px * half, hy + py * half, sx, sy, 1, str);
+      l(sx, sy, hx - px * half, hy - py * half, 1, str);
+      if (d > 0) { l(sx, sy, hx + ux * 5, hy + uy * 5, 1, L.wood); p(hx + ux * 6, hy + uy * 6, L.steel); } // the nocked arrow
+      if (T >= 5) { sparkle(hx + px * (half + 2), hy + py * (half + 2)); sparkle(hx - px * (half + 2), hy - py * (half + 2)); }
+      return [hx + ux * 6, hy + uy * 6];
     } else if (k === 'crossbow') {
-      if (second) return;
+      if (second) return [hx, hy];
       const [x1, y1] = at(11);
-      l(hx, hy, x1, y1, 2, L.wood);
-      l(x1 + uy * 6, y1 - ux * 6, x1 - uy * 6, y1 + ux * 6, 2, L.steel);
+      l(hx, hy, x1, y1, 2, T >= 3 ? L.trim : L.wood);
+      l(x1 + nx * 6, y1 + ny * 6, x1 - nx * 6, y1 - ny * 6, 2, T >= 4 ? L.trim : L.steel);
+      if (T >= 3) p(hx + ux * 5, hy + uy * 5, L.rune);
+      if (T >= 5) sparkle(x1 + ux * 2, y1 + uy * 2);
+      return [x1 + ux * 2, y1 + uy * 2];
     }
+    return [hx, hy];
+  };
+  /** The bright burst at a weapon's tip when a staff or an orb strikes, or a crossbow fires. */
+  const flashAt = (x: number, y: number) => {
+    if (pose.flash <= 0) return;
+    const r0 = 1.5 + pose.flash * 3;
+    e(x, y, r0, r0, L.glow);
+    e(x, y, r0 * 0.5, r0 * 0.5, L.glowHi);
   };
   const twoHanded = L.weapon === 'daggers' || L.weapon === 'dual_axe';
 
   if (view === 's') {
     // ---------------- side view, facing right ----------------
     const A = pose.A, sway = pose.sway;
-    const limb = (sx: number, sy: number, a: number, bd: number) => {
-      const ex = sx + Math.sin(a) * 3.5, ey = sy + Math.cos(a) * 3.5, hx = ex + Math.sin(a + bd) * 3.5, hy = ey + Math.cos(a + bd) * 3.5;
+    const limb = (sx: number, sy: number, a: number, bd: number, reach = 1) => {
+      const seg = 3.5 * reach, ex = sx + Math.sin(a) * seg, ey = sy + Math.cos(a) * seg, hx = ex + Math.sin(a + bd) * seg, hy = ey + Math.cos(a + bd) * seg;
       l(sx, sy, ex, ey, 3, sleeve); l(ex, ey, hx, hy, 3, plate ? L.steel : sleeve);
       r(Math.round(hx) - 1, Math.round(hy) - 1, 2, 2, L.skin);
       return [hx, hy];
     };
-    if (L.capeKind) for (let y = 41; y <= (L.capeKind === 2 ? 52 : 47); y++) { const x0 = Math.round(10 - (y - 41) * 0.45 - (sway * (y - 41)) / 9); r(x0, y + b, 14 - x0, 1, L.cape); }
+    if (L.capeKind) for (let y = 41, y1 = L.capeKind === 2 ? 52 : 47; y <= y1; y++) { const x0 = Math.round(10 - (y - 41) * 0.45 - (sway * (y - 41)) / 9); r(x0, y + b, 14 - x0, 1, y === y1 && L.gt >= 4 ? L.trim : L.cape); }
     if (L.weapon === 'bow' || L.weapon === 'crossbow' || L.weapon === 'sword_shield') {} // drawn on the near hand below
-    const far = limb(15, 42 + b, pose.armFar, 0.3);
-    if (twoHanded) weapon(far[0], far[1], pose.atk != null ? pose.arm + 0.6 : 2.5, 1, true);
+    const far = pose.far != null ? limb(15, 42 + b, pose.far, 0.1, pose.reachFar) : limb(15, 42 + b, pose.armFar, 0.3);
+    if (twoHanded) weapon(far[0], far[1], pose.atk != null ? (pose.far != null ? pose.wpnFar : pose.arm + 0.6) : 2.5, 1, true);
     if (!robe) { r(15 - Math.round(A * 3), 50 - pose.l2, 4, 4, L.boot); r(15 + Math.round(A * 3), 50 - pose.l1, 4, 4, L.boot); }
     else { for (let y = 46; y <= 53; y++) { const hw = Math.round(4 + (y - 46) * 0.5); r(15 - hw + 1, y, hw * 2, 1, y === 53 ? L.c2 : L.c1); } r(17, 52, 3, 2, L.boot); }
     for (let y = 40; y <= 46; y++) r(12, y + b, 8, 1, top);
@@ -219,6 +309,17 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
     if (coat) for (let y = 47; y <= 52; y++) r(10 - Math.round(A), y + b, 3, 1, L.c1);
     if (plate) { r(16, 41 + b, 4, 4, L.steel); }
     r(12, 46 + b, 8, 1, L.boot); p(19, 46 + b, L.goldF);
+    // the near arm and its weapon: in front of the body, but behind the head while raised for a wind-up
+    // the swing's trail sweeps behind the head, never across the face
+    if (pose.atkPrev != null) trail(15, 42 + b, pose.atkPrev, pose.wpn, 1);
+    const nearArm = () => {
+      const near = limb(15, 42 + b, pose.arm, pose.bend, pose.atk != null ? pose.reach : 1);
+      const tip = weapon(near[0], near[1], pose.atk != null ? pose.wpn : 2.2, 1); // held forward and up, ahead of the face
+      flashAt(tip[0], tip[1]);
+      if (pose.cast) castGlow(near[0] + 1, near[1] - 2);
+    };
+    const behindHead = pose.atk != null && !THRUST.has(L.weapon) && pose.wpn > 2.75;
+    if (behindHead) nearArm();
     // head
     if (L.hairKind === 4) e(15.5, 33 + b, 8.5, 8, L.skin);
     else e(15, 33 + b, 9, 8.5, L.hair);
@@ -239,11 +340,9 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
     }
     helmet(15, b, true);
     accessory(true);
-    if (pose.atkPrev != null) trail(15, 42 + b, pose.atkPrev + 0.25, pose.arm + 0.25, 1);
-    const near = limb(15, 42 + b, pose.atk != null ? pose.arm : pose.cast ? pose.arm : pose.arm, pose.bend);
-    weapon(near[0], near[1], pose.atk != null ? pose.arm + 0.25 : 2.2, 1); // held forward and up, ahead of the face
-    if (pose.cast) castGlow(near[0] + 1, near[1] - 2);
+    if (!behindHead) nearArm();
     if (plate) e(15, 41 + b, 2.6, 2.2, L.steel);
+    ornaments('s');
     if (L.weapon === 'sword_shield') { e(19, 44 + b, 2, 4, L.steel); p(19, 44 + b, L.goldF); }
     return finish();
   }
@@ -279,11 +378,39 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
     else if (s !== S && twoHanded && pose.atk == null) weapon(hx + (s ? 1 : -1), hy, Math.PI + 0.25, s ? 1 : -1, true);
     if (s !== S && L.weapon === 'sword_shield' && !back) { e(hx - 1, hy - 2, 3, 4, L.steel); e(hx - 1, hy - 2, 1.5, 2.5, L.c2); }
   };
-  const atk = pose.atk != null;
-  if (!(atk && S === 0)) armAt(0);
-  if (!(atk && S === 1)) armAt(1);
+  // bows and crossbows are aimed out to the side here; other thrusts come at the viewer
+  const atk = pose.atk != null, thrust = THRUST.has(L.weapon) && L.weapon !== 'bow' && L.weapon !== 'crossbow';
+  /**
+   * An attacking arm seen from the front or back. A swing is the side view's arc squeezed across the
+   * body; a thrust or a shot points at the viewer (down and out, the weapon shortened). The hand stays
+   * on the grip, and an arm raised above the shoulder is drawn behind the head instead of over the face.
+   */
+  const atkArm = (s: number, a: number, reach: number, wa: number, withWeapon: boolean) => {
+    const ax = (s ? 21 : 8) + 1, sg = s ? -1 : 1;
+    // a staff or an orb is raised up and out to cast; a dagger stabs at the viewer
+    const raise = L.weapon === 'staff' || L.weapon === 'holy_staff' || L.weapon === 'orb', stab = thrust && !raise;
+    const fa = raise ? 1.6 + (a - 1.57) * 0.6 : stab ? 0.45 + (a - 1.57) * 0.5 : a, fw = raise ? 2.6 + (wa - 1.85) * 0.5 : stab ? 0.55 + (wa - 1.57) * 0.5 : wa;
+    const seg = 3.5 * (stab ? 0.8 + (reach - 1) * 0.6 : reach);
+    const ex = ax + sg * Math.sin(fa) * seg * 0.75, ey = 42 + b + Math.cos(fa) * seg, hx = ex + sg * Math.sin(fa + 0.15) * seg * 0.75, hy = ey + Math.cos(fa + 0.15) * seg;
+    l(ax, 42 + b, ex, ey, 3, sleeve); l(ex, ey, hx, hy, 3, plate ? L.steel : sleeve); r(Math.round(hx) - 1, Math.round(hy) - 1, 2, 2, L.skin);
+    if (withWeapon) { const tip = weapon(hx, hy, fw, sg, s !== S, stab ? 0.6 : 1); flashAt(tip[0], tip[1]); }
+    if (plate) e(ax, 41 + b, 2.4, 2, L.steel);
+  };
+  // behind the head: an arm raised above the shoulder, or a weapon pointing up past the face
+  const raised = (a: number, wa: number) => !thrust && (a > 2.2 || wa > 1.8);
+  const farAtk = atk && pose.far != null, farS = 1 - S;
+  const drawAtk = () => atkArm(S, pose.atk!, pose.reach, pose.wpn, true);
+  if (atk && pose.atkPrev != null) trail((S ? 21 : 8) + 1, 42 + b, pose.atkPrev, pose.wpn, S ? -1 : 1);
+  const drawFar = () => atkArm(farS, pose.far!, pose.reachFar, pose.wpnFar, twoHanded);
+  if (!(atk && S === 0) && !(farAtk && farS === 0)) armAt(0);
+  if (!(atk && S === 1) && !(farAtk && farS === 1)) armAt(1);
+  // arms raised above the shoulder go behind the head
+  if (farAtk && raised(pose.far!, pose.wpnFar)) drawFar();
+  if (atk && raised(pose.atk!, pose.wpn)) drawAtk();
+  ornaments(back ? 'b' : 'f');
   if (L.capeKind && back) {
-    for (let y = 41; y <= (L.capeKind === 2 ? 52 : 48); y++) { const hw = Math.round(5 + (y - 41) * 0.25); r(16 - hw, y + b, hw * 2, 1, L.cape); }
+    for (let y = 41, y1 = L.capeKind === 2 ? 52 : 48; y <= y1; y++) { const hw = Math.round(5 + (y - 41) * 0.25); r(16 - hw, y + b, hw * 2, 1, y === y1 && L.gt >= 4 ? L.trim : L.cape); }
+    if (L.gt >= 5) for (let y = 43; y <= 50; y += 2) p(16, y + b, L.trim); // an embroidered crest down the cape
     for (let y = 43; y <= (L.capeKind === 2 ? 51 : 47); y++) { if (y % 3) p(14, y + b, L.capeD); if ((y + 1) % 3) p(18, y + b, L.capeD); }
   }
   // head
@@ -321,14 +448,8 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
   }
   helmet(16, b, false);
   if (!back) accessory(false);
-  if (atk) {
-    const s = S, ax = (s ? 21 : 8) + 1, sg = s ? -1 : 1, a = pose.atk!;
-    if (pose.atkPrev != null) trail(ax, 42 + b, pose.atkPrev + 0.2, a + 0.2, sg);
-    const ex = ax + sg * Math.sin(a) * 3.5, ey = 42 + b + Math.cos(a) * 3.5, hx = ex + sg * Math.sin(a + 0.2) * 3.5, hy = ey + Math.cos(a + 0.2) * 3.5;
-    l(ax, 42 + b, ex, ey, 3, sleeve); l(ex, ey, hx, hy, 3, plate ? L.steel : sleeve); r(Math.round(hx) - 1, Math.round(hy) - 1, 2, 2, L.skin);
-    weapon(hx, hy, a + 0.2, sg);
-    if (plate) e(ax, 41 + b, 2.4, 2, L.steel);
-  }
+  if (farAtk && !raised(pose.far!, pose.wpnFar)) drawFar();
+  if (atk && !raised(pose.atk!, pose.wpn)) drawAtk();
   return finish();
 
   function eyeAt(x: number, y: number) {
@@ -341,11 +462,47 @@ function frame(L: Look, view: View, pose: Pose): HTMLCanvasElement {
   }
   function helmet(cx: number, bb: number, side: boolean) {
     const k = L.helmKind, dx = cx - 16;
+    // better armour crowns the head: a plume from tier 4, a gold crown or circlet at tier 5
+    if (L.gt >= 4 && (k === 3 || k === 1)) { e(cx - (side ? 3 : 0), 21 + bb, 2, 3.4, L.c2); p(cx - (side ? 3 : 0), 19 + bb, L.trim); }
+    if (L.gt >= 5) {
+      if (k === 0 || k === 2 || k === 4) { r(8 + dx, 27 + bb, 17, 1, L.trim); if (view !== 'b') p(cx, 26 + bb, L.gem); }
+      if (k !== 5) for (const x of side ? [11, 15, 19] : [10, 16, 22]) { p(x + dx, 24 + bb, L.trim); p(x + dx, 23 + bb, L.trim); }
+    }
     if (k === 1) { r(8 + dx, 25 + bb, 17, 4, L.helm); r(side ? 20 + dx : 7 + dx, 28 + bb, side ? 6 : 19, 1, L.helmF); }
     else if (k === 2) { e(cx, 31 + bb, 10.5, 9, L.helm); if (!(view === 'b')) e(cx + (side ? 2 : 0), 34.5 + bb, 6.5, 5.8, L.skin); if (view !== 'b') { eyeAt(side ? 20 : 12, 34 + bb); if (!side) eyeAt(19, 34 + bb); } }
     else if (k === 3) { e(cx, 29 + bb, 9.5, 6.5, L.helm); r(7 + dx, 29 + bb, 19, 2, L.helm); if (!side && view !== 'b') r(15, 29 + bb, 2, 5, L.helm); if (side) r(21 + dx, 29 + bb, 2, 5, L.helm); }
     else if (k === 4) { r(8 + dx, 28 + bb, 17, 1, L.goldF); if (view !== 'b') p(cx, 28 + bb, L.acc); }
     else if (k === 5) { for (let y = 12; y <= 26; y++) { const hw = Math.round((y - 12) * 0.42); r(cx - hw + (y < 16 ? 2 : 0), y + bb, hw * 2 + 1, 1, L.helm); } r(cx - 11, 26 + bb, 23, 2, L.helm); r(cx - 6, 24 + bb, 13, 1, L.helmF); }
+  }
+  /**
+   * What better armour adds (L.gt): 1 a coloured collar, 2 pauldrons, 3 gold rims, a chest emblem and a
+   * gem at the belt, 4 glowing runes, 5 gold spikes on the shoulders and a radiant emblem.
+   */
+  function ornaments(v: View) {
+    const t = L.gt;
+    if (!t) return;
+    const pad = L.armorKind >= 2 ? L.steel : L.armorKind ? L.armor : L.c2;
+    if (v === 's') {
+      r(13, 40 + b, 6, 1, t >= 3 ? L.trim : L.c2);
+      if (t >= 2) e(15, 41 + b, 3.6, 2.6, pad);
+      if (t >= 3) { r(12, 43 + b, 7, 1, L.trim); p(19, 46 + b, L.gem); p(18, 43 + b, L.trim); }
+      if (t >= 4) { p(17, 44 + b, L.rune); p(18, 45 + b, L.rune); p(14, 45 + b, L.rune); }
+      if (t >= 5) { l(12, 41 + b, 10, 38 + b, 1, L.trim); l(14, 40 + b, 13, 38 + b, 1, L.trim); p(18, 43 + b, L.runeHi); } // spikes on the back of the shoulder, clear of the face
+      return;
+    }
+    const front = v === 'f';
+    if (front) r(13, 40 + b, 6, 1, t >= 3 ? L.trim : L.c2);
+    if (t >= 2) { e(9.5, 41 + b, 3.2, 2.4, pad); e(22.5, 41 + b, 3.2, 2.4, pad); }
+    if (t >= 3) {
+      r(7, 43 + b, 6, 1, L.trim); r(20, 43 + b, 6, 1, L.trim);
+      if (front) { p(16, 42 + b, L.trim); p(15, 43 + b, L.trim); p(17, 43 + b, L.trim); p(16, 44 + b, L.trim); p(16, 46 + b, L.gem); }
+    }
+    if (t >= 4 && front) { p(13, 44 + b, L.rune); p(19, 44 + b, L.rune); p(16, 43 + b, L.rune); }
+    if (t >= 5) {
+      l(8, 40 + b, 6, 35 + b, 1, L.trim); l(10, 39 + b, 10, 35 + b, 1, L.trim);
+      l(24, 40 + b, 26, 35 + b, 1, L.trim); l(22, 39 + b, 22, 35 + b, 1, L.trim);
+      if (front) p(16, 43 + b, L.runeHi);
+    }
   }
   function accessory(side: boolean) {
     const k = L.accKind;
@@ -394,7 +551,7 @@ export function renderStyleASheet(ap: Appearance, job: Job): HTMLCanvasElement {
   sheet.height = 4 * HD;
   const g = sheet.getContext('2d')!;
   for (const [row, view] of [[0, 'f'], [2, 's'], [3, 'b']] as const) for (const a of NAMES) for (let f = 0; f < HD_ANIMS[a].frames; f++) {
-    const c = a === 'death' ? deathFrame(L, view, f) : frame(L, view, poseFor(a, f)), x = (HD_COL[a] + f) * HD;
+    const c = a === 'death' ? deathFrame(L, view, f) : frame(L, view, poseFor(a, f, L.weapon)), x = (HD_COL[a] + f) * HD;
     g.drawImage(c, x, row * HD);
     if (view === 's') { g.save(); g.translate(x + HD, HD); g.scale(-1, 1); g.drawImage(c, 0, 0); g.restore(); }
   }

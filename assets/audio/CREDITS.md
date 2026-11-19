@@ -1,0 +1,55 @@
+# Audio credits
+
+Recordings used by Aetherion Online. CC0 works need no attribution; it is given anyway. CC-BY works are used under their licence with the attribution below.
+
+- "RPG Sound Pack" by artisticdude — CC0 — https://opengameart.org/content/rpg-sound-pack — used for: combat.sword_swing, game.battle_start, item.equip
+- "Swishes Sound Pack" by artisticdude — CC0 — https://opengameart.org/content/swishes-sound-pack — used for: skill.dash
+- "Ice spells" by bart — CC0 — https://opengameart.org/content/ice-spells — used for: rune.ice_spear
+- "Epic Main Menu Theme ~ Loop" by CleytonKauffman — CC0 — https://opengameart.org/content/epic-main-menu-theme-loop — used for: BGM-001
+- "Forest Whisper Theme" by CleytonKauffman — CC0 — https://opengameart.org/content/forest-whisper-theme — used for: BGM-004
+- "Ruined City Theme" by CleytonKauffman — CC0 — https://opengameart.org/content/ruined-city-theme — used for: BGM-008
+- "New thing get!" by congusbongus — CC0 — https://opengameart.org/content/new-thing-get — used for: game.level_up
+- "Battle Theme A" by cynicmusic — CC0 — https://opengameart.org/content/battle-theme-a — used for: BGM-009
+- "Determined Pursuit (epic orchestra loop)" by Emma_MA — CC0 — https://opengameart.org/content/determined-pursuit-epic-orchestra-loop — used for: BGM-010
+- "Hurt Sound Effects" by EZduzziteh — CC0 — https://opengameart.org/content/hurt-sound-effects — used for: combat.player_damage
+- "Explosions" by EZduzziteh — CC0 — https://opengameart.org/content/explosions-4 — used for: rune.meteor_impact
+- "Eerie Forest" by Frenchyboy — CC0 — https://opengameart.org/content/eerie-forest — used for: BGM-007
+- "Spell sounds" by HaelDB — CC0 — https://opengameart.org/content/spell-sounds — used for: rune.healing_rain
+- "Male Grunt/Yelling sounds" by HaelDB — CC0 — https://opengameart.org/content/male-gruntyelling-sounds — used for: skill.shout
+- "Quiet Village (Collection)" by Holizna — CC0 — https://opengameart.org/content/quiet-village-collection — used for: BGM-003
+- "Walking on snow sound" by IgnasD — CC0 — https://opengameart.org/content/walking-on-snow-sound — used for: move.step_snow
+- "Portal sound" by IgnasD — CC0 — https://opengameart.org/content/portal-sound — used for: env.portal
+- "Magic Spell SFX" by JaggedStone — CC0 — https://opengameart.org/content/magic-spell-sfx — used for: skill.buff, skill.shield, item.drop_legendary, item.drop_mythic
+- "Loopable Dungeon Ambience" by JaggedStone — CC0 — https://opengameart.org/content/loopable-dungeon-ambience — used for: AMB-DUNGEON
+- "50 RPG sound effects" by Kenney — CC0 — https://opengameart.org/content/50-rpg-sound-effects — used for: move.run, combat.dagger_attack, skill.trap_set, item.pickup, game.quest_accept, game.dungeon_enter, env.gather
+- "85 Short music jingles" by Kenney — CC0 — https://opengameart.org/content/85-short-music-jingles — used for: game.quest_complete
+- "Interface Sounds" by Kenney — CC0 — https://opengameart.org/content/interface-sounds — used for: ui.click, ui.notify, ui.error
+- "Fire Staff Sound Effects" by LEGIT Audio — CC0 — https://opengameart.org/content/fire-staff-sound-effects — used for: rune.meteor_cast
+- "Swamp Environment Audio" by LokiF — CC0 — https://opengameart.org/content/swamp-environment-audio — used for: AMB-WATER
+- "wind1" by Luke.RUSTLTD — CC0 — https://opengameart.org/content/wind1 — used for: AMB-WIND
+- "Earthquake and Open sesame" by mieki256 — CC0 — https://opengameart.org/content/earthquake-and-open-sesame — used for: rune.earthquake
+- "Great Labyrinth (Orchestral dungeon music)" by MintoDog — CC0 — https://opengameart.org/content/great-labyrinthorchestral-dungeon-music — used for: BGM-011
+- "Fall of Nightmares [Epic, Orchestral]" by nene — CC0 — https://opengameart.org/content/fall-of-nightmares-epic-orchestral — used for: BGM-013
+- "Battle Sound Effects" by Ogrebane — CC0 — https://opengameart.org/content/battle-sound-effects — used for: combat.bow_release, skill.volley
+- "Earth Element Magic Spell" by qubodup — CC0 — https://opengameart.org/content/earth-element-magic-spell — used for: rune.stone_shield
+- "Medieval: Market Day" by RandomMind — CC0 — https://opengameart.org/content/medieval-market-day — used for: BGM-002
+- "Medieval: Victory Theme" by RandomMind — CC0 — https://opengameart.org/content/medieval-victory-theme — used for: BGM-014
+- "Medieval: Defeat Theme" by RandomMind — CC0 — https://opengameart.org/content/medieval-defeat-theme — used for: BGM-015
+- "Medieval: King's Feast" by RandomMind — CC0 — https://opengameart.org/content/medieval-kings-feast — used for: BGM-016
+- "3 Melee sounds" by remaxim — CC0 — https://opengameart.org/content/3-melee-sounds — used for: combat.staff_attack
+- "100 CC0 SFX #2" by rubberduck — CC0 — https://opengameart.org/content/100-cc0-sfx-2 — used for: move.step_water, combat.arrow_impact, skill.smoke
+- "80 CC0 RPG SFX" by rubberduck — CC0 — https://opengameart.org/content/80-cc0-rpg-sfx — used for: combat.monster_hit, combat.monster_death, rune.fireball_cast, rune.flame_burst, skill.trap_fire, skill.arcane, item.gold, item.drop_rare
+- "100 CC0 SFX" by rubberduck — CC0 — https://opengameart.org/content/100-cc0-sfx — used for: item.upgrade_ok, game.world_boss_announce, env.cache_open
+- "75 CC0 breaking / falling / hit sfx" by rubberduck — CC0 — https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx — used for: item.upgrade_fail
+- "80 CC0 creature SFX" by rubberduck — CC0 — https://opengameart.org/content/80-cc0-creature-sfx — used for: game.boss_spawn, game.boss_defeat
+- "20 Sword Sound Effects (Attacks and Clashes)" by StarNinjas — CC0 — https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes — used for: combat.sword_impact, combat.greatsword_impact
+- "10 Impact/Shield Blocks" by StarNinjas — CC0 — https://opengameart.org/content/10-impactshield-blocks — used for: combat.shield_block
+- "Crowd Shouting/Speaking Ambience" by StarNinjas — CC0 — https://opengameart.org/content/crowd-shoutingspeaking-ambience — used for: AMB-CITY
+- "Boss Battle Music (Epic Boss Battle)" by SubspaceAudio (Juhani Junkala) — CC0 — https://opengameart.org/content/boss-battle-music — used for: BGM-012
+- "grunts of male death and pain" by thebardofblasphemy — CC0 — https://opengameart.org/content/grunts-male-death-and-pain — used for: combat.player_death
+- "Different steps on wood, stone, leaves, gravel and mud" by TinyWorlds — CC0 — https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud — used for: move.step_grass, move.step_stone, move.step_wood
+- "Forest Ambience" by TinyWorlds — CC0 — https://opengameart.org/content/forest-ambience — used for: AMB-FOREST
+- "Kingdom of Icereach" by Tsorthan Grove — CC0 — https://opengameart.org/content/kingdom-of-icereach — used for: BGM-006
+- "The Fire Dragon" by Umplix — CC0 — https://opengameart.org/content/the-fire-dragon — used for: BGM-005
+- "150 Combat Sound Effects" by untamedpixels — CC0 — https://opengameart.org/content/150-combat-sound-effects — used for: combat.physical_hit, combat.critical_hit, rune.fireball_impact, rune.water_bolt, rune.thunder_strike, rune.chain_lightning, rune.wind_slash, rune.tornado, skill.heal, skill.holy
+- "Fantasy Sound Effects (Tinysized SFX)" by Vehicle — CC0 — https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx — used for: item.potion

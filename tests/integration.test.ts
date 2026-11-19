@@ -880,7 +880,7 @@ test('M10 audio files: every sound is served, as audio, and may be cached for go
   const m = (await mres.json()) as { version: number; assets: any[] };
   assert.equal(m.version, 1);
   assert.deepEqual(m.assets.map((a) => a.id).sort(), AUDIO_DEFS.map((d) => d.id).sort(), 'the build ships every sound in the catalogue');
-  assert.ok(m.assets.every((a) => a.temporary === true), 'and tells the client they are placeholders');
+  assert.ok(m.assets.every((a) => a.temporary === false), 'and tells the client they are recorded, not placeholders');
   for (const id of ['BGM-002', 'rune.fireball_cast', 'AMB-FOREST']) {
     const e = m.assets.find((a) => a.id === id);
     const r = await fetch(`${base}/audio/${e.file}?v=${e.v}`);

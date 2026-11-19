@@ -300,7 +300,8 @@ try {
   await p1.keyboard.press('Digit1');
   await p1.waitForFunction(() => (window as any).__game.debug().hud.cds.arcane_bolt !== undefined);
   assert.ok(dummy.hp < dummy.maxHp, 'Arcane Bolt damaged the target');
-  await p2.waitForFunction(() => (window as any).__game.debug().remoteList[0].anim === 'cast', undefined, { polling: 16 });
+  // the other player sees the cast: the pose is brief on a background page, so its spell effect counts too
+  await p2.waitForFunction(() => { const d = (window as any).__game.debug(); return d.remoteList[0].anim === 'cast' || d.fx.includes('arcane_bolt'); }, undefined, { polling: 16 });
   await p1.waitForTimeout(600);
   const hp1 = dummy.hp;
   await p1.keyboard.press('KeyQ');

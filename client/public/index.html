@@ -564,6 +564,10 @@
   .pedestal.wide { width: 120px; } .compbody { display: grid; gap: 4px; align-content: start; min-width: 0; flex: 1; }
   .ribbon { position: absolute; top: 6px; right: 6px; padding: 1px 8px; border-radius: 10px; background: #c9a24a; color: #1a1408; font-size: 11px; font-weight: 700; }
   .petskill { padding: 4px 6px; border-radius: 6px; background: rgba(127,232,255,.07); border: 1px solid rgba(127,232,255,.25); } .petskill b { color: #7fe8ff; } .bonusline { color: #ffe08a; }
+  .topstack .target { width: min(300px, 100%) !important; } .topstack .target.slim { padding: 4px 8px !important; } .topstack .target.slim .chips { justify-content: center; }
+  /* portraits: the face crop fills the round frame; character cards scale the figure to their width, centred */
+  .tl .portrait canvas { width: 100%; height: 100%; display: block; }
+  .charcard canvas.sprite { width: min(100%, 132px); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; }
 </style>
 </head>
 <body>

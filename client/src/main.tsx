@@ -408,7 +408,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
       <canvas ref={canvas} className="world" />
       <div className="winlayer" />
       <div className="hud rail"><canvas ref={mini} width={144} height={144} className="minimap" /></div>
-      <div className="topstack">{(['boss', 'event', 'siege', 'pvp', 'toast', 'banner'] as const).map((s) => <div key={s} className={'slot-' + s} />)}</div>
+      <div className="topstack">{(['boss', 'target', 'event', 'siege', 'pvp', 'toast', 'banner'] as const).map((s) => <div key={s} className={'slot-' + s} />)}</div>
       {game && <Guard><HudView game={game} onExit={onExit} input={input} sheet={sheet} setSheet={setSheet} book={book} setBook={setBook} bag={bag} setBag={(b) => { setBag(b); if (b) markTutorial('inventory'); }} setOpts={setOpts} auto={auto} setAuto={setAuto} setMap={setMap} /></Guard>}
       {opts && <Win id="settings" title={'settings.title'} width={520} onClose={() => setOpts(false)}><Guard><SettingsPanel onClose={() => setOpts(false)} signedIn inGame /></Guard></Win>}
       {game && map && <Win id="map" title={'map.title'} width={980} onClose={() => setMap(false)}><Guard><WorldMap game={game} onClose={() => setMap(false)} /></Guard></Win>}
@@ -655,7 +655,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
     <>
       {me && s && (
         <div className="hud tl panel">
-          <button className="portrait" onClick={() => setSheet(!sheet)} aria-label={t('sheet.open')}><Sprite ap={me.ap} job={me.job} scale={2} /></button>
+          <button className="portrait" onClick={() => setSheet(!sheet)} aria-label={t('sheet.open')}><Sprite ap={me.ap} job={me.job} scale={2} face /></button>
           <div className="vitals">
             <strong>{me.name}</strong> <span className="sub">{t('common.lv', { n: me.level })} {PATH_INDEX[hud.asc.path] && me.level >= ASCENSION_LEVEL ? PATH_INDEX[hud.asc.path].title : jobTitle(me.job, me.level)}</span>
             <div className="vbar hp" role="meter" aria-label={t('stat.hp')} aria-valuenow={hud.hp} aria-valuemax={s.maxHp}><i style={{ width: `${(hud.hp / s.maxHp) * 100}%` }} /><span>{hud.hp} / {s.maxHp}</span></div>
@@ -666,13 +666,18 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
           </div>
         </div>
       )}
-      {hud.target && (
-        <div className={'hud target panel' + (hud.target.elite ? ' elite' : '')} role="status" aria-label={t('hud.target')}>
-          <div><strong>{hud.target.name}</strong> <span className="sub">{t('common.lv', { n: hud.target.level })}{hud.target.elite ? ` · ${t('hud.elite')}` : ''}{hud.target.player ? ` · ${t('hud.player')}` : ''}{hud.target.fierce ? ` · ${t('hud.fierce')}` : ''}</span></div>
-          <div className="vbar hp"><i style={{ width: `${(hud.target.hp / hud.target.mhp) * 100}%` }} /><span>{hud.target.hp} / {hud.target.mhp}</span></div>
-          <div className="chips">{hud.attacking && <span className="chip atk">{t('hud.attacking')}</span>}{hud.target.statuses.map((n, i) => <span key={i} className="chip">{n}</span>)}</div>
-        </div>
-      )}
+      {hud.target && toTop('target', (() => {
+        // the boss bar already shows the boss's name and health: the target frame then keeps only its statuses
+        const isBoss = !!hud.boss && hud.boss.name === hud.target.name && hud.boss.level === hud.target.level;
+        if (isBoss && !hud.attacking && !hud.target.statuses.length) return null;
+        return (
+          <div className={'hud target panel' + (hud.target.elite ? ' elite' : '') + (isBoss ? ' slim' : '')} role="status" aria-label={t('hud.target')}>
+            {!isBoss && <div><strong>{hud.target.name}</strong> <span className="sub">{t('common.lv', { n: hud.target.level })}{hud.target.elite ? ` · ${t('hud.elite')}` : ''}{hud.target.player ? ` · ${t('hud.player')}` : ''}{hud.target.fierce ? ` · ${t('hud.fierce')}` : ''}</span></div>}
+            {!isBoss && <div className="vbar hp"><i style={{ width: `${(hud.target.hp / hud.target.mhp) * 100}%` }} /><span>{hud.target.hp} / {hud.target.mhp}</span></div>}
+            <div className="chips">{hud.attacking && <span className="chip atk">{t('hud.attacking')}</span>}{hud.target.statuses.map((n, i) => <span key={i} className="chip">{n}</span>)}</div>
+          </div>
+        );
+      })())}
       {hud.ally && (
         <div className="hud allyframe panel" role="status" aria-label={t('hud.ally')}>
           <span className="sub">{t('hud.ally')}</span> <strong>{hud.ally.name}</strong>

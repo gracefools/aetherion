@@ -105,10 +105,10 @@ const SERA_AP = { v: 2, body: 1, build: 0, height: 1, skin: 6, face: 4, eyes: 2,
 const STORY_HELPER = (zone: string) => Object.values(STORY).find((s) => s.zone === zone && s.step === 2)?.giver ?? '';
 /** Portrait of whoever speaks: the townsperson's own sprite, or Sera's. */
 function Portrait({ who, zone }: { who: string; zone: string }) {
-  if (who === 'S') return <Sprite ap={SERA_AP as any} job="ranger" scale={3} />;
+  if (who === 'S') return <Sprite ap={SERA_AP as any} job="ranger" scale={3} face />;
   const id = who === 'L' ? `lorekeeper:${zone}` : who === 'H' ? STORY_HELPER(zone) : '';
   const o = id ? objById(id) : undefined;
-  return o?.ap && o.job ? <Sprite ap={o.ap} job={o.job} scale={3} /> : <div className="noportrait" />;
+  return o?.ap && o.job ? <Sprite ap={o.ap} job={o.job} scale={3} face /> : <div className="noportrait" />;
 }
 
 /** Story dialogue: opened with "Listen" on a story quest, and by itself when a story step is handed in. */

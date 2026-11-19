@@ -8,7 +8,7 @@ import { BOUNTY_STREAK, DEPTH_MONSTER, SANCTUARY_LEAVE_SHIELD_MS, SANCTUARY_SHIE
 import { applySigilSets, ARMAMENT_LEVEL, armamentDrops, armMultipliers, cleanGear, effectiveRanks, emptyGear, rollSigil, SIGIL_DROP, sigilTierForBoss, weaponAura, worldBossArmament, type Gear } from '../../../shared/src/gear';
 import { performance } from 'node:perf_hooks';
 import {
-  COMBAT_TIMEOUT_MS, Dmg, expLevelFactor, expToNext, missChance, mitigate, RAGE_PER_HIT, RAGE_PER_HIT_TAKEN,
+  COMBAT_TIMEOUT_MS, DODGE, Dmg, expLevelFactor, expToNext, missChance, mitigate, RAGE_PER_HIT, RAGE_PER_HIT_TAKEN,
   RESPAWN_AUTO_MS, RESPAWN_MIN_MS, STATUS, STATUS_INDEX, weaponRule, type WeaponRule,
 } from '../../../shared/src/combat';
 import { cleanBuild, type Build } from '../../../shared/src/abilities';
@@ -113,6 +113,9 @@ export class Player implements Ent {
   lastCombat = -1000;
   /** G10: when the summoned pet may use its skill again (tick). */
   petSkillAt = 0;
+  /** G1: the dodge roll: no damage until this tick; the next roll from dodgeAt. */
+  evadeUntil = 0;
+  dodgeAt = 0;
   /** Receiving developer overlay data (only possible when the server allows it). */
   debug = false;
   // auto hunting: the saved configuration, whether a session is running, and its figures
@@ -1064,6 +1067,7 @@ export class World implements CombatCtx {
    */
   action(p: Player, kind: unknown) {
     if (p.dead || p.mods.stun) return;
+    if (kind === Act.Dodge) return void this.dodge(p);
     if (kind !== Act.Attack) return;
     if (p.pvpTarget) {
       p.attacking = true;
@@ -1089,6 +1093,30 @@ export class World implements CombatCtx {
       p.swingTick = this.tick + 1;
       emit(p, this.evt, [p.id, Act.Attack]);
     }
+  }
+  /** G1: a quick roll the way the player is moving (or facing). Blows that land during it miss. */
+  dodge(p: Player): string {
+    if (p.dead) return 'You are dead';
+    if (p.mods.stun || p.mods.move === 0) return 'You cannot move';
+    if (p.casting) return 'Not while casting';
+    if (this.tick < p.dodgeAt) return 'Not ready';
+    const q = p.inQ, n = q.length;
+    let dx = n ? q[n - 3] : 0, dy = n ? q[n - 2] : 0;
+    if (!dx && !dy) {
+      dx = p.dir === Dir.Left ? -1 : p.dir === Dir.Right ? 1 : 0;
+      dy = p.dir === Dir.Up ? -1 : p.dir === Dir.Down ? 1 : 0;
+    }
+    const fx = p.x, fy = p.y, room = p.room;
+    for (let i = 0; i < Math.round(DODGE.dist / 8); i++) stepMove(p, dx, dy, room.map, 8, isFlying(p.comp));
+    p.dodgeAt = this.tick + Math.round(DODGE.cdMs / TICK_MS);
+    p.evadeUntil = this.tick + Math.round(DODGE.iframeMs / TICK_MS);
+    room.grid.update(p);
+    p.ver++;
+    p.dirty = true;
+    p.inQ.length = 0; // queued inputs were predicted from the old position
+    p.needAck = true;
+    emit(p, this.evt, [p.id, Act.Dodge, Math.round(fx), Math.round(fy), Math.round(p.x), Math.round(p.y)]);
+    return '';
   }
   // --- abilities and build: thin wrappers that report a refusal to the client ---
   use(p: Player, id: unknown, tid: unknown) {
@@ -1227,6 +1255,11 @@ export class World implements CombatCtx {
       }
       if (target.hasTalent('glass_cannon')) amount = Math.round(amount * 1.15);
       if (target.hasTalent('iron_skin')) amount = Math.max(1, Math.round(amount * 0.85));
+    }
+    if (target instanceof Player && amount > 0 && src && src !== target && !(flags & (Dmg.Heal | Dmg.Dot)) && this.tick < target.evadeUntil) {
+      // G1: rolling through the blow
+      pushDmg(target, this.evt, 0, Dmg.Miss, src.id);
+      return;
     }
     if (target instanceof Player && amount > 0) {
       const m = target.mods;

@@ -203,7 +203,7 @@ export const en = {
   'keys.change': '{action}, key {n}: {key}. Change', 'keys.none': 'none', 'keys.press': 'Press a key…', 'keys.clear': 'Remove key {n} of {action}',
   'keys.reset': 'Restore default keys', 'keys.resetAsk': 'Restore every key to its default?', 'keys.resetYes': 'Restore defaults', 'keys.resetDone': 'Default keys restored.',
   'keys.group.movement': 'Movement', 'keys.group.combat': 'Combat', 'keys.group.skills': 'Skills', 'keys.group.runes': 'Rune spells', 'keys.group.interface': 'Interface',
-  'act.move.up': 'Move up', 'act.move.down': 'Move down', 'act.move.left': 'Move left', 'act.move.right': 'Move right', 'act.walk': 'Walk', 'act.mount.toggle': 'Ride or dismount', 'mount.none': 'You have no mount yet',
+  'act.move.up': 'Move up', 'act.move.down': 'Move down', 'act.move.left': 'Move left', 'act.move.right': 'Move right', 'act.walk': 'Walk', 'act.mount.toggle': 'Ride or dismount', 'act.dodge': 'Dodge roll', 'mount.none': 'You have no mount yet',
   'act.attack': 'Attack', 'act.target': 'Next target', 'act.interact': 'Interact', 'act.potion.hp': 'Health potion', 'act.potion.mp': 'Mana potion',
   'act.skill.1': 'Skill 1', 'act.skill.2': 'Skill 2', 'act.skill.3': 'Skill 3', 'act.skill.4': 'Skill 4', 'act.skill.5': 'Skill 5', 'act.skill.6': 'Skill 6', 'act.skill.7': 'Skill 7',
   'act.rune.1.1': 'Rune slot 1, spell 1', 'act.rune.1.2': 'Rune slot 1, spell 2', 'act.rune.1.3': 'Rune slot 1, spell 3',

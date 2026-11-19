@@ -5078,6 +5078,32 @@ test('G10 pets fight: each pet has a skill on its own cooldown, used only in a f
   assert.ok(m1.hp < 1e7 && m2.hp < 1e7, 'both monsters are struck');
 });
 
+import { DODGE } from '../shared/src/combat';
+
+test('G1 dodge roll: a quick dash the way the player is moving, blows during it miss, then a cooldown', () => {
+  const h = harness({ capacity: 10 }), { world } = h;
+  const a = h.join(0, 0, 'knight', 30), p = a.p;
+  const x0 = p.x;
+  p.inQ.push(p.lastSeq + 1, 1, 0, 1); // moving right
+  assert.equal(world.dodge(p), '');
+  assert.ok(p.x > x0 + DODGE.dist * 0.5, 'rolled to the right');
+  assert.equal(p.inQ.length, 0, 'the predicted inputs are dropped; the client is corrected');
+  assert.ok(a.out.length >= 0);
+  const hp = p.hp, foe = world.spawn(p.room, 'mossling', p.x + 30, p.y);
+  world.hurt(p, 50, 0, foe);
+  assert.equal(p.hp, hp, 'a blow during the roll misses');
+  world.hurt(p, 50, Dmg.Dot, foe);
+  assert.ok(p.hp < hp, 'but a poison already working still does');
+  assert.equal(world.dodge(p), 'Not ready');
+  p.evadeUntil = 0;
+  const hp2 = p.hp;
+  world.hurt(p, 50, 0, foe);
+  assert.ok(p.hp < hp2, 'after the roll, blows land again');
+  p.dodgeAt = 0;
+  p.mods = { ...p.mods, stun: true } as any;
+  assert.equal(world.dodge(p), 'You cannot move');
+});
+
 test('M15 mounts: faster movement through the same collision rules, a level to ride, kept when struck, not in dungeons or the arena', () => {
   const h = harness({ capacity: 10 }), { world } = h;
   const a = h.join(0, 0, 'knight', 25), p = a.p;

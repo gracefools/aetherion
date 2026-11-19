@@ -205,7 +205,7 @@ export const id: Record<keyof typeof en, string> = {
   'keys.change': '{action}, tombol {n}: {key}. Ubah', 'keys.none': 'tidak ada', 'keys.press': 'Tekan tombol…', 'keys.clear': 'Hapus tombol {n} dari {action}',
   'keys.reset': 'Kembalikan tombol bawaan', 'keys.resetAsk': 'Kembalikan semua tombol ke bawaannya?', 'keys.resetYes': 'Kembalikan bawaan', 'keys.resetDone': 'Tombol bawaan dikembalikan.',
   'keys.group.movement': 'Gerakan', 'keys.group.combat': 'Pertarungan', 'keys.group.skills': 'Skill', 'keys.group.runes': 'Mantra rune', 'keys.group.interface': 'Antarmuka',
-  'act.move.up': 'Gerak ke atas', 'act.move.down': 'Gerak ke bawah', 'act.move.left': 'Gerak ke kiri', 'act.move.right': 'Gerak ke kanan', 'act.walk': 'Jalan pelan', 'act.mount.toggle': 'Naik atau turun tunggangan', 'mount.none': 'Kamu belum punya tunggangan',
+  'act.move.up': 'Gerak ke atas', 'act.move.down': 'Gerak ke bawah', 'act.move.left': 'Gerak ke kiri', 'act.move.right': 'Gerak ke kanan', 'act.walk': 'Jalan pelan', 'act.mount.toggle': 'Naik atau turun tunggangan', 'act.dodge': 'Guling menghindar', 'mount.none': 'Kamu belum punya tunggangan',
   'act.attack': 'Serang', 'act.target': 'Sasaran berikutnya', 'act.interact': 'Interaksi', 'act.potion.hp': 'Ramuan nyawa', 'act.potion.mp': 'Ramuan mana',
   'act.skill.1': 'Skill 1', 'act.skill.2': 'Skill 2', 'act.skill.3': 'Skill 3', 'act.skill.4': 'Skill 4', 'act.skill.5': 'Skill 5', 'act.skill.6': 'Skill 6', 'act.skill.7': 'Skill 7',
   'act.rune.1.1': 'Slot rune 1, mantra 1', 'act.rune.1.2': 'Slot rune 1, mantra 2', 'act.rune.1.3': 'Slot rune 1, mantra 3',

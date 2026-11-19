@@ -6,14 +6,14 @@
 //   left stick / d-pad  move              A [Cross]    attack        B [Circle]   interact, or close the top window
 //   X [Square]          skill 1           Y [Triangle] skill 2       LB [L1]      next target
 //   RB [R1]             skill 3           LT [L2]      health potion RT [R2]      skill 4
-//   View [Share]        world map         Menu [Options] inventory   L3           walk / run
+//   View [Share]        world map         Menu [Options] inventory   L3           dodge roll
 //   R3                  auto-hunt on/off
 import type { Action } from '../../shared/src/settings';
 import { settings } from './settings';
 import { openWindows } from './windows';
 
 const BUTTONS: (Action | null)[] = [
-  'attack', 'interact', 'skill.1', 'skill.2', 'target', 'skill.3', 'potion.hp', 'skill.4', 'panel.map', 'panel.bag', 'walk', 'auto.toggle',
+  'attack', 'interact', 'skill.1', 'skill.2', 'target', 'skill.3', 'potion.hp', 'skill.4', 'panel.map', 'panel.bag', 'dodge', 'auto.toggle',
   'move.up', 'move.down', 'move.left', 'move.right',
 ];
 const DEAD = 0.45;

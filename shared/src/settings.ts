@@ -10,6 +10,7 @@ export const ACTIONS = {
   'move.right': ['KeyD', 'ArrowRight'],
   walk: ['ShiftLeft', 'ShiftRight'],
   'mount.toggle': ['Comma'],
+  dodge: ['AltLeft'],
   attack: ['Space'],
   target: ['Tab'],
   interact: ['KeyF'],
@@ -46,7 +47,7 @@ export const ACTION_LIST = Object.keys(ACTIONS) as Action[];
 /** Groups for the settings screen. */
 export const ACTION_GROUPS: [string, Action[]][] = [
   ['movement', ['move.up', 'move.down', 'move.left', 'move.right', 'walk', 'mount.toggle']],
-  ['combat', ['attack', 'target', 'interact', 'potion.hp', 'potion.mp']],
+  ['combat', ['attack', 'dodge', 'target', 'interact', 'potion.hp', 'potion.mp']],
   ['skills', ['ultimate', 'fusion.1', 'fusion.2', 'fusion.3', 'skill.1', 'skill.2', 'skill.3', 'skill.4', 'skill.5', 'skill.6', 'skill.7']],
   ['runes', ['rune.1.1', 'rune.1.2', 'rune.1.3', 'rune.2.1', 'rune.2.2', 'rune.2.3', 'rune.3.1', 'rune.3.2', 'rune.3.3']],
   ['interface', ['chat', 'panel.character', 'panel.skills', 'panel.bag', 'panel.quests', 'panel.map', 'panel.guild', 'panel.companions', 'panel.auto', 'panel.journal', 'panel.mail', 'panel.friends', 'panel.ascension', 'panel.life', 'auto.toggle', 'panel.settings', 'panel.tutorial']],

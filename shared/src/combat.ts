@@ -137,6 +137,8 @@ export const expLevelFactor = (playerLevel: number, monsterLevel: number) => {
 
 export const RESPAWN_MIN_MS = 3000; // earliest manual respawn
 export const RESPAWN_AUTO_MS = 12000;
+/** G1: the dodge roll: how far, how long nothing can hurt the roller, and how often. */
+export const DODGE = { dist: 72, iframeMs: 350, cdMs: 1500 };
 export const COMBAT_TIMEOUT_MS = 5000; // out-of-combat regeneration starts after this
 
 /** Weapon mechanics executed by the server on basic attacks. */

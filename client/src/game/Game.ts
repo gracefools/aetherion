@@ -61,6 +61,7 @@ import { traitOf } from '../../../shared/src/traits';
 import type { FinderState } from '../../../shared/src/social';
 import type { LadderRow } from '../../../shared/src/seasons';
 import { PET_IDS, PET_SKILLS, PETS } from '../../../shared/src/companions';
+import { DODGE } from '../../../shared/src/combat';
 
 export interface ChatLine {
   id: number;
@@ -526,6 +527,10 @@ export class Game {
       if (act === 'mount.toggle') {
         e.preventDefault();
         return this.toggleMount();
+      }
+      if (act === 'dodge') {
+        e.preventDefault();
+        return this.dodge();
       }
       if (e.code === 'F9' && this.dev) {
         e.preventDefault();
@@ -1363,6 +1368,8 @@ export class Game {
         else if (e[1] === Act.Fx) {
           this.onFx(e, now);
           if (mine) myFx = true;
+        } else if (e[1] === Act.Dodge) {
+          this.onDodge(e, now);
         } else if (e[1] === Act.PetSkill) {
           this.onPetSkill(e[0], e[2], e[3], now);
         } else if (e[1] === Act.FxEnd) {
@@ -2183,6 +2190,28 @@ export class Game {
     }
   }
 
+  /** G1: roll out of the way (the server moves the character and says where it landed). */
+  private dodgeReady = 0;
+  dodge() {
+    const now = performance.now();
+    if (!this.me || now < this.dodgeReady || this.castUntil > now) return;
+    this.dodgeReady = now + DODGE.cdMs;
+    this.sendMsg({ t: 'act', k: Act.Dodge });
+  }
+  /** A roll: a streak along the ground from where it began to where it ended, and a quick tumble. */
+  private onDodge(e: number[], now: number) {
+    const mine = e[0] === this.me?.id, r = this.remotes.get(e[0]);
+    this.blasts.push({ x: e[2], y: e[3], r: 16, t0: now + (mine ? 0 : INTERP_DELAY), tier: 0, color: '#dfe8ff', inner: 0, kind: 'area' });
+    this.shots.push({ x: e[2], y: e[3] - 6, to: e[0], t0: now + (mine ? 0 : INTERP_DELAY), color: '#dfe8ff' });
+    if (mine) {
+      this.act = 'attack';
+      this.actAt = now;
+      sound.at('skill.dash', 0, 0, 0.6);
+    } else if (r) {
+      r.act = 'attack';
+      r.actAt = now + INTERP_DELAY;
+    }
+  }
   /** G10: a pet used its skill: a bolt or leap from the pet to the monster, or a glow on its owner. */
   private onPetSkill(owner: number, idx: number, target: number, now: number) {
     const kind = PET_IDS[idx], sk = kind && PET_SKILLS[kind], from = this.pets.get(owner);

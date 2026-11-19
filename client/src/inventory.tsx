@@ -40,7 +40,7 @@ function Cell({ item, sel, onClick, onUse, mark = false }: { item?: Item; sel: b
 }
 
 const KIND_LINE: Record<string, Key> = { potion: 'item.kind.potion', scroll: 'item.kind.scroll', pet: 'item.kind.pet', mount: 'item.kind.mount', material: 'item.kind.material', sigil: 'item.kind.sigil' };
-function Details({ item, worn, hud, game }: { item: Item; worn: Slot | null; hud: Hud; game: Game }) {
+function Details({ item, worn, hud, game, askRead = false }: { item: Item; worn: Slot | null; hud: Hud; game: Game; askRead?: boolean }) {
   const me = hud.self!, b = ITEMS[item.base], st = itemStats(item);
   const block = b.kind === 'equip' ? equipBlock(item, me.job, me.level) : '';
   const cur = b.slot && !worn ? hud.eq[b.slot] : undefined, curSt = cur ? itemStats(cur) : {};
@@ -84,7 +84,7 @@ function Details({ item, worn, hud, game }: { item: Item; worn: Slot | null; hud
         {worn && <button onClick={() => game.invOp('unequip', { slot: worn })}>{t('item.unequip')}</button>}
         {!worn && b.kind === 'equip' && <button className="primary" disabled={!!block} onClick={() => game.invOp('equip', { uid: item.uid })}>{t('item.equip')}</button>}
         {!worn && (b.kind === 'potion' || b.kind === 'pet' || b.kind === 'mount') && <button className="primary" onClick={() => game.invOp('use', { uid: item.uid })}>{t('item.use')}</button>}
-        {!worn && b.kind === 'scroll' && <ReadButton key={item.uid + item.qty} name={b.name} onConfirm={() => game.invOp('scroll', { uid: item.uid })} />}
+        {!worn && b.kind === 'scroll' && <ReadButton key={item.uid + item.qty + (askRead ? ':ask' : '')} name={b.name} armedAtFirst={askRead} onConfirm={() => game.invOp('scroll', { uid: item.uid })} />}
         {b.kind === 'equip' && item.up < MAX_UPGRADE && (
           <button
             disabled={hud.gold < cost.gold || stones < cost.stones} onClick={() => game.invOp('upgrade', { uid: item.uid })}
@@ -105,8 +105,8 @@ function SellButton({ n, total, onConfirm }: { n: number; total: number; onConfi
     : <button className="primary" disabled={!n} onClick={() => setArmed(true)}>{t('bulk.sell')}</button>;
 }
 /** Reading a scroll consumes it, so it asks first. */
-function ReadButton({ name, onConfirm }: { name: string; onConfirm: () => void }) {
-  const [armed, setArmed] = useState(false);
+function ReadButton({ name, onConfirm, armedAtFirst = false }: { name: string; onConfirm: () => void; armedAtFirst?: boolean }) {
+  const [armed, setArmed] = useState(armedAtFirst);
   if (!armed) return <button className="primary" onClick={() => setArmed(true)}>{t('scroll.read')}</button>;
   return (
     <span className="confirm" role="alertdialog" aria-label={t('scroll.ask', { name })}>
@@ -122,6 +122,8 @@ function DestroyButton({ onConfirm }: { onConfirm: () => void }) {
 export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () => void }) {
   useT();
   const [sel, setSel] = useState('');
+  /** A scroll double-clicked: its details open on the question whether to read it. */
+  const [askRead, setAskRead] = useState('');
   // bulk sale: the set of marked item ids while "sell several" is on (null = off)
   const [marks, setMarks] = useState(null as Set<string> | null);
   const marked = marks ? hud.inv.filter((i) => marks.has(i.uid)) : [];
@@ -139,6 +141,14 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
     if (k === 'equip') game.invOp('equip', { uid: it.uid });
     else if (k === 'potion' || k === 'pet' || k === 'mount') game.invOp('use', { uid: it.uid });
     else if (k === 'sigil') game.invOp('sigil', { uid: it.uid });
+    else if (k === 'scroll') {
+      // reading uses the scroll up: a double click opens the question instead of reading at once
+      setSel(it.uid);
+      setAskRead(it.uid);
+    } else if (it.base.startsWith('furn_') && hud.home?.mine) {
+      const at = game.homeTile();
+      game.lifeOp('place', { uid: it.uid, tx: at.tx, ty: at.ty });
+    }
   };
   const [tab, setTab] = useState('bag' as 'bag' | 'arm' | 'sigil');
   return (
@@ -174,13 +184,13 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
           <div className="grid" role="list">
             {Array.from({ length: INVENTORY_SIZE }, (_, i) => {
               const it = hud.inv[i];
-              return <Cell key={it?.uid ?? `e${i}`} item={it} sel={!!it && sel === it.uid} mark={!!it && !!marks?.has(it.uid)} onClick={() => (marks ? toggle(it!.uid) : setSel(it!.uid))} onUse={() => !marks && quick(it!)} />;
+              return <Cell key={it?.uid ?? `e${i}`} item={it} sel={!!it && sel === it.uid} mark={!!it && !!marks?.has(it.uid)} onClick={() => (marks ? toggle(it!.uid) : (setSel(it!.uid), setAskRead('')))} onUse={() => !marks && quick(it!)} />;
             })}
           </div>
           <p className="sub">{marks ? t('bulk.help') : t('bag.help', { hp: keyOf('potion.hp'), mp: keyOf('potion.mp') })}</p>
         </div>
         <div>
-          {item ? <Details item={item} worn={worn} hud={hud} game={game} /> : <p className="sub">{t('bag.select')}</p>}
+          {item ? <Details item={item} worn={worn} hud={hud} game={game} askRead={askRead === item.uid} /> : <p className="sub">{t('bag.select')}</p>}
           <h3>{t('shop.title')}</h3>
           {hud.shop ? (
             <div className="shop">

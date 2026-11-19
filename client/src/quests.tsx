@@ -1,12 +1,15 @@
 // Quests and factions (M13): the quest log (L), the on-screen tracker, quest offers and turn-ins
 // at a town's lorekeeper, and the faction quartermaster. Everything here displays the state the
 // server sent and asks the server to act.
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ITEMS } from '../../shared/src/items';
 import {
   acceptBlock, factionOfRegion, giverId, QUEST_LIST, QUESTS, REP_LEVELS, repLevel, type QuestDef,
 } from '../../shared/src/quests';
 import { ZONES } from '../../shared/src/world';
+import { SERA, speakerName, STORY, type Line } from '../../shared/src/story';
+import { objById } from '../../shared/src/places';
+import { Sprite } from './sprite';
 import type { Game, Hud } from './game/Game';
 import { Icon } from './inventory';
 import { t, tm, tv, useT, type Key } from './i18n';
@@ -39,22 +42,23 @@ function Objectives({ hud, q, active }: { hud: Hud; q: QuestDef; active: boolean
   );
 }
 
-/** At a lorekeeper: what this town offers, and what can be handed in here. */
-export function QuestGiver({ hud, game, zone }: { hud: Hud; game: Game; zone: string }) {
+/** A townsperson's quests: what they offer, and what can be handed in to them. */
+export function QuestGiver({ hud, game, giver }: { hud: Hud; game: Game; giver: string }) {
   useT();
   const me = hud.self;
   if (!me) return null;
-  const now = Date.now(), here = QUEST_LIST.filter((q) => q.zone === zone);
+  const now = Date.now(), here = QUEST_LIST.filter((q) => giverId(q) === giver);
   const mine = here.filter((q) => hud.quests.active[q.id]);
   const offered = here.filter((q) => !hud.quests.active[q.id]).map((q) => ({ q, why: acceptBlock(q, hud.quests, me.level, hud.rep, now) }))
-    // already-finished one-off quests are not shown; everything else is, with the reason it is not yet available
-    .filter(({ why }) => why !== 'Already completed');
+    // finished one-off quests are not shown, nor story steps the player has not reached yet
+    .filter(({ q, why }) => why !== 'Already completed' && !(STORY[q.id] && q.prereq.some((id) => !hud.quests.done[id])));
+  if (!mine.length && !offered.length && !giver.startsWith('lorekeeper:')) return null;
   return (
     <>
       <h3>{t('quest.title')}</h3>
       {mine.map((q) => (
-        <div key={q.id} className={'quest' + (complete(hud, q) ? ' ready' : '')}>
-          <h4>{q.name}<span className="qtype">{typeName(q)}</span></h4>
+        <div key={q.id} className={'quest' + (complete(hud, q) ? ' ready' : '') + (STORY[q.id] ? ' story' : '')}>
+          <h4>{q.name}<span className="qtype">{STORY[q.id] ? STORY[q.id].chapter : typeName(q)}</span></h4>
           <Objectives hud={hud} q={q} active />
           {complete(hud, q)
             ? <div className="actions"><button className="primary" onClick={() => game.questOp('turnin', { id: q.id })} aria-label={t('quest.turnInName', { name: q.name })}>{t('quest.turnIn')}</button></div>
@@ -62,13 +66,14 @@ export function QuestGiver({ hud, game, zone }: { hud: Hud; game: Game; zone: st
         </div>
       ))}
       {offered.map(({ q, why }) => (
-        <div key={q.id} className="quest">
-          <h4>{q.name}<span className="qtype">{typeName(q)}</span> <small className="sub">{t('common.lv', { n: q.level })}</small></h4>
-          <div className="sub">{q.text}</div>
+        <div key={q.id} className={'quest' + (STORY[q.id] ? ' story' : '')}>
+          <h4>{q.name}<span className="qtype">{STORY[q.id] ? STORY[q.id].chapter : typeName(q)}</span> <small className="sub">{t('common.lv', { n: q.level })}</small></h4>
+          {!q.intro && <div className="sub">{q.text}</div>}
           <Objectives hud={hud} q={q} active={false} />
           <Reward hud={hud} q={q} />
           <div className="actions">
-            <button className="primary" disabled={!!why} title={why ? tm(why) : undefined} onClick={() => game.questOp('accept', { id: q.id })} aria-label={t('quest.acceptName', { name: q.name })}>{t('common.accept')}</button>
+            {q.intro && <button className={why ? '' : 'primary'} onClick={() => openScene({ zone: q.zone, title: q.name, lines: q.intro!, accept: why ? undefined : () => game.questOp('accept', { id: q.id }) })} aria-label={t('story.listenName', { name: q.name })}>{t('story.listen')}</button>}
+            <button className={q.intro ? '' : 'primary'} disabled={!!why} title={why ? tm(why) : undefined} onClick={() => game.questOp('accept', { id: q.id })} aria-label={t('quest.acceptName', { name: q.name })}>{t('common.accept')}</button>
             {why && <span className="err">{tm(why)}</span>}
           </div>
         </div>
@@ -77,6 +82,77 @@ export function QuestGiver({ hud, game, zone }: { hud: Hud; game: Game; zone: st
     </>
   );
 }
+
+/** Quests from a townsperson who is not a lorekeeper, in a small panel beside their own dialog. */
+export function NpcQuests({ hud, game, npc }: { hud: Hud; game: Game; npc: string }) {
+  const any = QUEST_LIST.some((q) => giverId(q) === npc && (hud.quests.active[q.id] || !hud.quests.done[q.id]) && (hud.quests.active[q.id] || !acceptBlock(q, hud.quests, hud.self?.level ?? 0, hud.rep, Date.now())));
+  if (!any) return null;
+  return <div className="hud npcquests panel" role="region" aria-label={t('quest.title')}><QuestGiver hud={hud} game={game} giver={npc} /></div>;
+}
+
+// ---------- the story scene: who speaks, their portrait, the line typed out ----------
+interface Scene { zone: string; title: string; lines: Line[]; accept?: () => void }
+let scene: Scene | null = null;
+const sceneSubs = new Set<() => void>();
+export function openScene(s: Scene | null) {
+  scene = s;
+  sceneSubs.forEach((f) => f());
+}
+const closeScene = () => openScene(null);
+
+/** Sera Vale, the cartographer who walks the story with the player. */
+const SERA_AP = { v: 2, body: 1, build: 0, height: 1, skin: 6, face: 4, eyes: 2, eyeColor: 1, hair: 5, hairColor: 2, clothing: 3, color1: 1, color2: 4, armor: 1, armorColor: 8, helmet: 0, helmetColor: 0, weapon: 0, cape: 1, capeColor: 0, accessory: 1, accessoryColor: 4, aura: 0 };
+const STORY_HELPER = (zone: string) => Object.values(STORY).find((s) => s.zone === zone && s.step === 2)?.giver ?? '';
+/** Portrait of whoever speaks: the townsperson's own sprite, or Sera's. */
+function Portrait({ who, zone }: { who: string; zone: string }) {
+  if (who === 'S') return <Sprite ap={SERA_AP as any} job="ranger" scale={3} />;
+  const id = who === 'L' ? `lorekeeper:${zone}` : who === 'H' ? STORY_HELPER(zone) : '';
+  const o = id ? objById(id) : undefined;
+  return o?.ap && o.job ? <Sprite ap={o.ap} job={o.job} scale={3} /> : <div className="noportrait" />;
+}
+
+/** Story dialogue: opened with "Listen" on a story quest, and by itself when a story step is handed in. */
+export function StoryScene({ game }: { game: Game }) {
+  useT();
+  const s = useSyncExternalStore((f: () => void) => (sceneSubs.add(f), () => void sceneSubs.delete(f)), () => scene) as Scene | null;
+  const hud = useHud(game);
+  const [i, setI] = useState(0), [n, setN] = useState(0);
+  const done = useRef(null as Record<string, number> | null);
+  useEffect(() => {
+    const now = Object.fromEntries(Object.entries(hud.quests.done).map(([k, v]) => [k, v.n])) as Record<string, number>;
+    if (done.current) for (const [k, c] of Object.entries(now)) if (c > (done.current[k] ?? 0) && QUESTS[k]?.outro) openScene({ zone: QUESTS[k].zone, title: QUESTS[k].name, lines: QUESTS[k].outro! });
+    done.current = now;
+  }, [hud.quests.done]);
+  useEffect(() => { setI(0); setN(0); }, [s]);
+  const line = s?.lines[i];
+  useEffect(() => {
+    if (!line || n >= line[1].length) return;
+    const id = setTimeout(() => setN((x: number) => Math.min(line[1].length, x + 2)), 18);
+    return () => clearTimeout(id);
+  }, [line, n]);
+  if (!s || !line) return null;
+  const last = i === s.lines.length - 1, full = n >= line[1].length;
+  const next = () => {
+    if (!full) return setN(line[1].length);
+    if (!last) { setI(i + 1); setN(0); return; }
+    closeScene();
+  };
+  return (
+    <div className="hud storyscene panel" role="dialog" aria-label={t('story.scene', { name: s.title })} onClick={next}>
+      <div className="storyportrait" aria-hidden="true"><Portrait who={line[0]} zone={s.zone} /></div>
+      <div className="storytext">
+        <div className="storyhead"><b>{speakerName(line[0], s.zone)}</b><span className="sub">{s.title} · {i + 1}/{s.lines.length}</span></div>
+        <p aria-live="polite">{line[1].slice(0, n)}{!full && <span className="caret" aria-hidden="true">▌</span>}</p>
+        <div className="actions" onClick={(e: any) => e.stopPropagation()}>
+          {!last && <button className="primary" onClick={next}>{full ? t('story.next') : t('story.skip')}</button>}
+          {last && s.accept && <button className="primary" onClick={() => { s.accept!(); closeScene(); }}>{t('common.accept')}</button>}
+          {last && <button onClick={closeScene}>{s.accept ? t('story.later') : t('story.close')}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+void SERA;
 
 /** The faction whose seat is this town sells its goods to those it trusts. */
 export function FactionShop({ hud, game, zone }: { hud: Hud; game: Game; zone: string }) {

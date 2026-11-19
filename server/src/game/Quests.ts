@@ -104,6 +104,17 @@ export class Quests {
         sendInv(this.w, p);
         return '';
       }
+      case 'talk': {
+        // a conversation was opened: counts for quests that ask the player to speak to this townsperson
+        if (typeof m.npc !== 'string' || !this.atGiver(p, m.npc)) return '';
+        let hit = false;
+        for (const [id, a] of Object.entries(s.active))
+          QUESTS[id].objectives.forEach((o, i) => {
+            if (o.kind === 'talk' && o.npc === m.npc && a.p[i] < o.n) { a.p[i]++; hit = true; }
+          });
+        if (hit) this.changed(p);
+        return '';
+      }
       case 'shop': {
         // faction quartermaster: the faction's lorekeeper sells its goods to those it trusts
         const f = typeof m.faction === 'string' ? this.faction(m.faction) : undefined;
@@ -148,13 +159,27 @@ export class Quests {
       const q = QUESTS[id];
       q.objectives.forEach((o, i) => {
         if (a.p[i] >= o.n) return;
-        const ok = (o.kind === 'kill' && (!o.mob || o.mob === m.def.id) && (!o.zone || o.zone === p.room.zoneId) && !m.summoner) || (o.kind === 'boss' && o.mob === m.def.id);
+        const ok = (o.kind === 'kill' && (!o.mob || o.mob === m.def.id) && (!o.zone || o.zone === p.room.zoneId) && !m.summoner) || (o.kind === 'boss' && o.mob === m.def.id)
+          || (o.kind === 'loot' && o.mob === m.def.id && !m.summoner && this.w.rnd() < o.chance);
         if (ok) {
           a.p[i]++;
           hit = true;
         }
       });
     }
+    if (hit) this.changed(p);
+  }
+  /** Visit objectives: checked about once a second for players who have one. */
+  onMove(p: Player) {
+    let hit = false;
+    for (const [id, a] of Object.entries(p.quests.active))
+      QUESTS[id].objectives.forEach((o, i) => {
+        if (o.kind === 'visit' && a.p[i] < o.n && o.zone === p.room.zoneId && Math.hypot(p.x - o.x, p.y - o.y) <= o.r) {
+          a.p[i] = o.n;
+          hit = true;
+          this.w.send(p, { t: 'sys', text: `Objective complete: ${o.label}.`, cue: 'quest' });
+        }
+      });
     if (hit) this.changed(p);
   }
   /** A dungeon run this player was inside was cleared. */

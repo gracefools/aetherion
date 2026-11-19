@@ -29,6 +29,7 @@ import { LifePanel } from './lifeUi';
 import { FUSION_LEVEL, FUSION_RUNE_LEVEL, fusionsFor } from '../../shared/src/awakening';
 import { ASCENSION_LEVEL, COMBO_LEVEL, COMBO_WINDOW_MS, comboOf, PATH_INDEX, ULT_MAX } from '../../shared/src/ascension';
 import { Dock, MENU_OF_ACTION, menuLock } from './dock';
+import { Sprite } from './sprite';
 import { ChatBox } from './chat';
 import { startGamepad } from './gamepad';
 import { closeTopWindow, isNarrow, Win } from './windows';
@@ -50,7 +51,7 @@ import { actionFor, type Action } from '../../shared/src/settings';
 import { markTutorial } from './tutorial';
 import { subsOf, type SubSkillDef } from '../../shared/src/subskills';
 import { AutoPanel } from './autohunt';
-import { QuestLog, QuestTracker } from './quests';
+import { QuestLog, QuestTracker, StoryScene } from './quests';
 import { attackIcon, iconCanvas, iconManifest, runeIcon, skillIcon, statusIcon } from './game/skillicons';
 import { ownsRune } from '../../shared/src/runes';
 import { STATUS } from '../../shared/src/combat';
@@ -90,37 +91,6 @@ async function api<T>(path: string, token?: string, body?: unknown): Promise<T> 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error ? tm(data.error) : t('err.request')), { status: res.status });
   return data as T;
-}
-
-/** Draws one sprite; animates only when `anim` is given (creator preview). */
-function Sprite({ ap, job, scale = 3, anim, dir = 0 }: { ap: Appearance; job: Job; scale?: number; anim?: Anim; dir?: number }) {
-  const ref = useRef(null as HTMLCanvasElement | null);
-  useEffect(() => {
-    const g = ref.current!.getContext('2d')!;
-    const hd = settings.get().graphics.art === 'hd';
-    const sheet = hd ? getHDSheet(ap, job) : getCharSheet(ap, job);
-    const t0 = performance.now();
-    const draw = () => {
-      g.imageSmoothingEnabled = false;
-      g.clearRect(0, 0, FRAME_W * scale, FRAME_H * scale);
-      // one-shot animations replay with a short pause so they can be inspected
-      const t = anim ? (performance.now() - t0) % 1400 : 0;
-      // HD frames are 64px: a 40px window around the (style A) figure fills the same canvas
-      if (hd) g.drawImage(sheet, hdFrame(anim ?? 'idle', t) * HD + 12, dir * HD + 21, 40, 40, 0, 0, FRAME_W * scale, FRAME_H * scale);
-      else g.drawImage(sheet, animFrame(anim ?? 'idle', t) * FRAME_W, dir * FRAME_H, FRAME_W, FRAME_H, 0, 0, FRAME_W * scale, FRAME_H * scale);
-      if (anim && ap.aura) {
-        g.save();
-        g.scale(scale, scale);
-        drawAura(g, ap.aura, SPRITE_OX, SPRITE_OY, performance.now(), 1);
-        g.restore();
-      }
-    };
-    draw();
-    if (!anim) return;
-    const id = setInterval(draw, 50);
-    return () => clearInterval(id);
-  }, [JSON.stringify(ap), job, scale, anim, dir]);
-  return <canvas ref={ref} width={FRAME_W * scale} height={FRAME_H * scale} className="sprite" />;
 }
 
 function Auth({ onAuth }: { onAuth: (token: string) => void }) {
@@ -436,6 +406,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
       {game && tut && <Win id="help" title={'tut.panel'} onClose={() => setTut(false)}><Guard><TutorialPanel onClose={() => setTut(false)} /></Guard></Win>}
       {game && qlog && <Win id="quests" title={'quest.log'} onClose={() => setQlog(false)}><Guard><QuestLog game={game} onClose={() => setQlog(false)} /></Guard></Win>}
       {game && <Guard><QuestTracker game={game} onOpen={() => setQlog(true)} /></Guard>}
+      {game && <Guard><StoryScene game={game} /></Guard>}
       {game && <Guard><RiftTracker game={game} /></Guard>}
       {game && <Guard><RaidTracker game={game} /></Guard>}
       {game && <Guard><SiegeTracker game={game} /></Guard>}

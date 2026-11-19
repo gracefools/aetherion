@@ -1670,6 +1670,8 @@ export class World implements CombatCtx {
   private bountyRooms = new Set<ZoneRoom>();
   /** The Depths: players carrying a bounty are shown to everyone there; boss timers go to everyone. */
   private depthTick() {
+    // story quests: "go to" objectives are checked about once a second
+    if (this.tick % 20 === 7) for (const p of this.online.values()) if (!p.dead && Object.keys(p.quests.active).some((id) => id.startsWith('story_'))) this.quests.onMove(p);
     if (this.tick % 40 === 0)
       for (const z of DEPTH_ZONES) for (const room of this.rooms.get(z) ?? []) {
         const marks = [...room.players.values()].filter((p) => p.streak >= BOUNTY_STREAK && !p.dead).map((p) => ({ id: p.id, name: p.name, x: Math.round(p.x), y: Math.round(p.y), n: p.streak }));

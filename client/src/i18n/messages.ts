@@ -192,6 +192,7 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   completed: m('Already completed', 'Sudah diselesaikan'), daily: m('Completed today: available again after midnight (UTC)', 'Selesai hari ini: tersedia lagi setelah tengah malam (UTC)'),
   first: m('First complete "{a}"', 'Selesaikan dulu "{a}"'), haveQuest: m('You already have this quest', 'Kamu sudah mengambil misi ini'), maxQuests: m('You can have at most {a} quests at once', 'Kamu hanya bisa mengambil paling banyak {a} misi sekaligus'),
   bagReward: m('Make room in your bag for the reward first', 'Kosongkan tempat di tasmu untuk hadiahnya terlebih dahulu'), notFaction: m('Not sold by this faction', 'Tidak dijual oleh faksi ini'),
+  objDone: m('Objective complete: {a}.', 'Sasaran tercapai: {a}.'),
   abandoned: m('Quest abandoned: {a}.', 'Misi ditinggalkan: {a}.'), accepted: m('Quest accepted: {a}.', 'Misi diterima: {a}.'), questDone: m('Quest complete: {a}. {b} EXP, {c} gold.', 'Misi selesai: {a}. {b} EXP, {c} emas.'),
   repNeed: m('Requires {a} reputation with {b}', 'Butuh reputasi {a} dengan {b}'), returnGiver: m('Return to the quest giver to turn this quest in', 'Kembali ke pemberi misi untuk menyerahkan misi ini'),
   talkGiver: m('Talk to the quest giver to accept this quest', 'Bicaralah dengan pemberi misi untuk menerima misi ini'), notComplete: m('The quest is not complete yet', 'Misi belum selesai'),

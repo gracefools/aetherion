@@ -431,6 +431,19 @@
     .dock { grid-template-columns: repeat(4, 36px); gap: 4px; } .dockbtn { width: 36px; height: 36px; } .dockbtn .ico { width: 19px; height: 19px; }
     .bl { width: calc(100% - 200px) !important; min-width: 150px; } .chattab { padding: 3px 6px; }
   }
+  /* story scene: portrait, speaker and the line typed out, over the bottom of the screen */
+  .storyscene { z-index: 8; left: 50%; bottom: 120px; transform: translateX(-50%); width: min(760px, calc(100% - 24px)); display: flex; gap: 14px; align-items: stretch; padding: 12px 16px !important;
+    cursor: pointer; border-color: var(--gold) !important; background: linear-gradient(180deg, rgba(30,28,46,.97), rgba(18,18,30,.97)) !important; animation: winin .2s ease-out; }
+  .storyportrait { flex: 0 0 auto; display: grid; place-items: end center; width: 100px; background: radial-gradient(circle at 50% 70%, rgba(201,162,74,.25), transparent 70%); border-radius: 8px; }
+  .storyportrait .sprite { margin-bottom: -6px; } .noportrait { width: 96px; height: 96px; }
+  .storytext { flex: 1; min-width: 0; display: grid; gap: 6px; align-content: start; }
+  .storyhead { display: flex; gap: 10px; align-items: baseline; } .storyhead b { font: 600 17px Georgia, serif; color: var(--gold); }
+  .storytext p { margin: 0; font-size: 16px; line-height: 1.5; min-height: 4.5em; } .storytext .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .caret { opacity: .6; animation: blink 1s steps(2) infinite; } @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .caret { animation: none; } .storyscene { animation: none; } }
+  .quest.story { border-left: 3px solid var(--gold); padding-left: 8px; } .quest.story .qtype { color: #ffe08a; }
+  .npcquests { z-index: 4; left: 10px; top: 160px; width: min(360px, calc(100% - 24px)); max-height: calc(100% - 420px); overflow: auto; padding: 12px !important; font-size: 13px; }
+  .npc ~ .npcquests, .npc .npcquests { position: static; width: auto; max-height: none; margin-top: 8px; padding: 0 !important; border: 0; background: none; box-shadow: none; }
   /* chat tabs with unread counts */
   .chattabs { display: flex; gap: 2px; margin: -2px 0 6px; overflow-x: auto; scrollbar-width: none; }
   .chattab { position: relative; padding: 3px 9px; font-size: 12px; border-radius: 5px 5px 0 0; background: rgba(255,255,255,.04); border: 1px solid transparent; border-bottom-color: var(--line); color: var(--dim); white-space: nowrap; transition: color .12s, background .12s; }

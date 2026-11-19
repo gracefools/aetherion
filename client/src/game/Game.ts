@@ -21,7 +21,7 @@ import { DEFAULT_AUTO, emptyAutoStats, withSkills, type AutoConfig, type AutoSta
 import { INVENTORY_SIZE } from '../../../shared/src/items';
 import type { Job, SortKey, TradeState } from '../../../shared/src/protocol';
 import { AutoHunter } from './autohunt';
-import { DEFAULT_FACTIONS, emptyQuests, giverId, offeredAt, QUESTS, type FactionDef, type QuestState } from '../../../shared/src/quests';
+import { acceptBlock, DEFAULT_FACTIONS, emptyQuests, giverId, QUEST_LIST, QUESTS, type FactionDef, type QuestState } from '../../../shared/src/quests';
 import { emptyCompanions, type Companions, isFlying, MOUNTS, petStage } from '../../../shared/src/companions';
 import { emptyBank, type AuctionRates, type Bank, type GuildView, type Listing } from '../../../shared/src/economy';
 import { inTown, pvpBlock, pvpRuleAt } from '../../../shared/src/pvp';
@@ -775,7 +775,7 @@ export class Game {
     this.sendMsg({ t: 'mail', op, ...a });
   }
   /** Quests and faction shops; the server decides. */
-  questOp(op: 'accept' | 'abandon' | 'turnin' | 'shop', a: { id?: string; faction?: string; base?: string } = {}) {
+  questOp(op: 'accept' | 'abandon' | 'turnin' | 'shop' | 'talk', a: { id?: string; faction?: string; base?: string; npc?: string } = {}) {
     this.sendMsg({ t: 'quest', op, ...a });
     if (op === 'accept') this.tut('quest');
   }
@@ -2148,11 +2148,10 @@ export class Game {
   }
 
   /** Quest givers with something for this character, and the monsters active quests still need; refreshed twice a second. */
-  private qm = { at: -1e9, npc: new Map<string, string>(), mobs: new Set<string>() };
+  private qm = { at: -1e9, npc: new Map<string, string>(), mobs: new Set<string>(), spots: [] as { x: number; y: number }[] };
   private questMarks() {
-    const now = performance.now();
-    if (now - this.qm.at < 500) return this.qm;
-    const h = this.hud, zone = this.map?.def.id, lv = h.self?.level ?? 0, npc = new Map<string, string>(), mobs = new Set<string>();
+    if (performance.now() - this.qm.at < 500) return this.qm;
+    const h = this.hud, zone = this.map?.def.id, lv = h.self?.level ?? 0, npc = new Map<string, string>(), mobs = new Set<string>(), spots: { x: number; y: number }[] = [];
     if (settings.get().graphics.questMarkers !== false) {
       for (const id of Object.keys(h.quests.active)) {
         const q = QUESTS[id];
@@ -2160,12 +2159,19 @@ export class Game {
         const p = h.qprog[id] ?? q.objectives.map(() => 0);
         if (q.objectives.every((o, i) => (p[i] ?? 0) >= o.n)) npc.set(giverId(q), '?');
         else q.objectives.forEach((o, i) => {
-          if ((o.kind === 'kill' || o.kind === 'boss') && o.mob && (p[i] ?? 0) < o.n && (o.kind === 'boss' || !o.zone || o.zone === zone)) mobs.add(o.mob);
+          if ((p[i] ?? 0) >= o.n) return;
+          if ((o.kind === 'kill' || o.kind === 'boss' || o.kind === 'loot') && o.mob && (o.kind !== 'kill' || !o.zone || o.zone === zone)) mobs.add(o.mob);
+          if (o.kind === 'talk' && !npc.has(o.npc)) npc.set(o.npc, '…');
+          if (o.kind === 'visit' && o.zone === zone) spots.push({ x: o.x, y: o.y });
         });
       }
-      for (const ob of this.objs) if (ob.kind === 'lorekeeper' && !npc.has(ob.id) && offeredAt(ob.zone, h.quests, lv, h.rep, Date.now()).length) npc.set(ob.id, '!');
+      const now = Date.now();
+      for (const q of QUEST_LIST) {
+        if (h.quests.active[q.id] || npc.has(giverId(q)) || (q.repeat !== 'once' && q.type !== 'main') || acceptBlock(q, h.quests, lv, h.rep, now)) continue;
+        if (this.objs.some((o) => o.id === giverId(q))) npc.set(giverId(q), '!');
+      }
     }
-    this.qm = { at: now, npc, mobs };
+    this.qm = { at: performance.now(), npc, mobs, spots };
     return this.qm;
   }
   private drawQuestMark(g: CanvasRenderingContext2D, mark: string, x: number, y: number, now: number) {
@@ -2223,6 +2229,12 @@ export class Game {
       }
       g.fillStyle = r.mt ? (MONSTERS[r.mt].elite ? '#ffb347' : '#e2523f') : '#ffffff';
       g.fillRect(r.rx * sx - 1, r.ry * sy - 1, r.mt ? 2 : 3, r.mt ? 2 : 3);
+    }
+    for (const sp of qm.spots) { // a place a story step sends the player to
+      g.strokeStyle = '#2a1c05'; g.lineWidth = 3;
+      g.beginPath(); g.arc(sp.x * sx, sp.y * sy, 5, 0, 7); g.stroke();
+      g.strokeStyle = '#ffe14a'; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(sp.x * sx, sp.y * sy, 5, 0, 7); g.stroke();
     }
     if (qm.npc.size) {
       g.font = 'bold 12px Georgia, serif';

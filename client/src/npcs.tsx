@@ -5,7 +5,7 @@ import { RaidHerald } from './conquestUi';
 import { Steward } from './lifeUi';
 import { BankerDialog } from './economy';
 import { ArenaMaster } from './pvp';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ITEMS } from '../../shared/src/items';
 import { FACTIONS, LORE } from '../../shared/src/lore';
 import { allDiscoveries, objById, RECIPES, teleportCost, waypointId, zoneObjects } from '../../shared/src/places';
@@ -13,7 +13,8 @@ import { REGIONS, ZONES } from '../../shared/src/world';
 import { ELEMENT_NAMES, ELEMENTS, runeSpells, type Element } from '../../shared/src/abilities';
 import { ownedRunes, ownsRune, RUNE_SHOP, RUNE_STOCK, runePrice } from '../../shared/src/runes';
 import { runeIcon, skillIcon } from './game/skillicons';
-import { QuestGiver, FactionShop } from './quests';
+import { QuestGiver, FactionShop, NpcQuests } from './quests';
+import { QUESTS } from '../../shared/src/quests';
 import type { Game, Hud } from './game/Game';
 import { keyOf } from './game/Game';
 import { Icon } from './inventory';
@@ -85,7 +86,7 @@ function Lorekeeper({ hud, game }: { hud: Hud; game: Game }) {
         <button disabled={page === lore.pages.length - 1} onClick={() => setPage(page + 1)}>{t('npc.lore.next')}</button>
       </div>
       {faction && <p className="sub"><b>{faction.name}</b> — "{faction.creed}" {faction.about}</p>}
-      <QuestGiver hud={hud} game={game} zone={hud.zoneId} />
+      <QuestGiver hud={hud} game={game} giver={`lorekeeper:${hud.zoneId}`} />
       <FactionShop hud={hud} game={game} zone={hud.zoneId} />
     </>
   );
@@ -147,8 +148,13 @@ const ROLE: Record<string, Key> = { merchant: 'npc.role.merchant', waykeeper: 'n
 export function NpcDialog({ hud, game, openBag }: { hud: Hud; game: Game; openBag: () => void }) {
   useT();
   const o = hud.talk ? objById(hud.talk) : undefined;
+  // opening a conversation counts for story quests that ask the player to speak to this person
+  useEffect(() => {
+    if (o && Object.entries(hud.quests.active).some(([id, a]) => QUESTS[id]?.objectives.some((ob, i) => ob.kind === 'talk' && ob.npc === o.id && a.p[i] < ob.n))) game.questOp('talk', { npc: o.id });
+  }, [o?.id]);
   if (!o) return null;
-  if (o.kind === 'banker') return <BankerDialog hud={hud} game={game} name={o.name} town={ZONES[o.zone].town!.name} />;
+  const quests = o.kind !== 'lorekeeper' ? <NpcQuests hud={hud} game={game} npc={o.id} /> : null;
+  if (o.kind === 'banker') return <><BankerDialog hud={hud} game={game} name={o.name} town={ZONES[o.zone].town!.name} />{quests}</>;
   return (
     <div className="hud npc panel" role="dialog" aria-label={o.name}>
       <div className="sheethead"><div><h2>{o.name}</h2><div className="sub">{t(ROLE[o.kind] ?? 'npc.role.lorekeeper')} · {ZONES[o.zone].town!.name}</div></div>
@@ -161,6 +167,7 @@ export function NpcDialog({ hud, game, openBag }: { hud: Hud; game: Game; openBa
       {o.kind === 'riftwarden' && <RiftWarden hud={hud} game={game} />}
       {o.kind === 'raidherald' && <RaidHerald hud={hud} game={game} />}
       {o.kind === 'steward' && <Steward hud={hud} game={game} />}
+      {quests}
     </div>
   );
 }

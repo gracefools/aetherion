@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { allDiscoveries, isNpc, NODE_RESPAWN_MS, objById, RECIPES, REGION_RES, teleportCost, WAYSTONE_RANGE, zoneObjects } from '../shared/src/places';
+import { speakerName, STORY, STORY_REGIONS } from '../shared/src/story';
 import { FACTIONS, LORE } from '../shared/src/lore';
 import { validateDir, validateSheet, type SheetEntry } from '../scripts/assets';
 import { decodePng, encodePng, type Image } from '../scripts/png';
@@ -4181,11 +4182,11 @@ function kill(world: World, p: Player, type: string) {
 test('M13 quest data: every type, valid givers, objectives, prerequisites and rewards', () => {
   assert.deepEqual([...new Set(QUEST_LIST.map((q) => q.type))].sort(), [...QUEST_TYPES].sort(), 'every quest type exists');
   assert.equal(new Set(QUEST_LIST.map((q) => q.id)).size, QUEST_LIST.length, 'unique ids');
-  assert.equal(QUEST_LIST.length, REGIONS.length * 7 + Object.keys(DUNGEON_DEFS).length + WORLD_BOSSES.length);
+  assert.equal(QUEST_LIST.length, REGIONS.length * 7 + STORY_REGIONS.length * 3 + Object.keys(DUNGEON_DEFS).length + WORLD_BOSSES.length);
   const factions = new Set(DEFAULT_FACTIONS.map((f) => f.id));
   for (const q of QUEST_LIST) {
     const giver = objById(giverId(q));
-    assert.ok(giver && giver.kind === 'lorekeeper' && giver.zone === q.zone, `${q.id}: given by the lorekeeper of ${q.zone}`);
+    assert.ok(giver && isNpc(giver) && giver.zone === q.zone && (giver.kind === 'lorekeeper' || !!STORY[q.id]), `${q.id}: given by a townsperson of ${q.zone}`);
     assert.ok(q.name.length > 3 && q.text.length > 20 && q.level >= 1 && q.objectives.length >= 1, q.id);
     for (const o of q.objectives) {
       assert.ok(o.n >= 1 && o.label.length > 3, `${q.id}: objective`);
@@ -4195,6 +4196,15 @@ test('M13 quest data: every type, valid givers, objectives, prerequisites and re
       if (o.kind === 'discover') assert.equal(o.n, zoneObjects(o.zone).filter((x) => x.kind === 'cache').length, 'as many caches as the zone has');
       if (o.kind === 'clear') assert.ok(DUNGEON_DEFS[o.dungeon]);
       if (o.kind === 'boss') assert.ok(MONSTERS[o.mob]?.boss);
+      if (o.kind === 'talk') assert.ok(objById(o.npc) && isNpc(objById(o.npc)!) && objById(o.npc)!.zone === q.zone, `${q.id}: speak to ${o.npc}`);
+      if (o.kind === 'loot') assert.ok(MONSTERS[o.mob] && !MONSTERS[o.mob].boss && SPAWNS[q.zone].some((g) => g.type === o.mob) && o.chance > 0 && o.chance <= 1, `${q.id}: loot from ${o.mob}`);
+      if (o.kind === 'visit') {
+        // the place is on the map and can be walked to (some tile within its radius is open ground)
+        const map = getZoneMap(o.zone), T = TILE;
+        let open = false;
+        for (let y = o.y - o.r; y <= o.y + o.r && !open; y += 16) for (let x = o.x - o.r; x <= o.x + o.r && !open; x += 16) if (Math.hypot(x - o.x, y - o.y) <= o.r && !blocked(map, x, y)) open = true;
+        assert.ok(o.zone === q.zone && open && o.x > 0 && o.y > 0 && o.x < map.w * T && o.y < map.h * T, `${q.id}: a reachable place`);
+      }
     }
     for (const id of q.prereq) assert.ok(QUESTS[id], `${q.id}: prerequisite ${id}`);
     assert.ok(q.reward.exp > 0 && q.reward.gold > 0, `${q.id}: reward`);
@@ -4212,6 +4222,49 @@ test('M13 quest data: every type, valid givers, objectives, prerequisites and re
     assert.ok(REGIONS.includes(f.region) && f.shop.length >= 3, `${f.id} has a seat and a shop`);
     for (const [b, price, lv] of f.shop) assert.ok(ITEMS[b] && price > 0 && lv >= 0 && lv < REP_LEVELS.length, `${f.id} sells ${b}`);
   }
+});
+
+test('G3 the main story: a chapter in every region, three chained steps, dialogue, every new objective on the server', () => {
+  assert.equal(STORY_REGIONS.length, REGIONS.length, 'every region has a chapter');
+  for (const z of STORY_REGIONS) {
+    const [s1, s2, s3] = [1, 2, 3].map((n) => QUESTS[`story_${z}_${n}`]);
+    assert.deepEqual([s1.prereq, s2.prereq, s3.prereq], [[`main_${z}`], [s1.id], [s2.id]], `${z}: the steps follow the region's main quest`);
+    for (const q of [s1, s2, s3]) assert.ok(q.type === 'main' && q.intro!.length >= 1 && q.outro!.length >= 1 && q.intro!.every(([who, line]) => who && line.length > 10), `${q.id}: spoken lines`);
+    assert.equal(giverId(s2), s1.objectives.find((o) => o.kind === 'talk')!.kind === 'talk' ? (s1.objectives[0] as any).npc : '', `${z}: step 2 comes from the person step 1 sends you to`);
+    for (const [who] of [...s1.intro!, ...s3.outro!]) assert.ok(speakerName(who, z).length > 2);
+  }
+  assert.match(QUESTS.story_voidreach_3.outro!.map((l) => l[1]).join(' '), /Remember yourself/, 'the story ends where it says it does');
+  // the server: speak to, go to, recover from monsters
+  const h = harness({ capacity: 10, rng: () => 0.1 }), { world } = h;
+  const a = atGiver(h, 'eldoria', 'knight', 6), p = a.p;
+  p.quests.done.main_eldoria = { n: 1, day: 0 };
+  assert.equal(world.quest(p, { op: 'accept', id: 'story_eldoria_1' }), '');
+  const talk = QUESTS.story_eldoria_1.objectives[0] as any, visit = QUESTS.story_eldoria_1.objectives[1] as any;
+  assert.equal(world.quest(p, { op: 'talk', npc: talk.npc }), '');
+  assert.deepEqual(p.quests.active.story_eldoria_1.p, [0, 0], 'speaking from across the plaza does not count');
+  const npc = objById(talk.npc)!;
+  p.x = npc.x + 20; p.y = npc.y;
+  assert.equal(world.quest(p, { op: 'talk', npc: talk.npc }), '');
+  assert.deepEqual(p.quests.active.story_eldoria_1.p, [1, 0]);
+  world.quests.onMove(p);
+  assert.deepEqual(p.quests.active.story_eldoria_1.p, [1, 0], 'not there yet');
+  p.x = visit.x; p.y = visit.y;
+  world.quests.onMove(p);
+  assert.deepEqual(p.quests.active.story_eldoria_1.p, [1, 1], 'arrived');
+  const lk = objById('lorekeeper:eldoria')!;
+  p.x = lk.x + 20; p.y = lk.y;
+  assert.equal(world.quest(p, { op: 'turnin', id: 'story_eldoria_1' }), '');
+  // step 2 is given by the person step 1 sent you to
+  assert.equal(world.quest(p, { op: 'accept', id: 'story_eldoria_2' }), 'Talk to the quest giver to accept this quest');
+  p.x = npc.x + 20; p.y = npc.y;
+  assert.equal(world.quest(p, { op: 'accept', id: 'story_eldoria_2' }), '');
+  const loot = QUESTS.story_eldoria_2.objectives[0] as any;
+  kill(world, p, 'boar' === loot.mob ? 'mossling' : 'boar');
+  assert.deepEqual(p.quests.active.story_eldoria_2.p, [0], 'only the named monster carries the pieces');
+  for (let i = 0; i < loot.n + 3; i++) kill(world, p, loot.mob);
+  assert.deepEqual(p.quests.active.story_eldoria_2.p, [loot.n], 'recovered, and no more than needed');
+  assert.equal(world.quest(p, { op: 'turnin', id: 'story_eldoria_2' }), '');
+  for (const junk of [{ op: 'talk' }, { op: 'talk', npc: 5 }, { op: 'talk', npc: 'nobody' }]) assert.equal(world.quest(p, junk), '', 'unknown townsfolk are ignored quietly');
 });
 
 test('M13 accepting: level, prerequisites, reputation, once, daily reset at midnight UTC, and the active limit', () => {

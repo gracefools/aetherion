@@ -8,6 +8,7 @@ import { MONSTERS, SPAWNS, WORLD_BOSSES } from './monsters';
 import { REGION_RES, zoneObjects } from './places';
 import { EXPANSION } from './expansion';
 import { REGIONS, ZONES } from './world';
+import { STORY_REGIONS, storyParts, type Line } from './story';
 
 // ---------------------------------------------------------------------------------------------
 // Factions and reputation
@@ -57,13 +58,24 @@ export type Objective =
   | { kind: 'collect'; item: string; n: number; label: string }
   | { kind: 'discover'; zone: string; n: number; label: string }
   | { kind: 'clear'; dungeon: string; n: number; label: string }
-  | { kind: 'boss'; mob: string; n: number; label: string };
+  | { kind: 'boss'; mob: string; n: number; label: string }
+  /** Speak to a townsperson (counted when the player opens a conversation with them). */
+  | { kind: 'talk'; npc: string; n: number; label: string }
+  /** Reach a place: within r map pixels of (x, y) in a zone. */
+  | { kind: 'visit'; zone: string; x: number; y: number; r: number; n: number; label: string }
+  /** Recover story items: each kill of the monster has this chance to yield one. */
+  | { kind: 'loot'; mob: string; n: number; chance: number; label: string };
 export interface QuestDef {
   id: string;
   name: string;
   type: QuestType;
-  /** The quest giver: the lorekeeper of this region's town. Accept and turn in there. */
+  /** The region whose town gives the quest. Accept and turn in with the giver there. */
   zone: string;
+  /** The townsperson who gives it (an object id); the region's lorekeeper when absent. */
+  giver?: string;
+  /** Story quests: what is said when it is offered and when it is handed in. */
+  intro?: Line[];
+  outro?: Line[];
   level: number;
   prereq: string[];
   /** Faction quests: the reputation level needed to be offered the quest. */
@@ -74,7 +86,7 @@ export interface QuestDef {
   /** once, once per (UTC) day, or as often as the player likes. */
   repeat: 'once' | 'day' | 'always';
 }
-export const giverId = (q: QuestDef) => `lorekeeper:${q.zone}`;
+export const giverId = (q: QuestDef) => q.giver ?? `lorekeeper:${q.zone}`;
 export const MAX_ACTIVE_QUESTS = 15;
 export const HISTORY_SIZE = 50;
 
@@ -91,7 +103,7 @@ function regionQuests(zone: string, i: number): QuestDef[] {
     ({ zone, prereq: [], ...o, reward: { exp: 0, gold: 0, items: [], rep: [], ...o.reward } });
   return [
     q({ id: `main_${zone}`, name: MAIN_NAMES[zone], type: 'main', level: lv, prereq: prev ? [prev] : [], repeat: 'once',
-      text: MAIN_TEXT[zone], objectives: [{ kind: 'kill', mob: elite.type, n: 1, label: `Defeat ${name(elite.type)}` }, { kind: 'kill', mob: a.type, n: 6, label: `Defeat 6 ${plural(a.type, 6)}` }],
+      text: MAIN_TEXT[zone], intro: [['L', MAIN_TEXT[zone]]], objectives: [{ kind: 'kill', mob: elite.type, n: 1, label: `Defeat ${name(elite.type)}` }, { kind: 'kill', mob: a.type, n: 6, label: `Defeat 6 ${plural(a.type, 6)}` }],
       reward: { exp: exp(lv + 1, 0.8), gold: 60 * lv, items: [['scroll_random', 1]], rep: [[f, 250]] } }),
     q({ id: `side_${zone}`, name: `Trouble on the Roads of ${z.name}`, type: 'side', level: lv, repeat: 'once',
       text: `Travellers keep turning back. Thin out the ${plural(b.type, 2)} and ${plural(c.type, 2)} that hunt the roads of ${z.name}.`,
@@ -158,7 +170,19 @@ function bossQuests(): QuestDef[] {
     reward: { exp: exp(MONSTERS[b.type].level, 1), gold: 200 * MONSTERS[b.type].level, items: [['scroll_advanced', 1]], rep: [[SEAT_OF[b.zone], 300]] },
   } satisfies QuestDef));
 }
-export const QUEST_LIST: QuestDef[] = [...REGIONS.flatMap((z, i) => regionQuests(z, i)), ...dungeonQuests(), ...bossQuests()];
+/** The main story's chapter in each region (shared/src/story.ts): three steps after the region's main quest. */
+function storyQuests(): QuestDef[] {
+  return STORY_REGIONS.flatMap((zone) => {
+    const parts = storyParts(zone)!, z = ZONES[zone], lv = z.level[0], hi = z.level[1], f = SEAT_OF[zone];
+    return parts.steps.map((st, i): QuestDef => ({
+      id: st.id, name: st.name, type: 'main', zone, giver: st.giver, level: Math.min(hi, lv + i), repeat: 'once',
+      prereq: [i ? parts.steps[i - 1].id : `main_${zone}`], text: st.text, intro: st.intro, outro: st.outro,
+      objectives: st.objectives as Objective[],
+      reward: { exp: exp(lv + i, [0.6, 0.7, 1.1][i]), gold: [40, 60, 120][i] * lv, items: i === 2 ? [['scroll_advanced', 1], ['upgrade_stone', 2]] : [['hp_potion', 3]], rep: [[f, [150, 200, 400][i]]] },
+    }));
+  });
+}
+export const QUEST_LIST: QuestDef[] = [...REGIONS.flatMap((z, i) => regionQuests(z, i)), ...storyQuests(), ...dungeonQuests(), ...bossQuests()];
 export const QUESTS: Record<string, QuestDef> = Object.fromEntries(QUEST_LIST.map((q) => [q.id, q]));
 
 // ---------------------------------------------------------------------------------------------

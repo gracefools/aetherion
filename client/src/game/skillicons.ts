@@ -206,27 +206,100 @@ const ATTACK: Record<WeaponKind, IconDef> = {
 const RUNE_SHAPE: Record<Element, keyof typeof S> = { fire: 'flame', water: 'drop', lightning: 'bolt', earth: 'rock', wind: 'crescent' };
 
 // ---- drawing ----
-const shade = (hex: string, k: number) => {
-  const n = parseInt(hex.slice(1), 16), c = (v: number) => Math.max(0, Math.min(255, Math.round(v * k)));
-  return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
+const shade = (col: string, k: number) => {
+  // takes '#rrggbb' or 'rgb(r,g,b)' (a colour that was shaded before)
+  const m = /^rgb\((\d+),(\d+),(\d+)\)$/.exec(col), n = parseInt(col.slice(1), 16);
+  const [r, g, b] = m ? [+m[1], +m[2], +m[3]] : [n >> 16, (n >> 8) & 255, n & 255], c = (v: number) => Math.max(0, Math.min(255, Math.round(v * k)));
+  return `rgb(${c(r)},${c(g)},${c(b)})`;
 };
+/** The colour the current icon glows in (its tile), for the symbol's halo. */
+let glowColor = '#ffffff';
+/** The tile's outline, so glows can be trimmed to it at the end (the corners stay transparent). */
+let tilePath: Path2D | null = null;
 function frame(g: CanvasRenderingContext2D, bg: string, border: string, hexagon = false) {
   const path = new Path2D(hexagon ? S.hex : 'M10 2H54A8 8 0 0 1 62 10V54A8 8 0 0 1 54 62H10A8 8 0 0 1 2 54V10A8 8 0 0 1 10 2Z');
+  tilePath = path;
+  glowColor = shade(bg, 1.6);
+  // the tile: lit from the upper left, deep at the edges
   const grad = g.createRadialGradient(24, 20, 4, 32, 32, 44);
-  grad.addColorStop(0, shade(bg, 0.95));
-  grad.addColorStop(1, shade(bg, 0.32));
+  grad.addColorStop(0, shade(bg, 1.05));
+  grad.addColorStop(0.55, shade(bg, 0.62));
+  grad.addColorStop(1, shade(bg, 0.24));
   g.fillStyle = grad;
   g.fill(path);
+  g.save();
+  g.clip(path);
+  // soft rays from the centre, then a fine diagonal grain: depth without noise
+  g.translate(32, 32);
+  for (let i = 0; i < 12; i++) {
+    g.rotate(Math.PI / 6);
+    g.fillStyle = i % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.025)';
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(-5, -46); g.lineTo(5, -46); g.closePath(); g.fill();
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.strokeStyle = 'rgba(0,0,0,0.08)';
+  g.lineWidth = 1;
+  for (let k = -64; k < 64; k += 4) { g.beginPath(); g.moveTo(k, 64); g.lineTo(k + 64, 0); g.stroke(); }
+  // a vignette that darkens the rim
+  const v = g.createRadialGradient(32, 32, 18, 32, 32, 46);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, 'rgba(0,0,0,0.45)');
+  g.fillStyle = v;
+  g.fillRect(0, 0, 64, 64);
+  g.restore();
+  // a metal border: dark outer edge, the coloured band, a bright bevel inside
+  g.lineWidth = 5;
+  g.strokeStyle = '#120e18';
+  g.stroke(path);
+  const metal = g.createLinearGradient(0, 0, 64, 64);
+  metal.addColorStop(0, shade(border, 1.35));
+  metal.addColorStop(0.5, border);
+  metal.addColorStop(1, shade(border, 0.55));
   g.lineWidth = 3;
-  g.strokeStyle = border;
+  g.strokeStyle = metal;
   g.stroke(path);
   g.lineWidth = 1;
-  g.strokeStyle = 'rgba(255,255,255,0.28)';
+  g.strokeStyle = 'rgba(255,255,255,0.35)';
   g.save();
   g.translate(32, 32);
-  g.scale(0.9, 0.9);
+  g.scale(0.88, 0.88);
   g.translate(-32, -32);
   g.stroke(path);
+  g.restore();
+  // studs at the corners of square tiles
+  if (!hexagon) for (const [x, y] of [[8, 8], [56, 8], [8, 56], [56, 56]]) {
+    const s = g.createRadialGradient(x - 0.8, y - 0.8, 0.2, x, y, 2.4);
+    s.addColorStop(0, '#fff6d8'); s.addColorStop(1, shade(border, 0.6));
+    g.fillStyle = s;
+    g.beginPath(); g.arc(x, y, 2.2, 0, Math.PI * 2); g.fill();
+  }
+}
+/** The glossy finish over a finished icon: a soft sheen across the top. */
+function gloss(g: CanvasRenderingContext2D) {
+  // nothing outside the tile and its border: glows are cut back to it
+  if (tilePath) {
+    // the tile and its border as one mask, applied in a single step (each destination-in draw would
+    // otherwise erase everything outside itself, including what an earlier one kept)
+    const m = document.createElement('canvas');
+    m.width = m.height = ICON_SIZE;
+    const mg = m.getContext('2d')!;
+    mg.fillStyle = mg.strokeStyle = '#000';
+    mg.lineWidth = 5;
+    mg.fill(tilePath);
+    mg.stroke(tilePath);
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'destination-in';
+    g.drawImage(m, 0, 0);
+    g.restore();
+  }
+  g.save();
+  const p = new Path2D('M8 5H56A5 5 0 0 1 61 10V22C44 28 22 28 3 22V10A5 5 0 0 1 8 5Z');
+  const s = g.createLinearGradient(0, 4, 0, 26);
+  s.addColorStop(0, 'rgba(255,255,255,0.22)');
+  s.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = s;
+  g.fill(p);
   g.restore();
 }
 function drawLayers(g: CanvasRenderingContext2D, layers: Layer[]) {
@@ -239,6 +312,8 @@ function drawLayers(g: CanvasRenderingContext2D, layers: Layer[]) {
     g.translate(-32, -32);
     g.lineJoin = 'round';
     g.lineCap = 'round';
+    g.shadowColor = glowColor;
+    g.shadowBlur = 10;
     if (stroke) {
       // an open or ring shape drawn as a line: dark edge, then colour
       g.strokeStyle = K;
@@ -251,6 +326,7 @@ function drawLayers(g: CanvasRenderingContext2D, layers: Layer[]) {
       g.strokeStyle = K;
       g.lineWidth = 5 / scale;
       g.stroke(p);
+      g.shadowBlur = 0;
       g.fillStyle = fill;
       g.fill(p);
       // highlight: the upper-left of every shape catches the light
@@ -262,8 +338,13 @@ function drawLayers(g: CanvasRenderingContext2D, layers: Layer[]) {
       hl.addColorStop(1, 'rgba(0,0,0,0.28)');
       g.fillStyle = hl;
       g.fillRect(0, 0, 64, 64);
+      // a thin bright edge just inside the outline
+      g.strokeStyle = 'rgba(255,255,255,0.35)';
+      g.lineWidth = 1.6 / scale;
+      g.stroke(p);
       g.restore();
     }
+    g.shadowBlur = 0;
     g.restore();
   }
 }
@@ -287,8 +368,20 @@ function render(key: string): HTMLCanvasElement {
     drawLayers(g, def?.layers ?? sigil(ref));
   } else if (kind === 'passive') {
     const job = JOBS.find((j) => JOB_DEFS[j].skills.some((s) => s.id === ref) || JOB_DEFS[j].passives.some((p) => p.id === ref));
-    frame(g, shade(job ? JOBC[job] : '#6a6a7a', 0.7), '#8a8f98');
+    frame(g, shade(job ? JOBC[job] : '#6a6a7a', 0.85), '#b8bcc8');
     drawLayers(g, sigil(ref));
+    // a ring of marks counting the passive's place in its class: no two passives of a class look alike
+    if (job) {
+      const list = [...JOB_DEFS[job].passives.map((x) => x.id), ...JOB_DEFS[job].skills.map((x) => x.id)];
+      const n = list.indexOf(ref) + 1;
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + ((i - (n - 1) / 2) * Math.PI) / 9;
+        g.fillStyle = '#17121f';
+        g.beginPath(); g.arc(32 + Math.cos(a) * 25, 32 + Math.sin(a) * 25, 2.6, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#fff2c0';
+        g.beginPath(); g.arc(32 + Math.cos(a) * 25, 32 + Math.sin(a) * 25, 1.6, 0, Math.PI * 2); g.fill();
+      }
+    }
   } else if (kind === 'status') {
     const st = STATUS.find((s) => s.id === ref), def = STATUS_ICON[ref];
     frame(g, def?.bg ?? '#5a5a6a', st?.debuff ? '#e2523f' : '#5fae5a'); // red rim: debuff; green rim: buff
@@ -303,6 +396,7 @@ function render(key: string): HTMLCanvasElement {
     frame(g, EL[el] ?? '#5a5a6a', '#e8d9a8', true);
     drawLayers(g, [[RUNE_SHAPE[el] ?? 'star', '#fff7e0', 0, 0, 0, 0.8]]);
   }
+  gloss(g);
   return c;
 }
 /** The icon canvas for a key such as "skill/fireball", "status/poison", "attack/bow", "rune/fire". */

@@ -1,4 +1,4 @@
-// Item icons: 16x16 pixel glyphs drawn from string masks, shaded and outlined in code.
+// Item icons: 16x16 pixel glyphs drawn from string masks, smoothed to 32x32 (Scale2x), then lit, shaded and outlined in code.
 // One glyph per item family; rarity only changes the frame colour in the UI.
 import { ITEMS } from '../../../shared/src/items';
 
@@ -149,26 +149,47 @@ export function itemIcon(base: string): string {
   const [glyph, pal] = RECIPE[base] ?? guessRecipe(base);
   // rows are padded to 16 x 16, so a glyph may be written without its trailing dots
   const rows = Array.from({ length: 16 }, (_, y) => ((GLYPHS[glyph] ?? GLYPHS.stone)[y] ?? '').padEnd(16, '.').slice(0, 16)), p = PAL[pal] ?? PAL.steel;
+  // Scale2x: every glyph cell becomes four, following its neighbours, so diagonals stay smooth at 32 px
+  const N = 32, big: string[][] = Array.from({ length: N }, () => Array(N).fill('.'));
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= 16 || y >= 16 ? '.' : rows[y][x]);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const P = at(x, y), A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1);
+    big[y * 2][x * 2] = C === A && C !== D && A !== B ? A : P;
+    big[y * 2][x * 2 + 1] = A === B && A !== C && B !== D ? B : P;
+    big[y * 2 + 1][x * 2] = D === C && D !== B && C !== A ? C : P;
+    big[y * 2 + 1][x * 2 + 1] = B === D && B !== A && D !== C ? D : P;
+  }
   const c = document.createElement('canvas');
-  c.width = c.height = 16;
+  c.width = c.height = N;
   const g = c.getContext('2d')!;
-  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < 16 && y < 16 && rows[y][x] !== '.';
-  for (let y = 0; y < 16; y++)
-    for (let x = 0; x < 16; x++) {
-      const ch = rows[y][x];
+  const filled = (x: number, y: number) => x >= 0 && y >= 0 && x < N && y < N && big[y][x] !== '.';
+  const hex = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const ink = (h: string, k: number, lift = 0) => { const [r, gg, bb] = hex(h); return `rgb(${Math.min(255, r * k + lift)},${Math.min(255, gg * k + lift)},${Math.min(255, bb * k + lift)})`; };
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const ch = big[y][x];
       if (ch === '.') {
-        // 1px dark outline around the glyph
-        if (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) {
-          g.fillStyle = '#14101c';
-          g.fillRect(x, y, 1, 1);
-        }
+        // a fine dark outline around the shape, a softer one on the diagonals
+        if (filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1)) { g.fillStyle = '#120e1a'; g.fillRect(x, y, 1, 1); }
+        else if (filled(x - 1, y - 1) || filled(x + 1, y - 1) || filled(x - 1, y + 1) || filled(x + 1, y + 1)) { g.fillStyle = 'rgba(18,14,26,0.55)'; g.fillRect(x, y, 1, 1); }
         continue;
       }
-      g.fillStyle = ch === '#' ? p[0] : ch === '+' ? p[1] : ch === '-' ? p[2] : p[3];
+      const base = ch === '#' ? p[0] : ch === '+' ? p[1] : ch === '-' ? p[2] : p[3];
+      // light from the upper left across the whole icon; a bright rim where the edge faces the light, shade where it faces away
+      const k = 1.1 - ((x + y) / (2 * N)) * 0.28;
+      const lit = !filled(x - 1, y) || !filled(x, y - 1), dark = !filled(x + 1, y) || !filled(x, y + 1);
+      g.fillStyle = lit && !dark ? ink(base, k * 1.12, 16) : dark && !lit ? ink(base, k * 0.78) : ink(base, k);
       g.fillRect(x, y, 1, 1);
     }
+  // a small specular glint on metal and gems
+  if (['steel', 'plate', 'silver', 'crystal', 'frost', 'gold', 'holy', 'ruby', 'sapphire', 'emerald', 'amethyst', 'topaz'].includes(pal)) {
+    for (let y = 2; y < N - 2; y++) {
+      const x = [...Array(N).keys()].find((xx) => filled(xx, y) && big[y][xx] !== 'o');
+      if (x !== undefined && filled(x + 1, y + 1) && filled(x + 2, y + 2)) { g.fillStyle = 'rgba(255,255,255,0.85)'; g.fillRect(x + 1, y + 1, 1, 1); g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(x + 2, y + 1, 1, 1); break; }
+    }
+  }
   // the rarest uniques (legendary and mythic) twinkle in a corner
-  if ((b?.unique?.rar ?? 0) >= 4) for (const [x, y, col] of [[13, 1, '#fff6c8'], [12, 2, '#ffe08a'], [14, 2, '#ffe08a'], [13, 3, '#ffe08a'], [13, 2, '#ffffff']] as const) { g.fillStyle = col; g.fillRect(x, y, 1, 1); }
+  if ((b?.unique?.rar ?? 0) >= 4) for (const [x, y, col] of [[27, 1, '#fff6c8'], [27, 7, '#fff6c8'], [24, 4, '#ffe08a'], [30, 4, '#ffe08a'], [25, 4, '#ffe08a'], [29, 4, '#ffe08a'], [27, 2, '#ffe08a'], [27, 6, '#ffe08a'], [27, 3, '#ffffff'], [26, 4, '#ffffff'], [28, 4, '#ffffff'], [27, 5, '#ffffff'], [27, 4, '#ffffff']] as const) { g.fillStyle = col; g.fillRect(x, y, 1, 1); }
   url = c.toDataURL();
   cache.set(base, url);
   return url;

@@ -67,7 +67,7 @@ import { LFG_CHAT_MS, WORLD_CHAT_MS } from '../../../shared/src/social';
 import { Seasons } from './Seasons';
 import { Moderation } from './Moderation';
 import type { PvpMode } from '../../../shared/src/pvp';
-import { GROUND_MOUNT_DROP, GROUND_MOUNTS } from '../../../shared/src/items';
+import { GROUND_MOUNT_DROP, GROUND_MOUNTS, rollWorldBossPet } from '../../../shared/src/items';
 import { applyFood } from '../../../shared/src/life';
 
 export interface Conn {
@@ -1488,6 +1488,8 @@ export class World implements CombatCtx {
       }
       // world bosses of level 30 or more: armament material too
       if (world) items.push(...worldBossArmament(this.rnd, m.def.level));
+      // world bosses: a pet whistle, Normal to Mythic, by the boss's level
+      if (world) { const pet = rollWorldBossPet(this.rnd, m.def.level); if (pet) items.push(pet); }
       // world bosses of level 120+ rarely give a flying mount's reins
       if (world && m.def.level >= 160 && this.rnd() < 0.015) items.push({ base: 'mount_star_drake', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
       else if (world && m.def.level >= 120 && this.rnd() < 0.03) items.push({ base: 'mount_sky_griffin', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });

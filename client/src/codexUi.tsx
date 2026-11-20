@@ -2,7 +2,7 @@
 // opens its details. Pets and mounts not yet owned show as silhouettes with where to find them.
 import React, { useState } from 'react';
 import { MOUNTS, PET_FLAT_TOP, PET_GRADE_COLOR, PET_GRADES, PET_MAX_LEVEL, PET_SKILLS, PET_TIER_COLOR, PET_TIER_MULS, PET_TIERS, petBonus, PETS, petSkillPower } from '../../shared/src/companions';
-import { PET_DROP_ELITE, GROUND_MOUNT_DROP } from '../../shared/src/items';
+import { PET_DROP_ELITE, GROUND_MOUNT_DROP, WORLD_BOSS_PET_DROP } from '../../shared/src/items';
 import { CODEX_BONUS, CODEX_SETS, codexCard, codexComplete, codexNeed, codexRegionOf } from '../../shared/src/journal';
 import { MONSTERS } from '../../shared/src/monsters';
 import { REGIONS, ZONES } from '../../shared/src/world';
@@ -158,6 +158,13 @@ function PetDetail({ id, hud }: { id: string; hud: Hud }) {
       <div className="chips">{PET_GRADES.map((g) => <span key={g.g} className="chip" style={{ color: PET_GRADE_COLOR[g.g] }}>{g.g} {g.lo}–{g.hi}% · {g.w}%</span>)}</div>
       <h4>{t('codex.source')}</h4>
       <p className="sub">{t('codex.petSource', { n: Math.round(PET_DROP_ELITE * 100) })}{id === 'moss_sprout' ? ' ' + t('codex.petShop') : ''}</p>
+      <p className="sub">{t('codex.petBoss')}</p>
+      <div className="tablewrap"><table className="ctable bossodds">
+        <thead><tr><th>{t('codex.bossLv')}</th>{PET_TIERS.map((_, i) => <th key={i} style={{ color: PET_TIER_COLOR[i] }}>{t(`comp.tier.${i}` as Key)}</th>)}</tr></thead>
+        <tbody>{WORLD_BOSS_PET_DROP.map((b, i) => (
+          <tr key={b.upTo}><td>{(i ? WORLD_BOSS_PET_DROP[i - 1].upTo + 1 : 1)}–{b.upTo}</td>{b.pct.map((v, k) => <td key={k}>{v}%</td>)}</tr>
+        ))}</tbody>
+      </table></div>
       {mine.length > 0 && <>
         <h4>{t('codex.yours')}</h4>
         <ul className="cmine">{mine.map((p) => <li key={p.uid}><b>{p.name}</b> <small className="sub">{t('common.lv', { n: p.level })}</small> <span style={{ color: PET_TIER_COLOR[p.tier] }}>{t(`comp.tier.${p.tier}` as Key)}</span> · <span style={{ color: PET_GRADE_COLOR[PET_GRADES.find((g) => p.gr >= g.lo && p.gr <= g.hi)?.g ?? 'D'] }}>{t('comp.grade', { g: PET_GRADES.find((g) => p.gr >= g.lo && p.gr <= g.hi)?.g ?? 'D', n: p.gr })}</span></li>)}</ul>

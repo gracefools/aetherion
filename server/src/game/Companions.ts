@@ -18,9 +18,9 @@ export function learnCompanion(w: World, p: Player, base: string): string {
   if (b?.kind === 'pet') {
     if (!b.ref || !PETS[b.ref]) return 'Unknown pet';
     if (p.comp.pets.length >= MAX_PETS) return `You can keep at most ${MAX_PETS} pets`;
-    const gr = rollGrade(() => w.rnd());
-    p.comp.pets.push({ uid: newUid(), kind: b.ref, name: PETS[b.ref].name, level: 1, exp: 0, tier: 0, tx: 0, gr });
-    w.send(p, { t: 'sys', text: `${PETS[b.ref].name} joins your companions with grade ${gradeOf(gr)} (${gr}%). Summon it from the companions panel (P).` });
+    const gr = rollGrade(() => w.rnd()), tier = Math.max(0, Math.min(MAX_PET_TIER, b.ptier ?? 0));
+    p.comp.pets.push({ uid: newUid(), kind: b.ref, name: PETS[b.ref].name, level: 1, exp: 0, tier, tx: 0, gr });
+    w.send(p, { t: 'sys', text: tier ? `A ${PET_TIER_NAMES[tier]} ${PETS[b.ref].name} joins your companions with grade ${gradeOf(gr)} (${gr}%). Summon it from the companions panel (P).` : `${PETS[b.ref].name} joins your companions with grade ${gradeOf(gr)} (${gr}%). Summon it from the companions panel (P).` });
   } else if (b?.kind === 'mount') {
     if (!b.ref || !MOUNTS[b.ref]) return 'Unknown mount';
     if (p.comp.mounts.includes(b.ref)) return 'You already have this mount';

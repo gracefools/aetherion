@@ -42,6 +42,10 @@ export interface ItemBase {
   sigil?: { shape: number; sym: number };
   /** Pet and mount whistles: which pet or mount the item adds to the collection. */
   ref?: string;
+  /** Pet whistles from world bosses: the tier the pet joins at (1 Rare .. 4 Mythic). */
+  ptier?: number;
+  /** A rarity fixed by the item itself (tiered whistles), kept when the bag is stored. */
+  fixRar?: number;
   slot?: Slot;
   /** Weapons: the job and which of its two weapon specialisations this is. */
   job?: Job;
@@ -161,6 +165,16 @@ export const ITEM_LIST: ItemBase[] = [
   { id: 'moonleaf', name: 'Moonleaf', kind: 'material', stack: 99, price: 16, desc: 'Herbalism, tier 1: gathered in regions below level 30. Cooks tier 1 food; merchants brew potions from it.' },
   { id: 'star_shard', name: 'Star Shard', kind: 'material', stack: 99, price: 180, desc: 'Mining, tier 3: mined in regions of level 60 to 89. Forges gear of level 90.' },
 ];
+// World bosses drop whistles of a higher tier: the pet joins already Rare, Epic, Legend or Mythic.
+export const PET_TIER_LABEL = ['Normal', 'Rare', 'Epic', 'Legend', 'Mythic'];
+/** The item rarity colour a pet tier shows as (Rare, Epic, Legendary, Mythic). */
+export const PET_TIER_RAR = [0, 2, 3, 4, 5];
+const PET_TIER_PRICE = [1, 3, 10, 30, 100];
+for (const b of ITEM_LIST.filter((x) => x.kind === 'pet' && !x.ptier))
+  for (let n = 1; n <= 4; n++)
+    ITEM_LIST.push({ id: `${b.id}_t${n}`, name: `${PET_TIER_LABEL[n]} ${b.name}`, kind: 'pet', ref: b.ref, ptier: n, fixRar: PET_TIER_RAR[n], stack: 5, price: b.price * PET_TIER_PRICE[n], desc: `Use it to add a ${PET_TIER_LABEL[n]} ${b.name.replace(/ Whistle$/, '')} to your companions: it joins at ${PET_TIER_LABEL[n]} tier, its grade rolled as usual. Dropped by world bosses.` });
+/** The whistle of a pet kind at a tier. */
+export const petWhistle = (kind: string, tier: number) => (tier > 0 ? `pet_${kind}_t${tier}` : `pet_${kind}`);
 export const ITEMS: Record<string, ItemBase> = Object.fromEntries(ITEM_LIST.map((b) => [b.id, b]));
 /** Late registration of fixed-identity items (M7 boss loot) so `ITEMS` stays the single lookup. */
 export function registerItems(list: ItemBase[]) {
@@ -231,6 +245,33 @@ export const MONSTER_GOLD = 0.1;
 /** Chance that a kill drops a Random Rune Scroll. */
 export const SCROLL_DROP = { normal: 0.012, elite: 0.15 };
 export const PET_DROP_ELITE = 0.05;
+/**
+ * A world boss's pet drop, by the boss's level: one roll per rewarded player, chances in percent
+ * for a Normal / Rare / Epic / Legend / Mythic whistle of a random pet; otherwise none.
+ */
+export const WORLD_BOSS_PET_DROP: { upTo: number; pct: [number, number, number, number, number] }[] = [
+  { upTo: 30, pct: [20, 10, 5, 3, 0.1] },
+  { upTo: 60, pct: [20, 11, 6, 4, 0.5] },
+  { upTo: 90, pct: [20, 12, 7, 5, 0.8] },
+  { upTo: 120, pct: [20, 13, 8, 6, 1.2] },
+  { upTo: 150, pct: [20, 14, 9, 7, 1.5] },
+  { upTo: 180, pct: [20, 15, 10, 8, 1.7] },
+  { upTo: 200, pct: [20, 16, 11, 9, 1.9] },
+];
+export const worldBossPetOdds = (level: number) => (WORLD_BOSS_PET_DROP.find((b) => level <= b.upTo) ?? WORLD_BOSS_PET_DROP[WORLD_BOSS_PET_DROP.length - 1]).pct;
+/** The whistle a world boss gives this player, or null: the rarest tier is checked first. */
+export function rollWorldBossPet(rng: () => number, level: number): ItemSpec | null {
+  const pct = worldBossPetOdds(level);
+  let r = rng() * 100;
+  for (let tier = 4; tier >= 0; tier--) {
+    if (r < pct[tier]) {
+      const kind = PET_WHISTLES[Math.floor(rng() * PET_WHISTLES.length)].slice(4);
+      return { base: petWhistle(kind, tier), rar: PET_TIER_RAR[tier], ilvl: 1, aff: [], up: 0, qty: 1 };
+    }
+    r -= pct[tier];
+  }
+  return null;
+}
 export const PET_WHISTLES = ['pet_ember_kit', 'pet_moss_sprout', 'pet_frost_owlet', 'pet_bog_toad', 'pet_iron_pup', 'pet_star_mote'];
 /** Reins of the ground mounts: dropped by dungeon bosses, now that no shop sells them. */
 export const GROUND_MOUNTS = ['mount_plains_strider', 'mount_ashen_charger', 'mount_frost_elk', 'mount_void_skiff'];
@@ -369,7 +410,7 @@ export function cleanItem(raw: any, seen: Set<string>): Item | null {
   const b = ITEMS[LEGACY_ITEMS[raw.base] ?? raw.base];
   if (!b) return null;
   const int = (v: unknown, lo: number, hi: number, d: number) => (Number.isInteger(v) ? Math.max(lo, Math.min(hi, v as number)) : d);
-  const it: Item = { uid: raw.uid, base: b.id, rar: 0, ilvl: 1, aff: [], up: 0, qty: int(raw.qty, 1, b.stack ?? 1, 1) };
+  const it: Item = { uid: raw.uid, base: b.id, rar: b.fixRar ?? 0, ilvl: 1, aff: [], up: 0, qty: int(raw.qty, 1, b.stack ?? 1, 1) };
   if (b.kind === 'equip') {
     it.ilvl = int(raw.ilvl, 1, MAX_ILVL, 1);
     it.rar = b.unique ? b.unique.rar : int(raw.rar, 0, 5, 0);

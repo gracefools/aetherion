@@ -5491,6 +5491,38 @@ test('pet grades and tiers: a weighted grade rolled once, flat bonus by tier and
   assert.equal(world.companion(p, { op: 'feed', uid: k1.uid, food: p.comp.pets[1].uid }), 'This pet is already Mythic');
 });
 
+import { petWhistle, rollWorldBossPet, worldBossPetOdds, WORLD_BOSS_PET_DROP } from '../shared/src/items';
+test('world bosses drop pet whistles of every tier, by the boss level; a tiered whistle gives a pet at that tier', () => {
+  assert.deepEqual(worldBossPetOdds(1), [20, 10, 5, 3, 0.1]);
+  assert.deepEqual(worldBossPetOdds(30), [20, 10, 5, 3, 0.1]);
+  assert.deepEqual(worldBossPetOdds(31), [20, 11, 6, 4, 0.5]);
+  assert.deepEqual(worldBossPetOdds(90), [20, 12, 7, 5, 0.8]);
+  assert.deepEqual(worldBossPetOdds(120), [20, 13, 8, 6, 1.2]);
+  assert.deepEqual(worldBossPetOdds(150), [20, 14, 9, 7, 1.5]);
+  assert.deepEqual(worldBossPetOdds(180), [20, 15, 10, 8, 1.7]);
+  assert.deepEqual(worldBossPetOdds(200), [20, 16, 11, 9, 1.9]);
+  assert.equal(WORLD_BOSS_PET_DROP.length, 7);
+  // the roll follows the table
+  let seed = 11; const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (const lv of [20, 190]) {
+    const n = 200000, by = [0, 0, 0, 0, 0];
+    let none = 0;
+    for (let i = 0; i < n; i++) { const it = rollWorldBossPet(rng, lv); if (!it) { none++; continue; } by[ITEMS[it.base].ptier ?? 0]++; assert.equal(ITEMS[it.base].kind, 'pet'); }
+    const pct = worldBossPetOdds(lv);
+    for (let k = 0; k < 5; k++) assert.ok(Math.abs((by[k] / n) * 100 - pct[k]) < Math.max(0.35, pct[k] * 0.06), `lv ${lv} tier ${k}: ${(by[k] / n) * 100}% vs ${pct[k]}%`);
+    assert.ok(Math.abs((none / n) * 100 - (100 - pct.reduce((a, b) => a + b, 0))) < 0.5);
+  }
+  // tiered whistles exist for every pet, keep their tier colour when stored, and give a pet at that tier
+  for (const kind of Object.keys(PETS)) for (let tier = 1; tier <= 4; tier++) assert.equal(ITEMS[petWhistle(kind, tier)].ptier, tier);
+  assert.equal(cleanItem({ uid: 'w1', base: 'pet_bog_toad_t4', qty: 1 }, new Set())!.rar, 5, 'a Mythic whistle shows as Mythic');
+  const h = harness({ capacity: 10 }), { world } = h;
+  const a = h.join(0, 0, 'knight', 20), p = a.p;
+  give(p, spec('pet_bog_toad_t3', { qty: 1 }));
+  assert.equal(world.inventory(p, { op: 'use', uid: p.inv.find((x) => x.base === 'pet_bog_toad_t3')!.uid }), '');
+  assert.deepEqual([p.comp.pets[0].kind, p.comp.pets[0].tier, p.comp.pets[0].tx], ['bog_toad', 3, 0]);
+  assert.ok(a.out.some((m) => m.t === 'sys' && /^A Legend Bog Toad joins your companions with grade/.test(m.text)));
+});
+
 import { PET_IDS, PET_SKILLS, petSkillPower } from '../shared/src/companions';
 import { petAct } from '../server/src/game/Companions';
 

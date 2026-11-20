@@ -2094,6 +2094,12 @@ export const CONTENT_ID: Record<string, string> = {
 "the Veteran": "Sang Veteran"
 };
 /** Names that are the same in Indonesian (people, places, named bosses). */
+// tiered pet whistles (world bosses): the plain whistle's name with the tier, and one sentence
+for (const pet of ['Ember Kit', 'Moss Sprout', 'Frost Owlet', 'Bog Toad', 'Star Mote', 'Iron Pup'])
+  for (const tier of ['Rare', 'Epic', 'Legend', 'Mythic']) {
+    CONTENT_ID[`${tier} ${pet} Whistle`] = `${CONTENT_ID[`${pet} Whistle`]} ${tier}`;
+    CONTENT_ID[`Use it to add a ${tier} ${pet} to your companions: it joins at ${tier} tier, its grade rolled as usual. Dropped by world bosses.`] = `Pakai untuk menambahkan ${pet} ${tier} ke peliharaanmu: ia bergabung di tingkat ${tier}, grade-nya diundi seperti biasa. Dijatuhkan oleh bos dunia.`;
+  }
 export const CONTENT_KEPT: string[] = [
   'D', 'C', 'B', 'A', 'S', 'SS', // pet grades
 "Aetherite",

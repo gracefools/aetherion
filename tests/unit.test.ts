@@ -145,6 +145,11 @@ test('password hashing: salted scrypt, verify accepts only the right password', 
 });
 
 // ---- World (no network, no database) ----
+/** Puts a character at the capital's shop (the armoury): since the city was rebuilt the trades have their own houses. */
+function atShop(world: World, p: Player, dx = 0, dy = 40) {
+  const m = zoneObjects('eldoria').find((o) => o.kind === 'merchant')!;
+  world.relocate(p, p.room, m.x + dx, m.y + dy);
+}
 function harness(opts: { rng?: () => number; capacity?: number; kit?: boolean; world?: Partial<WorldOpts> } = {}) {
   const saved: any[] = [];
   const builds: any[] = [];
@@ -1791,7 +1796,9 @@ test('M6 stacking and capacity: stacks fill first, a full bag refuses whole gran
 
 test('M6 shop: buy and sell only near the town plaza, with gold checked on the server', () => {
   const { world, join } = harness();
-  const { p } = join(0, 0, 'knight', 5), far = join(SHOP_RANGE + 60, 0, 'knight', 5);
+  const { p } = join(0, 0, 'knight', 5), far = join(0, 0, 'knight', 5);
+  atShop(world, p);
+  atShop(world, far.p, SHOP_RANGE + 60, 0);
   p.gold = 100;
   assert.equal(world.inventory(p, { op: 'buy', base: 'hp_potion', qty: 2 }), '');
   assert.equal(p.gold, 100 - 2 * ITEMS.hp_potion.price);
@@ -3874,6 +3881,7 @@ test('M11 server authority under automation: attack interval, potions and cooldo
 test('bulk sale: several items in one step at a shop, all or nothing', () => {
   const { world, join } = harness();
   const { p, out } = join(0, 40, 'knight', 10);
+  atShop(world, p);
   for (const s of [spec('longsword', { rar: 0, ilvl: 5 }), spec('greatsword', { rar: 1, ilvl: 5 }), spec('cloth_robe', { rar: 3, ilvl: 5 }), spec('upgrade_stone', { qty: 7 })]) give(p, s);
   const [a, b, c, stones] = p.inv, worth = (i: Item) => sellValue(i) * i.qty;
   const expect = worth(a) + worth(b) + worth(stones), gold = p.gold;
@@ -3957,6 +3965,7 @@ test('bound items: worn gear and quest rewards stay with their owner; drops, eve
 test('trading: invitation, offers, confirmation reset on change, atomic exchange, audit record', () => {
   const { world, join, trades } = harness({ capacity: 10 });
   const A = join(0, 0, 'knight', 10), B = join(60, 0, 'mage', 10), C = join(0, 60, 'ranger', 10), a = A.p, b = B.p;
+  atShop(world, a, 0, 40); atShop(world, b, 60, 40); atShop(world, C.p, 0, 100);
   const state = (x: typeof A) => x.out.filter((m) => m.t === 'trade').pop()?.trade;
   give(a, spec('longsword', { rar: 3, ilvl: 8, aff: [['atk', 3]] }));
   give(a, spec('upgrade_stone', { qty: 10 }));
@@ -4202,7 +4211,7 @@ test('M12 Rune Merchant: in every town, sells runes and scrolls for gold, checks
   for (const z of REGIONS) {
     const npc = runesmith(z), t = ZONES[z].town!;
     assert.ok(npc && isNpc(npc) && npc.name.length > 5, `${z} has a Rune Merchant`);
-    assert.ok(Math.hypot(npc.x / TILE - t.tx, npc.y / TILE - t.ty) < 8, 'in town');
+    assert.ok(z === 'eldoria' ? inTown(z, npc.x, npc.y) : Math.hypot(npc.x / TILE - t.tx, npc.y / TILE - t.ty) < 8, 'in town');
     assert.equal(blocked(getZoneMap(z), npc.x, npc.y), false, 'standing on open ground');
   }
   assert.deepEqual(Object.keys(RUNE_SHOP).sort(), [...ELEMENTS].sort(), 'the five rune categories');
@@ -7267,4 +7276,48 @@ test('PvP modes: peaceful never fights, prepared only fights the hostile and hit
   for (let i = 0; i < 20 * 21; i++) h.step();
   assert.ok(!world.pvp.hostile(a), 'the mark wears off');
   assert.match(world.pvp.block(b, a), /not hostile/);
+});
+
+test('feature guides: each level tells what it opened, once; an older character is not flooded; texts exist in both languages', async () => {
+  const { FEATURES, pendingGuides, initialSeen } = await import('../client/src/guide');
+  const { en: EN } = await import('../client/src/i18n/en');
+  const { id: IDN } = await import('../client/src/i18n/id');
+  // a brand-new character: only the first things
+  assert.deepEqual(pendingGuides(1, initialSeen(1)).map((f) => f.id), ['quests']);
+  // reaching level 3 with the first two read: auto hunting is next
+  assert.deepEqual(pendingGuides(3, ['quests', 'travel']).map((f) => f.id), ['auto']);
+  // a level 60 character met for the first time: nothing below its level is replayed
+  assert.deepEqual(pendingGuides(60, initialSeen(60)), []);
+  assert.deepEqual(pendingGuides(70, initialSeen(60)).map((f) => f.id), ['ascension'], 'but what comes next is still told');
+  // in order of level, each with a title and a text in English and Indonesian
+  assert.deepEqual(FEATURES.map((f) => f.level), [...FEATURES.map((f) => f.level)].sort((a, b) => a - b));
+  for (const f of FEATURES) for (const k of [`guide.${f.id}.title`, `guide.${f.id}.text`]) {
+    assert.ok((EN as Record<string, string>)[k], `English ${k}`);
+    assert.ok((IDN as Record<string, string>)[k], `Indonesian ${k}`);
+  }
+  for (let i = 1; i <= 6; i++) assert.ok((EN as Record<string, string>)[`pro.${i}`] && (IDN as Record<string, string>)[`pro.${i}`], `prologue line ${i}`);
+});
+
+test('the world around Eldoria: eight directions two deep, a gate each way, levels rising round the compass', async () => {
+  const { COMPASS, WORLD_LAYOUT, innerRegion, recommendedFor, REGIONS: REG, ZONES: Z, CITY, inCity, cityDecor, getZoneMap: gm, T: TT, tileAt: ta } = await import('../shared/src/world');
+  assert.equal(Object.keys(WORLD_LAYOUT).length, REG.length - 1);
+  // every direction has a nearer region, reached straight from Eldoria and leading back to it
+  for (const d of COMPASS) {
+    const id = innerRegion(d);
+    assert.ok(Z.eldoria.portals.some((p) => p.to === id), `Eldoria has a gate ${d} to ${id}`);
+    assert.ok(Z[id].portals.some((p) => p.to === 'eldoria'), `${id} leads back to Eldoria`);
+  }
+  assert.equal(Z.eldoria.portals.length, 8);
+  // levels rise going round from the east, the nearer region below the farther
+  const order = REG.slice(1).map((id) => Z[id].level[0]);
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  assert.deepEqual([WORLD_LAYOUT.verdant, WORLD_LAYOUT.ashen], [{ dir: 'e', ring: 1 }, { dir: 'e', ring: 2 }], 'east is for the first levels');
+  assert.ok(recommendedFor(12, 'ashen') && !recommendedFor(12, 'frostveil') && !recommendedFor(60, 'verdant'));
+  // the capital: walled, the scenery stands on ground nobody walks through, the whole city is town
+  const map = gm('eldoria'), cx = Z.eldoria.spawn.tx, cy = Z.eldoria.spawn.ty;
+  assert.equal(ta(map, cx + CITY.statue[0] - 1, cy + CITY.statue[1] - 1), TT.Block, 'the statue stands on its plinth');
+  assert.equal(ta(map, cx + CITY.fountain[0] + 1, cy + CITY.fountain[1]), TT.Water, 'the fountain has its basin');
+  assert.ok(cityDecor('eldoria').length > 40 && cityDecor('verdant').length === 0);
+  for (const k of ['statue', 'fountain', 'rift', 'campfire', 'stall_red', 'weapon_rack', 'tower']) assert.ok(cityDecor('eldoria').some((d) => d.kind === k), k);
+  assert.ok(inCity('eldoria', (cx + CITY.wx - 2) * 32, (cy + CITY.wy - 2) * 32) && !inCity('eldoria', (cx + CITY.wx + 8) * 32, cy * 32) && !inCity('verdant', 100, 100));
 });

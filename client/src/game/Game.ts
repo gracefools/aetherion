@@ -15,7 +15,7 @@ import { MONSTERS, phaseAt } from '../../../shared/src/monsters';
 import type { DungeonState } from '../../../shared/src/dungeons';
 import { INTERACT_RANGE, isNpc, NODE_RESPAWN_MS, objNear, zoneObjects, type WorldObj } from '../../../shared/src/places';
 import { propSprite } from './props';
-import { gateNear, getZoneMap, START_ZONE, stepMove, stepSize, tileAt, tileCenter, ZONES, type ZoneMap } from '../../../shared/src/world';
+import { gateNear, getZoneMap, START_ZONE, stepMove, stepSize, tileAt, tileCenter, ZONES, type ZoneMap, cityDecor } from '../../../shared/src/world';
 import { BOSS_MUSIC_RANGE } from '../../../shared/src/audio';
 import { navOf } from '../../../shared/src/nav';
 import { DEFAULT_AUTO, emptyAutoStats, withSkills, type AutoConfig, type AutoStats } from '../../../shared/src/autohunt';
@@ -70,6 +70,7 @@ import { clearLine, findPath, tileOf, tileXY } from '../../../shared/src/nav';
 import { tc } from '../i18n/content';
 import { planRoute, routeSummary, type Leg, type Place, type Route, type TravelCtx } from '../../../shared/src/travel';
 import { modeBlock, type PvpMode } from '../../../shared/src/pvp';
+import { decorSprite } from './decor';
 
 export interface ChatLine {
   id: number;
@@ -283,6 +284,8 @@ interface Drawable {
   sx: number; // source rect
   sy: number;
   sw: number;
+  /** Height of the source frame when it is not square (scenery). */
+  sh?: number;
   ox: number; // anchor
   oy: number;
   aura: number;
@@ -2453,7 +2456,7 @@ export class Game {
     for (const ob of this.objs) {
       if (Math.abs(ob.x - px) > 760 || Math.abs(ob.y - py) > 480) continue;
       const o = pool.pop() ?? ({} as Drawable), npc = isNpc(ob);
-      o.sqx = o.sqy = 1;
+      o.sqx = o.sqy = 1; o.sh = undefined;
       o.mark = npc ? this.questMarks().npc.get(ob.id) ?? '' : '';
       o.x = ob.x; o.y = ob.y; o.id = 0; o.aura = npc ? ob.ap!.aura : 0; o.bar = -1; o.barW = 0; o.alpha = 1;
       o.pet = o.mount = null; o.flip = false; o.wa = 0;
@@ -2488,6 +2491,15 @@ export class Game {
         o.sx = 0; o.sy = 0; o.sw = 32; o.ox = 16; o.oy = 24; o.alpha = spent ? 0.3 : 1;
         o.label = ''; o.labelY = 30; o.color = '#ffffff'; o.title = '';
       }
+      list.push(o);
+    }
+    // the capital's scenery: statue, fountain, towers, stalls, racks, the rift and its fire, lamps
+    for (const d of cityDecor(map.def.id)) {
+      if (d.x < camX - 80 || d.x > camX + vw + 80 || d.y < camY - 20 || d.y > camY + vh + 120) continue;
+      const sp = decorSprite(d.kind), o = pool.pop() ?? ({} as Drawable);
+      o.sqx = o.sqy = 1; o.mark = ''; o.x = d.x; o.y = d.y; o.id = 0; o.aura = 0; o.bar = -1; o.barW = 0; o.alpha = 1;
+      o.pet = o.mount = null; o.flip = false; o.wa = 0; o.label = ''; o.labelY = 0; o.color = '#ffffff'; o.title = '';
+      o.sheet = sp.img; o.sx = (sp.frames > 1 ? Math.floor((now + d.x * 7) / sp.ms) % sp.frames : 0) * sp.w; o.sy = 0; o.sw = sp.w; o.sh = sp.h; o.ox = sp.w / 2; o.oy = sp.h - 3;
       list.push(o);
     }
     list.sort((a, b) => a.y - b.y);
@@ -2539,7 +2551,8 @@ export class Game {
           else st.sprite(o.mount, f * MOUNT_W, 0, MOUNT_W, MOUNT_H, sx - (MOUNT_W * MS) / 2, sy - hover - MOUNT_H * MS + 14, MOUNT_W * MS, MOUNT_H * MS, sy, order++, o.alpha, o.flip);
         }
         const qx = o.sqx ?? 1, qy = o.sqy ?? 1;
-        st.sprite(o.sheet, o.sx, o.sy, o.sw, o.sw, sx - o.ox * qx, sy - o.oy * qy - lift, o.sw * qx, o.sw * qy, sy, order++, o.alpha);
+        const oh = o.sh ?? o.sw;
+        st.sprite(o.sheet, o.sx, o.sy, o.sw, oh, sx - o.ox * qx, sy - o.oy * qy - lift, o.sw * qx, oh * qy, sy, order++, o.alpha);
         if (o.wa) drawWeaponGlow(g, (o.wk && AURA_SKINS[o.wk]?.color) || WEAPON_AURA_COLORS[o.wa], sx + (o.flip ? -8 : 8), sy - 15 - lift, now, o.wa, o.id);
         if (o.aura && !low) drawAura(g, o.aura, sx, sy, now, o.id);
         continue;
@@ -2581,7 +2594,7 @@ export class Game {
         else g.drawImage(o.mount, (Math.floor(now / 160 + o.id) & 1) * MOUNT_W, 0, MOUNT_W, MOUNT_H, (-MOUNT_W * MS) / 2, -MOUNT_H * MS + 14, MOUNT_W * MS, MOUNT_H * MS);
         g.restore();
       }
-      g.drawImage(o.sheet, o.sx, o.sy, o.sw, o.sw, sx - o.ox, sy - o.oy - lift, o.sw, o.sw);
+      g.drawImage(o.sheet, o.sx, o.sy, o.sw, o.sh ?? o.sw, sx - o.ox, sy - o.oy - lift, o.sw, o.sh ?? o.sw);
       g.globalAlpha = 1;
       if (o.wa) drawWeaponGlow(g, (o.wk && AURA_SKINS[o.wk]?.color) || WEAPON_AURA_COLORS[o.wa], sx + (o.flip ? -8 : 8), sy - 15 - lift, now, o.wa, o.id);
       if (o.aura && !low) drawAura(g, o.aura, sx, sy, now, o.id);
@@ -2747,6 +2760,9 @@ export class Game {
         if (town) lamps.push({ x: town.tx * TILE + 16, y: town.ty * TILE + 16, h: 70, color: 0xffb060, power: 16000 * night, range: 420 });
         const near = this.doors.filter((d) => Math.abs(d.x - px) < vw && Math.abs(d.y - py) < vh).sort((a, b) => Math.hypot(a.x - px, a.y - py) - Math.hypot(b.x - px, b.y - py));
         for (const d of near.slice(0, 4)) lamps.push({ x: d.x, y: d.y, h: 34, color: 0xff9a40, power: 4500 * night, range: 240 });
+        // street lamps, the watch fire and the rift glow too (the nearest few)
+        const lit = cityDecor(map.def.id).filter((d) => decorSprite(d.kind).light && Math.abs(d.x - px) < vw && Math.abs(d.y - py) < vh).sort((a, b) => Math.hypot(a.x - px, a.y - py) - Math.hypot(b.x - px, b.y - py));
+        for (const d of lit.slice(0, 5)) { const [color, hh] = decorSprite(d.kind).light!; lamps.push({ x: d.x, y: d.y - 6, h: hh, color, power: 5200 * night, range: 230 }); }
       }
       st.setLights(lamps);
       st.render(camX, camY, z, Math.max(0, Math.min(1, ((py - camY) * z) / H)), day, indoor, gfx.quality === 'high');

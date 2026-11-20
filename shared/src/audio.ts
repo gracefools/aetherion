@@ -340,7 +340,7 @@ export const STEP_SOUND: Record<Surface, string> = {
 };
 /** What the ground sounds like: paved tiles are stone everywhere; open ground depends on the region. */
 export function surfaceOf(tile: T, theme: Theme): Surface {
-  if (tile === T.Path || tile === T.Plaza || tile === T.Portal || tile === T.Gate) return theme === 'frost' && tile === T.Path ? 'snow' : 'stone';
+  if (tile === T.Path || tile === T.Plaza || tile === T.Portal || tile === T.Gate || tile === T.Block) return theme === 'frost' && tile === T.Path ? 'snow' : 'stone';
   switch (theme) {
     case 'frost': case 'citadel': return 'snow';
     case 'moor': case 'temple': return 'water';

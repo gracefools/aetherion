@@ -785,6 +785,33 @@
   .pvpmodes button.peaceful.on { background: #2f8a3a; color: #eaffea; border-color: #9fe39b; } .pvpmodes button.prepared.on { background: #a57f2e; color: #1a1408; border-color: #e5c877; }
   .pvpmodes button.predator.on { background: #a32a22; color: #fff; border-color: #ff8a7a; }
   .hostiletag { margin-left: 6px; color: #ff5a4a; }
+  /* the world map as a chart: Eldoria in the middle, regions around it by compass direction */
+  .regions.worldchart { position: relative; display: block; height: 500px; margin: 6px 0 12px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px;
+    background: radial-gradient(ellipse at 50% 50%, rgba(201,162,74,.16), rgba(22,26,40,.2) 34%, rgba(8,10,16,.5) 78%), repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 46px), repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 46px); }
+  .worldchart li { min-width: 0; display: block; }
+  .worldchart .chartroads { position: absolute; inset: 0; pointer-events: none; }
+  .worldchart .chartroads svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .worldchart .chartroads line { stroke: #6f6344; stroke-width: 0.45; stroke-dasharray: 1.2 1; vector-effect: non-scaling-stroke; stroke-width: 2px; opacity: .8; }
+  .worldchart .chartroads line.hub { stroke: #c9a24a; stroke-dasharray: none; opacity: .55; }
+  .worldchart .compass { position: absolute; translate: -50% -50%; font: 700 11px Georgia, serif; letter-spacing: .12em; color: rgba(236,223,196,.42); text-transform: uppercase; }
+  .worldchart .chartnode { position: absolute; translate: -50% -50%; width: 104px; }
+  .worldchart .region { width: 100%; padding: 4px 6px; font-size: 11px; gap: 0; text-align: center; background: rgba(26,30,46,.94); line-height: 1.25; }
+  .worldchart .region b { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .worldchart .region .badges { justify-content: center; flex-wrap: wrap; font-size: 10px; min-height: 0; }
+  .worldchart .region.depth { width: 86%; margin: 0 auto; font-size: 10px; padding: 2px 4px; }
+  .worldchart .region.rec { border-color: #5fd35a; box-shadow: 0 0 0 1px #5fd35a, 0 0 14px rgba(95,211,90,.55); } .worldchart .region.rec.here { box-shadow: 0 0 0 2px #ffd24a inset, 0 0 14px rgba(95,211,90,.55); }
+  .worldchart .region.low { opacity: .5; } .recmark { color: #9fe39b; font-style: normal; }
+  @media (max-width: 760px) { .regions.worldchart { height: 400px; } .worldchart .chartnode { width: 76px; } .worldchart .region { font-size: 9.5px; padding: 3px 3px; } .worldchart .region b { font-size: 10px; } .worldchart .region .badges { display: none; } }
+  /* the opening story, and the cards that explain what a level has opened */
+  .prologue { position: fixed; inset: 0; z-index: 80; display: grid; place-items: end center; background: #0d1018; cursor: pointer; }
+  .prologue canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .prologuebox { position: relative; zoom: var(--uiw, 1); width: min(720px, calc(100vw / var(--uiw, 1) - 32px)); margin-bottom: max(7vh, 24px); padding: 18px 22px; border-radius: 10px; background: rgba(13,16,24,.82); border: 1px solid rgba(201,162,74,.5); box-shadow: 0 12px 40px rgba(0,0,0,.6); }
+  .prologuebox p { font: 19px/1.6 Georgia, "Times New Roman", serif; color: #f1e6cc; min-height: 4.8em; margin: 6px 0 12px; }
+  .prologuebox .actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
+  .featurecard { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: min(420px, calc(100vw / var(--ui, 1) - 24px)); z-index: 7; padding: 14px 16px; border-color: var(--gold); pointer-events: auto; animation: winin .2s ease-out; }
+  .featurecard .fchead { display: flex; gap: 10px; align-items: center; } .featurecard .fchead b { display: block; font: 600 17px Georgia, serif; color: var(--gold); }
+  .featurecard .fcicon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(201,162,74,.18); border: 1px solid var(--gold); color: var(--gold); flex: 0 0 auto; }
+  .featurecard p { margin: 10px 0 12px; line-height: 1.5; } .featurecard .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  html.touch .featurecard { top: calc(70px / var(--ui, 1)); }
 </style>
 </head>
 <body>

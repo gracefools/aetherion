@@ -494,6 +494,7 @@ test('M6: inventory over the network with PostgreSQL: starter kit, loot, equip, 
   const gear = a.inv.find((i) => ITEMS[i.base].kind === 'equip')!;
   assert.ok(gear.rar >= 1 && gear.rar <= 3, 'elite drops are Uncommon to Epic');
   // forged requests: someone else's uid, a made-up uid, buying without gold, selling far from the shop is covered in unit tests
+  { const shop = zoneObjects('eldoria').find((o) => o.kind === 'merchant')!; app.world.relocate(p, p.room, shop.x, shop.y + 40); await sleep(300); } // the shop is the armoury now, not the plaza
   a.raw({ t: 'inv', op: 'equip', uid: 'made-up' });
   a.raw({ t: 'inv', op: 'buy', base: 'hp_potion', qty: 999 });
   a.raw({ t: 'inv', op: 'sell', uid: w.inv[0].uid });

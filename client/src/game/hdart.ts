@@ -6,7 +6,7 @@
 //  - cliffs (rock) with a lit top lip, strata and a contact shadow; timber houses with shingled roofs,
 //    windows, doors and chimneys; big trees of clustered, light-shaded leaf balls with a dark outline.
 import { TILE } from '../../../shared/src/protocol';
-import { T, tileAt, type ZoneMap } from '../../../shared/src/world';
+import { isRampart, T, tileAt, type ZoneMap } from '../../../shared/src/world';
 
 type G = CanvasRenderingContext2D;
 type RGB = [number, number, number];
@@ -275,7 +275,7 @@ export interface Chunk {
   /** Style B: trees to stand up as billboards (map pixels; x, y the top-left, footY the row they stand on). */
   trees?: { img: HTMLCanvasElement; x: number; y: number; footY: number }[];
 }
-const isW = (t: T) => t === T.Water, isPl = (t: T) => t === T.Plaza || t === T.Portal || t === T.Gate, isPa = (t: T) => t === T.Path;
+const isW = (t: T) => t === T.Water, isPl = (t: T) => t === T.Plaza || t === T.Portal || t === T.Gate || t === T.Block, isPa = (t: T) => t === T.Path;
 
 /**
  * `stage`: the chunk is for the 3D stage (style B). Buildings are left out (the stage raises them as
@@ -510,7 +510,36 @@ function cliff(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: numbe
 }
 
 /** Houses: timber-framed plaster walls with windows and a door; shingled roofs with a ridge and an eave. */
+/** A city wall: a walkway of flagstones behind battlements on top, coursed stone on the face. */
+function rampart(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: number, t: T, p: Pal) {
+  const st = ramp(p.stone, 0.85), img = g.getImageData(ox, oy, TS, TS), d = img.data;
+  const set = (x: number, y: number, c: RGB) => { const i = (y * TS + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+  const isWall = (dx: number, dy: number) => { const q = tileAt(map, wx + dx, wy + dy); return q === T.Roof || q === T.Wall; };
+  for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+    const X = wx * TS + x, Y = wy * TS + y, j = h01(X >> 1, Y >> 1, 77);
+    let c: RGB;
+    if (t === T.Roof) {
+      // the walkway: flagstones; merlons along every outer edge
+      const edgeN = !isWall(0, -1) && y < 7, edgeS = tileAt(map, wx, wy + 1) !== T.Roof && tileAt(map, wx, wy + 1) !== T.Wall && y > 24, edgeW = !isWall(-1, 0) && x < 6, edgeE = !isWall(1, 0) && x > 25;
+      const merlon = ((edgeN || edgeS) && (X >> 3) % 2 === 0) || ((edgeW || edgeE) && (Y >> 3) % 2 === 0);
+      const fx = (X + ((Y >> 4) & 1) * 8) % 16, fy = Y % 16;
+      c = st[fx === 0 || fy === 0 ? 1 : j < 0.12 ? 2 : 3];
+      if (edgeN || edgeS || edgeW || edgeE) c = merlon ? st[4] : st[1];
+      if (merlon && ((edgeN && y === 6) || (edgeW && x === 5))) c = st[0];
+    } else {
+      // the face: courses of dressed stone, darker toward the ground, a lit lip under the parapet
+      const row = Math.floor(Y / 8), bx2 = (X + (row & 1) * 8) % 16, by2 = Y % 8;
+      c = st[by2 === 7 || bx2 === 0 ? 0 : by2 === 0 ? 3 : j < 0.1 ? 1 : 2];
+      if (tileAt(map, wx, wy - 1) === T.Roof && y < 3) c = st[y === 0 ? 4 : 0];
+      if (tileAt(map, wx, wy + 1) !== T.Wall && y > 26) c = st[0];
+    }
+    set(x, y, c);
+  }
+  g.putImageData(img, ox, oy);
+}
+
 function building(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: number, t: T, p: Pal) {
+  if (isRampart(map.def.id, wx, wy, map.w)) return rampart(g, map, wx, wy, ox, oy, t, p);
   const at = (dx: number, dy: number) => tileAt(map, wx + dx, wy + dy);
   // identify the building by the top-left of its roof, to colour it
   let bx = wx, by = wy;
@@ -612,5 +641,5 @@ function door(g: G, x: number, y: number, tb: RGB[]) {
 /** Minimap colour per tile type for a theme (index = tile id). */
 export function miniColors(theme: string): string[] {
   const p = PALS[theme] ?? KINGDOM;
-  return [p.grass, p.dirt, p.water, p.leaf, '#e2d6bd', p.roofs[0], '#a070ff', p.grass, p.stone, p.rock, '#d0b8ff'];
+  return [p.grass, p.dirt, p.water, p.leaf, '#e2d6bd', p.roofs[0], '#a070ff', p.grass, p.stone, p.rock, '#d0b8ff', p.stone];
 }

@@ -43,6 +43,8 @@ const btn = (p: Page, name: string) => p.getByRole('button', { name, exact: true
 
 async function enter(name: string, customise: (p: Page) => Promise<void>): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  // the opening story and the feature guides are checked on their own; here they would cover what is clicked
+  await ctx.addInitScript(() => { try { localStorage.setItem('aetherion.guides.off', '1'); } catch { /* no storage */ } });
   const page = await ctx.newPage();
   page.on('console', (m) => m.type() === 'error' && errors.push(`${name}: ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
@@ -394,14 +396,14 @@ try {
   {
     const sp = ZONES.eldoria.spawn;
     const pl = [...app.world.online.values()].find((q) => q.name === 'Lyra' + uid)!;
-    pl.x = tileCenter(sp.tx); pl.y = tileCenter(sp.ty) + 40; // stand in the plaza (the shop)
+    { const shop = zoneObjects('eldoria').find((o) => o.kind === 'merchant')!; pl.x = shop.x; pl.y = shop.y + 40; void sp; } // stand at the shop (the armoury)
     (app.world as any).welcome(pl);
     pl.gold = 500;
     // earlier sections left monsters around: clear them so the upgrade below is not refused as 'in combat'
     for (const mo of [...pl.room.monsters.values()]) if (!mo.dead) app.world.hurt(mo, 1e9, 0, null);
     pl.lastCombat = -1e6;
-    give(pl, { base: 'cloth_robe', rar: 2, ilvl: 2, aff: [['maxHp', 12], ['mdef', 3]], up: 0, qty: 1 });
-    give(pl, { base: 'cloth_hood', rar: 1, ilvl: 2, aff: [['maxRes', 9]], up: 0, qty: 1 });
+    give(pl, { base: 'cloth_robe', rar: 2, ilvl: 2, aff: [['maxHp', 12], ['mdef', 2]], up: 0, qty: 1 });
+    give(pl, { base: 'cloth_hood', rar: 1, ilvl: 2, aff: [['maxRes', 8]], up: 0, qty: 1 });
     give(pl, { base: 'longsword', rar: 3, ilvl: 2, aff: [['atk', 3], ['def', 2], ['maxHp', 9]], up: 0, qty: 1 });
     give(pl, { base: 'upgrade_stone', rar: 0, ilvl: 1, aff: [], up: 0, qty: 3 });
     sendInv(app.world, pl);
@@ -954,8 +956,9 @@ try {
     console.log(`auto hunting ok: ${hunted} monsters hunted through the real client, stayed in its area, auto potion at the threshold, Stop and the hotkey immediate, steering keeps it running`);
 
     // --- sort and bulk sale ---
-    w.relocate(pl, pl.room, ax, ay - 20);
-    await p1.waitForFunction((y) => Math.abs((window as any).__game.debug().y - y) < 30, ay - 20);
+    const shopAt = zoneObjects('eldoria').find((o) => o.kind === 'merchant')!; // the shop is the armoury
+    w.relocate(pl, pl.room, shopAt.x, shopAt.y + 40);
+    await p1.waitForFunction((y) => Math.abs((window as any).__game.debug().y - y) < 30, shopAt.y + 40);
     pl.inv.length = 0;
     for (const [base, rar, ilvl] of [['longsword', 0, 3], ['cloth_hood', 1, 4], ['greatsword', 2, 6], ['cloth_robe', 0, 2], ['leather_jerkin', 0, 5]] as const) give(pl, { base, rar, ilvl, aff: [], up: 0, qty: 1 });
     give(pl, { base: 'upgrade_stone', rar: 0, ilvl: 1, aff: [], up: 0, qty: 4 });

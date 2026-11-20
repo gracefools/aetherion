@@ -5,7 +5,7 @@
 import { defaultAppearance, type Appearance } from './appearance';
 import { TILE, type Job } from './protocol';
 import { EXPANSION } from './expansion';
-import { getZoneMap, REGIONS, T, tileAt, tileCenter, ZONES } from './world';
+import { CITY, getZoneMap, REGIONS, T, tileAt, tileCenter, ZONES } from './world';
 
 export type ObjKind = 'merchant' | 'waykeeper' | 'lorekeeper' | 'runesmith' | 'banker' | 'arenamaster' | 'riftwarden' | 'raidherald' | 'steward' | 'node' | 'cache';
 export interface WorldObj {
@@ -104,7 +104,7 @@ function mulberry(a: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const SOLID_T = (t: T) => t === T.Water || t === T.Tree || t === T.Wall || t === T.Roof || t === T.Rock;
+const SOLID_T = (t: T) => t === T.Water || t === T.Tree || t === T.Wall || t === T.Roof || t === T.Rock || t === T.Block;
 
 const cache = new Map<string, WorldObj[]>();
 export function zoneObjects(zoneId: string): WorldObj[] {
@@ -140,6 +140,9 @@ export function zoneObjects(zoneId: string): WorldObj[] {
     }
     list.push({ id: `runesmith:${zoneId}`, kind: 'runesmith', name: RUNESMITH_NAMES[zoneId] ?? 'Rune Merchant', zone: zoneId, x: tileCenter(tx + dx), y: tileCenter(ty + dy), job: look.job, ap: { ...defaultAppearance(look.job), ...look.tweak } });
   }
+
+  // the capital: everyone stands at the house or yard of their trade (CITY in world.ts)
+  if (zoneId === 'eldoria') for (const o of list) { const at = CITY.npcs[o.kind]; if (at) { o.x = tileCenter(tx + at[0]); o.y = tileCenter(ty + at[1]); } }
 
   // Reachable ground, found once by flood fill from the spawn point.
   const seen = new Uint8Array(map.w * map.h), stack = [def.spawn.tx + def.spawn.ty * map.w];

@@ -7,7 +7,7 @@ import { DEPTH_BOSSES, MONSTERS, SPAWNS, WORLD_BOSSES } from '../../shared/src/m
 import { DEPTH_MONSTER, depthOf } from '../../shared/src/depths';
 import { teleportCost, waypointId, zoneObjects } from '../../shared/src/places';
 import { MAX_MARKERS, type GameSettings, type MapMarker } from '../../shared/src/settings';
-import { EXIT, getZoneMap, REGIONS, tileCenter, ZONES } from '../../shared/src/world';
+import { EXIT, getZoneMap, REGIONS, tileCenter, ZONES, COMPASS, COMPASS_VEC, innerRegion, recommendedFor, WORLD_LAYOUT } from '../../shared/src/world';
 import { TILE } from '../../shared/src/protocol';
 import { miniColors } from './game/art';
 import { miniColors as hdMiniColors } from './game/hdart';
@@ -141,16 +141,23 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
         <h2>{t('map.title')}</h2>
         <button className="link panelx" onClick={onClose} aria-label={t('map.close')}>{t('common.close')}</button>
       </div>
-      <ol className="regions" ref={strip} aria-label={t('map.regions')}>
+      <ol className="regions worldchart" ref={strip} aria-label={t('map.regions')}>
+        <li className="chartroads" aria-hidden="true">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            {ROADS.map(([p, q, hub], i) => <line key={i} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} className={hub ? 'hub' : ''} />)}
+          </svg>
+          {COMPASS.map((d) => <span key={d} className="compass" style={{ left: `${50 + COMPASS_VEC[d][0] * (d === 'e' || d === 'w' ? 47 : 62)}%`, top: `${50 + COMPASS_VEC[d][1] * (d === 'n' || d === 's' ? 47 : 62)}%` }}>{t(`map.dir.${d}` as Key)}</span>)}
+        </li>
         {MAPS.map((r, i) => {
           const d = ZONES[r], ok = explored(hud, r), party = (hud.party?.members ?? []).filter((m) => m.id !== hud.self?.id && regionOf(m.zone) === r).length;
+          const at = chartPos(r), lv = hud.self?.level ?? 1, rec = !d.depth && recommendedFor(lv, r), low = lv < (d.depth ? ZONES[d.depth.host] : d).level[0];
+          void i;
           return (
-            <li key={r}>
-              {i > 0 && <span className="road" aria-hidden="true" />}
-              <button className={'region ' + (d.depth ? 'depth ' : '') + (ok ? 'open' : 'locked') + (sel === r ? ' on' : '') + (here === r ? ' here' : '')} onClick={() => { setSel(r); setDraft(null); }} aria-pressed={sel === r}
-                aria-label={`${d.name}, ${t('common.lvRange', { a: d.level[0], b: d.level[1] })}, ${ok ? t('map.explored') : t('map.unexplored')}${here === r ? `, ${t('map.youAreHere')}` : ''}`}>
+            <li key={r} className="chartnode" style={{ left: `${at[0]}%`, top: `${at[1]}%` }}>
+              <button className={'region ' + (d.depth ? 'depth ' : '') + (ok ? 'open' : 'locked') + (sel === r ? ' on' : '') + (here === r ? ' here' : '') + (rec ? ' rec' : '') + (low ? ' low' : '')} onClick={() => { setSel(r); setDraft(null); }} aria-pressed={sel === r}
+                aria-label={`${d.name}, ${t('common.lvRange', { a: d.level[0], b: d.level[1] })}, ${ok ? t('map.explored') : t('map.unexplored')}${here === r ? `, ${t('map.youAreHere')}` : ''}${rec ? `, ${t('map.recommended')}` : ''}`}>
                 <b>{d.name}</b>
-                <small>{t('common.lvRange', { a: d.level[0], b: d.level[1] })}</small>
+                <small>{t('common.lvRange', { a: d.level[0], b: d.level[1] })}{rec && <em className="recmark" title={t('map.recommended')}> ★</em>}</small>
                 <span className="badges">
                   {here === r && <i title={t('map.youAreHere')}>{GLYPH.you}</i>}
                   {party > 0 && <i title={t('map.partyHere', { n: party })}>{GLYPH.party}{party}</i>}
@@ -211,6 +218,26 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
     </div>
   );
 }
+
+// ---------- the chart: Eldoria in the middle, eight directions, two regions deep ----------
+const RING = [0, 21, 37];
+/** Where a region sits on the chart, in percent (the Depths hang beside the region they lie under). */
+function chartPos(zone: string): [number, number] {
+  const z = ZONES[zone];
+  if (z?.depth) {
+    const [hx, hy] = chartPos(z.depth.host), v = COMPASS_VEC[WORLD_LAYOUT[z.depth.host].dir];
+    return [hx - v[1] * 10.5 + v[0] * 3, hy + v[0] * 9.5 + v[1] * 3];
+  }
+  const p = WORLD_LAYOUT[zone];
+  if (!p) return [50, 50];
+  const v = COMPASS_VEC[p.dir], r = RING[p.ring];
+  return [50 + v[0] * r * 0.98, 50 + v[1] * r];
+}
+/** Roads: Eldoria's eight gates to the nearer regions, then every region's road to the next. */
+const ROADS: [[number, number], [number, number], boolean][] = [
+  ...COMPASS.map((d) => [chartPos('eldoria'), chartPos(innerRegion(d)), true] as [[number, number], [number, number], boolean]),
+  ...REGIONS.slice(1, -1).map((id, i) => [chartPos(id), chartPos(REGIONS[i + 2]), false] as [[number, number], [number, number], boolean]),
+];
 
 /** The spot chosen on the map (or the region's town), the way there, and the button that sets off. */
 function GoHere({ game, hud, sel, dest, onClose }: { game: Game; hud: Hud; sel: string; dest: { zone: string; x: number; y: number } | null; onClose: () => void }) {

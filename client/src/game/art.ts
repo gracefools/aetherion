@@ -424,7 +424,7 @@ function build(theme: string): Tex {
 }
 
 const grassy = (t: T) => t === T.Grass || t === T.Flower || t === T.Tree;
-const GROUND: Partial<Record<T, string>> = { [T.Grass]: 'grass', [T.Tree]: 'grass', [T.Flower]: 'flower', [T.Path]: 'dirt', [T.Water]: 'water', [T.Plaza]: 'cobble', [T.Portal]: 'portal', [T.Gate]: 'gate', [T.Rock]: 'rock' };
+const GROUND: Partial<Record<T, string>> = { [T.Grass]: 'grass', [T.Tree]: 'grass', [T.Flower]: 'flower', [T.Path]: 'dirt', [T.Water]: 'water', [T.Plaza]: 'cobble', [T.Block]: 'cobble', [T.Portal]: 'portal', [T.Gate]: 'gate', [T.Rock]: 'rock' };
 
 /** Organic borders: grass creeps over paths and plazas, water gets a bank and foam line. */
 function edges(g: G, map: ZoneMap, wx: number, wy: number, ox: number, oy: number, t: T, p: Pal) {
@@ -493,7 +493,7 @@ function building(g: G, tex: Tex, map: ZoneMap, wx: number, wy: number, ox: numb
 /** Minimap colour per tile type for a theme (index = tile id). */
 export function miniColors(theme: string): string[] {
   const p = PALS[theme];
-  return [p.g, p.dirt[0], p.liquid[0], p.leaf[1], '#e2d6bd', '#a84a36', '#a070ff', p.gl, p.cobble[1][0], p.rock[0], '#d0b8ff'];
+  return [p.g, p.dirt[0], p.liquid[0], p.leaf[1], '#e2d6bd', '#a84a36', '#a070ff', p.gl, p.cobble[1][0], p.rock[0], '#d0b8ff', p.cobble[1][0]];
 }
 
 export interface Chunk {

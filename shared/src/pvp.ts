@@ -2,7 +2,7 @@
 // same function only to know whom it may click on as an enemy.
 import { VILLAGE_LEAVE_TILES } from './audio';
 import { TILE } from './protocol';
-import { BOSS_ROOM, CHAMBERS, MONSTER_TOWN_CLEAR, REGIONS, ZONES } from './world';
+import { BOSS_ROOM, CHAMBERS, inCity, MONSTER_TOWN_CLEAR, REGIONS, ZONES } from './world';
 
 /**
  *  safe  - no player may attack another, not even in a duel (dungeons; inside the arena its own rules apply).
@@ -58,6 +58,7 @@ export const MONSTER_TOWN_CHASE = VILLAGE_LEAVE_TILES + 6;
 /** Within `tiles` of the village centre of a zone. */
 export function nearTown(zone: string, x: number, y: number, tiles: number): boolean {
   const t = ZONES[zone]?.town, s = ZONES[zone]?.sanctuary;
+  if (inCity(zone, x, y, tiles - VILLAGE_LEAVE_TILES)) return true; // the capital: everything inside the wall, and the same margin beyond it
   // a sanctuary is kept clear the same way, by the same margin beyond its edge
   if (s && Math.hypot(x / TILE - s.tx, y / TILE - s.ty) <= s.r + (tiles - VILLAGE_LEAVE_TILES)) return true;
   return !!t && Math.hypot(x / TILE - t.tx, y / TILE - t.ty) <= tiles;
@@ -65,6 +66,7 @@ export function nearTown(zone: string, x: number, y: number, tiles: number): boo
 /** Inside the safe radius of a town (open-PvP zones still protect their villages). */
 export function inTown(zone: string, x: number, y: number): boolean {
   const t = ZONES[zone]?.town;
+  if (inCity(zone, x, y)) return true; // the walled capital is town from wall to wall
   return !!t && Math.hypot(x / TILE - t.tx, y / TILE - t.ty) <= VILLAGE_LEAVE_TILES;
 }
 export interface PvpView {

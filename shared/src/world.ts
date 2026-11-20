@@ -17,9 +17,11 @@ export const enum T {
   Rock = 9,
   /** Dungeon entrance: walkable, opens the dungeon dialog. */
   Gate = 10,
+  /** Paving that cannot be walked on: under a statue, a market stall, a tower. Drawn as plaza. */
+  Block = 11,
 }
 export const SOLID: boolean[] = [];
-SOLID[T.Water] = SOLID[T.Tree] = SOLID[T.Wall] = SOLID[T.Roof] = SOLID[T.Rock] = true;
+SOLID[T.Water] = SOLID[T.Tree] = SOLID[T.Wall] = SOLID[T.Roof] = SOLID[T.Rock] = SOLID[T.Block] = true;
 
 export interface Portal {
   tx: number;
@@ -145,6 +147,41 @@ ZONES.d_rift = dungeonZone('d_rift', 'The Endless Rift', 0xd0d0ff, 'temple', 20,
 export const REGIONS = ['eldoria', 'verdant', 'ashen', 'frostveil', 'dreadmoor', 'astral', ...EXPANSION.map((e) => e.id)];
 
 // ---------------------------------------------------------------------------------------------
+// The shape of the world. Eldoria lies in the middle; the other regions lie around it in the eight
+// compass directions, two deep: a nearer region and a farther one in each direction, in order of
+// level going round from the east (east 4-18, north-east 18-34, north 34-60 ... south-east 180-200).
+// Eldoria has a gate in each direction leading straight to the nearer region there; the regions
+// also keep their own road from one to the next. The world map draws exactly this.
+// ---------------------------------------------------------------------------------------------
+export const COMPASS = ['e', 'ne', 'n', 'nw', 'w', 'sw', 's', 'se'] as const;
+export type Compass = (typeof COMPASS)[number];
+/** Unit steps on the map: x to the east, y to the south. */
+export const COMPASS_VEC: Record<Compass, [number, number]> = { e: [1, 0], ne: [0.72, -0.72], n: [0, -1], nw: [-0.72, -0.72], w: [-1, 0], sw: [-0.72, 0.72], s: [0, 1], se: [0.72, 0.72] };
+export interface WorldPlace { dir: Compass; ring: 1 | 2 }
+/** Where each region lies from Eldoria (Eldoria itself is the centre and has no entry). */
+export const WORLD_LAYOUT: Record<string, WorldPlace> = Object.fromEntries(
+  REGIONS.slice(1).map((id, i) => [id, { dir: COMPASS[Math.floor(i / 2)], ring: ((i % 2) + 1) as 1 | 2 }]),
+);
+/** The nearer region in a direction: the one Eldoria's gate there leads to. */
+export const innerRegion = (dir: Compass) => REGIONS.find((id) => WORLD_LAYOUT[id]?.dir === dir && WORLD_LAYOUT[id].ring === 1)!;
+/** A region suits a character of this level: strong enough to hunt there, not yet far beyond it. */
+export const recommendedFor = (level: number, zone: string) => !!ZONES[zone] && level >= ZONES[zone].level[0] && level <= ZONES[zone].level[1] + 2;
+{
+  // Eldoria's gates (designed tiles, 96x96) and, in each nearer region (120x80), the gate back on
+  // the side that faces Eldoria. The east gate is the old road to Verdant Reach.
+  const E_GATE: Record<Compass, [number, number]> = { e: [93, 48], ne: [88, 8], n: [48, 2], nw: [8, 8], w: [2, 48], sw: [8, 88], s: [48, 93], se: [88, 88] };
+  const BACK: Record<Compass, [number, number]> = { e: [2, 40], ne: [8, 72], n: [60, 77], nw: [112, 72], w: [117, 62], sw: [112, 8], s: [34, 2], se: [8, 8] };
+  const inward = (x: number, y: number, w: number, h: number): [number, number] => [x + Math.sign(w / 2 - x) * 3, y + Math.sign(h / 2 - y) * (Math.abs(h / 2 - y) > 6 ? 3 : 0)];
+  for (const dir of COMPASS) {
+    if (dir === 'e') continue;
+    const id = innerRegion(dir), z = ZONES[id], [gx, gy] = E_GATE[dir], [bx, by] = BACK[dir];
+    const [ax, ay] = inward(bx, by, z.w, z.h), [hx, hy] = inward(gx, gy, 96, 96);
+    ZONES.eldoria.portals.push({ tx: gx, ty: gy, to: id, toTx: ax, toTy: ay });
+    z.portals.push({ tx: bx, ty: by, to: 'eldoria', toTx: hx, toTy: hy });
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // Open-world maps are 1.5 times their designed size. Every coordinate written above (spawn
 // points, portals and their arrival points, villages, dungeon gates, clearings) is in designed
 // tiles and is scaled here once, so the rest of the game only ever sees the final map.
@@ -189,6 +226,85 @@ export const scaleTile = (v: number) => Math.round(v * MAP_SCALE);
     }
   }
 }
+// ---------------------------------------------------------------------------------------------
+// Eldoria, the capital: a walled city. Everything is in tiles from the city's centre (the spawn
+// point) on the final map. The wall has a gate in each of the eight directions (the four sides
+// and the four corners); inside, each trade has its own house and yard, and the townsfolk stand
+// at theirs (places.ts puts them on these spots, decor.ts dresses the yards).
+// ---------------------------------------------------------------------------------------------
+export const CITY = {
+  /** Half the wall's width and height: the wall runs along x = +-wx, y = +-wy. */
+  wx: 31, wy: 28,
+  /** Houses and halls: top-left corner, width (each is 3 roof rows over 2 wall rows). */
+  buildings: {
+    bank: [16, -8, 9], armoury: [-24, -8, 9], runeshop: [14, 3, 7], library: [-20, 3, 7], stewardhouse: [22, 12, 7],
+    house1: [-28, -22, 7], house2: [-28, 12, 7], house3: [4, 15, 6], house4: [24, -17, 6],
+  } as Record<string, [number, number, number]>,
+  /** The arena: a walled ring of sand (outer rectangle), its gate in the middle of the south side. */
+  arena: { x0: -17, y0: -24, x1: -5, y1: -17 },
+  /** Where each of the townsfolk stands, by the kind of their trade. */
+  npcs: {
+    merchant: [-20, -3], banker: [20, -3], runesmith: [17, 9], lorekeeper: [-17, 9], steward: [25, 18],
+    arenamaster: [-11, -15], riftwarden: [13, -18], raidherald: [5, -12], waykeeper: [-9, 16],
+  } as Record<string, [number, number]>,
+  statue: [0, -5] as [number, number],
+  fountain: [0, 6] as [number, number],
+  rift: [13, -21] as [number, number],
+  waystone: [-9, 19] as [number, number],
+  /**
+   * Scenery: [kind, x, y, solid tiles]. x and y are where its foot stands, in tiles from the centre
+   * (fractions allowed); with solid tiles > 0 that many tiles under it cannot be walked on.
+   */
+  decor: [
+    ['statue', 0, -4, 0], ['fountain', 0.5, 7.2, 0], ['planter', -2.2, -3.6, 0], ['planter', 2.2, -3.6, 0],
+    // the bank and its market
+    ['stall_red', 15, -2, 2], ['stall_blue', 26, -2, 2], ['crate', 13.3, -1.7, 0], ['barrel', 27.6, -1.8, 0], ['crate', 24.2, -1.7, 0],
+    // the armoury
+    ['weapon_rack', -23.5, -2, 1], ['potion_table', -16, -2, 2], ['armor_stand', -14.4, -2, 1], ['barrel', -25.2, -1.8, 0],
+    // the arena's forecourt
+    ['sword_ground', -13.5, -14.2, 0], ['shield_ground', -8.5, -14.2, 0], ['sword_ground', -14.3, -12.5, 0], ['shield_ground', -7.7, -12.5, 0], ['dummy', -6.5, -13, 1],
+    // the rift and the watch fire before it
+    ['rift', 13.5, -20, 0], ['campfire', 11.5, -17.2, 1], ['sword_ground', 15.8, -17.4, 0],
+    // the raid herald's banners, the rune shop, the library, the waygate, the housing steward
+    ['war_banner', 3.5, -11.1, 0], ['war_banner', 7.5, -11.1, 0],
+    ['rune_stone', 15, 9.9, 1], ['rune_stone', 20, 9.9, 1], ['bookstand', -19, 9.9, 1], ['bookstand', -14, 9.9, 1],
+    ['waygate', -8.5, 19.9, 1], ['signpost', 27.5, 18.9, 0],
+    // street lamps
+    ['lamp', -7.5, -6, 0], ['lamp', 8.5, -6, 0], ['lamp', -7.5, 7, 0], ['lamp', 8.5, 7, 0], ['lamp', 2.6, -15, 0], ['lamp', 2.6, 16, 0], ['lamp', -15, -1.6, 0], ['lamp', 16, -1.6, 0],
+    ['lamp', 2.6, -24, 0], ['lamp', 2.6, 25, 0], ['lamp', -26, -1.6, 0], ['lamp', 27, 2.4, 0],
+  ] as [string, number, number, number][],
+};
+/** Inside the capital's wall (world pixels), or within `margin` tiles outside it. */
+export function inCity(zone: string, x: number, y: number, margin = 0): boolean {
+  if (zone !== 'eldoria') return false;
+  const z = ZONES.eldoria;
+  return Math.abs(x / TILE - z.spawn.tx - 0.5) <= CITY.wx + 1 + margin && Math.abs(y / TILE - z.spawn.ty - 0.5) <= CITY.wy + 2 + margin;
+}
+export interface Decor { kind: string; x: number; y: number }
+const decorCache = new Map<string, Decor[]>();
+/** The scenery standing in a zone (world pixels at each piece's foot). Only the capital has any. */
+export function cityDecor(zoneId: string): Decor[] {
+  let list = decorCache.get(zoneId);
+  if (list) return list;
+  list = [];
+  decorCache.set(zoneId, list);
+  if (zoneId !== 'eldoria') return list;
+  const C = CITY, z = ZONES.eldoria, cx = z.spawn.tx, cy = z.spawn.ty, px = (fx: number, fy: number) => ({ x: Math.round((cx + fx) * TILE), y: Math.round((cy + fy) * TILE) });
+  for (const [kind, fx, fy] of C.decor) list.push({ kind, ...px(fx, fy) });
+  // towers: the arena's corners, both sides of each gate, and the ends of the wall at the corner gates
+  const A = C.arena, G = 3, CG = 5;
+  for (const [fx, fy] of [
+    [A.x0 + 1, A.y0 + 3], [A.x1, A.y0 + 3], [A.x0 + 1, A.y1 + 1], [A.x1, A.y1 + 1],
+    [-G + 0.5, -C.wy + 1], [G + 0.5, -C.wy + 1], [-G + 0.5, C.wy + 3], [G + 0.5, C.wy + 3],
+    [-C.wx, -G + 1], [-C.wx, G + 1], [C.wx + 1, -G + 1], [C.wx + 1, G + 1],
+    [-C.wx + CG + 0.5, -C.wy + 1], [C.wx - CG + 0.5, -C.wy + 1], [-C.wx + CG + 0.5, C.wy + 3], [C.wx - CG + 0.5, C.wy + 3],
+  ]) list.push({ kind: 'tower', ...px(fx, fy) });
+  return list;
+}
+
+/** City-wall tiles of each zone (tile index): drawn as a stone rampart, not as a house. */
+export const RAMPARTS: Record<string, Set<number>> = {};
+export const isRampart = (zone: string, tx: number, ty: number, w: number) => !!RAMPARTS[zone]?.has(tx + ty * w);
 /** Dungeon chambers, west to east: five combat rooms and the boss hall. Coordinates in tiles. */
 export const DUNGEON_ROOMS = 4;
 export const CHAMBERS = Array.from({ length: DUNGEON_ROOMS }, (_, k) =>
@@ -386,20 +502,51 @@ function generate(def: ZoneDef): ZoneMap {
       }
       nodes.push({ x: gx, y: gy, main: false });
     }
-    // The capital: a plaza, a ring of houses, and a street from the plaza to every door.
-    rect(sp.tx - 7, sp.ty - 7, 15, 15, T.Plaza);
-    const houses = [[-16, -13], [-16, 4], [9, -13], [9, 5], [-6, -17], [-6, 11], [-27, -4], [20, 5]];
-    for (const [dx, dy] of houses) {
-      const hx = sp.tx + dx, hy = sp.ty + dy;
-      rect(hx - 1, hy - 1, 9, 7, T.Grass);
-      rect(hx, hy, 7, 3, T.Roof);
-      rect(hx, hy + 3, 7, 2, T.Wall);
+    // The capital: open, level ground inside the wall, then the plaza, the avenues to the eight gates,
+    // the halls and houses, the arena and the courts. The wall itself is raised after the roads (below).
+    const C = CITY, cx = sp.tx, cy = sp.ty;
+    for (let y = cy - C.wy - 2; y <= cy + C.wy + 2; y++) for (let x = cx - C.wx - 2; x <= cx + C.wx + 2; x++) {
+      const t = get(x, y);
+      if (t === T.Water || t === T.Tree || t === T.Flower) set(x, y, T.Grass);
     }
-    houses.forEach(([dx, dy], i) => {
-      const doorX = sp.tx + dx + 3, doorY = sp.ty + dy + 5;
-      // from the doorstep to the nearest edge of the plaza
-      road(doorX, doorY, Math.max(sp.tx - 7, Math.min(sp.tx + 7, doorX)), Math.max(sp.ty - 7, Math.min(sp.ty + 7, doorY)), 2, i + 3);
+    // the great plaza: round, with the statue of peace to the north and the fountain to the south
+    for (let y = -9; y <= 9; y++) for (let x = -9; x <= 9; x++) if (Math.hypot(x, y) <= 9.3) set(cx + x, cy + y, T.Plaza);
+    // avenues: from the plaza to the middle of each side and to each corner
+    const gates: [number, number][] = [[0, -C.wy], [0, C.wy], [-C.wx, 0], [C.wx, 0], [-C.wx, -C.wy], [C.wx, -C.wy], [-C.wx, C.wy], [C.wx, C.wy]];
+    gates.forEach(([gx, gy], i) => {
+      const len = Math.hypot(gx, gy), ux = gx / len, uy = gy / len;
+      // straight and three wide: the city's streets do not wander
+      for (let d = 8; d <= len + 2; d += 0.5) for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+        const px = Math.round(cx + ux * d) + ox, py = Math.round(cy + uy * d) + oy;
+        if (px > 1 && py > 1 && px < w - 2 && py < h - 2 && get(px, py) !== T.Plaza) set(px, py, T.Path);
+      }
+      nodes.push({ x: cx + gx + Math.sign(gx) * 3, y: cy + gy + Math.sign(gy) * 3, main: true });
+      void i;
     });
+    for (const [bx, by, bw] of Object.values(C.buildings)) {
+      rect(cx + bx - 1, cy + by - 1, bw + 2, 7, T.Grass);
+      rect(cx + bx, cy + by, bw, 3, T.Roof);
+      rect(cx + bx, cy + by + 3, bw, 2, T.Wall);
+      // a doorstep and a lane from the door to the nearest avenue or the plaza
+      const doorX = cx + bx + Math.floor(bw / 2), doorY = cy + by + 5;
+      rect(doorX - 1, doorY, 3, 2, T.Path);
+      nodes.push({ x: doorX, y: doorY + 1, main: false });
+    }
+    // the arena: sand inside, a paved forecourt before its gate
+    const A = C.arena;
+    rect(cx + A.x0 + 2, cy + A.y0 + 3, A.x1 - A.x0 - 3, A.y1 - A.y0 - 5, T.Path);
+    rect(cx + Math.floor((A.x0 + A.x1) / 2) - 2, cy + A.y1 + 1, 5, 4, T.Plaza);
+    // courts: the townsfolk stand on paving
+    for (const [nx, ny] of Object.values(C.npcs)) for (let y = -1; y <= 1; y++) for (let x = -2; x <= 2; x++) { const q = get(cx + nx + x, cy + ny + y); if (q === T.Grass || q === T.Path || q === T.Flower) set(cx + nx + x, cy + ny + y, T.Plaza); }
+    // the rift: scorched ground around the tear; the waygate: a paved round
+    for (let y = -3; y <= 3; y++) for (let x = -4; x <= 4; x++) if (Math.hypot(x, y * 1.3) <= 4 && get(cx + C.rift[0] + x, cy + C.rift[1] + y) !== T.Plaza) set(cx + C.rift[0] + x, cy + C.rift[1] + y, T.Path);
+    for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (Math.hypot(x, y) <= 3.2) set(cx + C.waystone[0] + x, cy + C.waystone[1] + y, T.Plaza);
+    // flower beds along the plaza's rim and by the halls
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2 + 0.2, fx = Math.round(cx + Math.cos(a) * 11), fy = Math.round(cy + Math.sin(a) * 11);
+      if (get(fx, fy) === T.Grass) set(fx, fy, T.Flower);
+      if (get(fx + 1, fy) === T.Grass) set(fx + 1, fy, T.Flower);
+    }
   } else {
     rect(sp.tx - 3, sp.ty - 3, 7, 7, T.Grass);
     if (def.town) {
@@ -436,6 +583,46 @@ function generate(def: ZoneDef): ZoneMap {
     on.push(a);
   }
 
+  if (def.id === 'eldoria') {
+    const C = CITY, cx = sp.tx, cy = sp.ty, ramp = (RAMPARTS[def.id] = new Set<number>());
+    const solid = (x: number, y: number, t: T) => { set(x, y, t); if (t === T.Wall || t === T.Roof) ramp.add(x + y * w); };
+    // the statue's plinth and the fountain's basin
+    rect(cx + C.statue[0] - 1, cy + C.statue[1] - 1, 2, 2, T.Block);
+    for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (Math.hypot(x, y) <= 2.3) set(cx + C.fountain[0] + x, cy + C.fountain[1] + y, Math.hypot(x, y) < 0.8 ? T.Block : T.Water);
+    // A stretch of wall along a row (a parapet over two rows of stone) or down a column (two wide).
+    // Roads are left open: wherever a street or a path crosses the line there is a gate.
+    const open = (x: number, y: number) => { const t = get(x, y); return t === T.Path || t === T.Plaza || t === T.Portal; };
+    const rowWall = (x0: number, x1: number, y: number, gate: (x: number) => boolean) => {
+      for (let x = x0; x <= x1; x++) {
+        if (gate(x) || open(x, y) || open(x, y + 1) || open(x, y + 2)) continue;
+        solid(x, y, T.Roof); solid(x, y + 1, T.Wall); solid(x, y + 2, T.Wall);
+      }
+    };
+    const colWall = (x: number, y0: number, y1: number, gate: (y: number) => boolean) => {
+      let run: number[] = [];
+      const flush = () => { run.forEach((y, i) => { const t = i === run.length - 1 ? T.Wall : T.Roof; solid(x, y, t); solid(x + 1, y, t); }); run = []; };
+      for (let y = y0; y <= y1; y++) {
+        if (gate(y) || open(x, y) || open(x + 1, y)) { if (run.length >= 2) flush(); else run = []; continue; }
+        run.push(y);
+      }
+      if (run.length >= 2) flush();
+    };
+    for (const [, fx, fy, n] of C.decor) for (let k = 0; k < n; k++) set(cx + Math.floor(fx - n / 2 + k + 0.001), cy + Math.ceil(fy) - 1, T.Block);
+    // the arena: north side, two halves of the south side with the gate between, and the two flanks
+    const A = C.arena, ax0 = cx + A.x0, ax1 = cx + A.x1, ay0 = cy + A.y0, ay1 = cy + A.y1, amid = Math.floor((ax0 + ax1) / 2);
+    rowWall(ax0 + 2, ax1 - 2, ay0, () => false);
+    rowWall(ax0 + 2, ax1 - 2, ay1 - 2, (x) => Math.abs(x - amid) <= 1);
+    colWall(ax0, ay0 + 3, ay1 - 3, () => false);
+    colWall(ax1 - 1, ay0 + 3, ay1 - 3, () => false);
+    for (const [x, y] of [[ax0, ay0], [ax1 - 1, ay0], [ax0, ay1 - 2], [ax1 - 1, ay1 - 2]]) rect(x, y, 2, 3, T.Block); // corner towers stand here
+    for (let x = amid - 1; x <= amid + 1; x++) for (let y = ay1 - 2; y <= ay1; y++) set(x, y, T.Path); // the gateway
+    // the city wall: the four sides, each broken by its gate; the corners are the diagonal gates
+    const X0 = cx - C.wx, X1 = cx + C.wx, Y0 = cy - C.wy, Y1 = cy + C.wy, G = 2, CG = 5;
+    rowWall(X0 + CG, X1 - CG, Y0 - 2, (x) => Math.abs(x - cx) <= G);
+    rowWall(X0 + CG, X1 - CG, Y1, (x) => Math.abs(x - cx) <= G);
+    colWall(X0 - 1, Y0 + CG, Y1 - CG, (y) => Math.abs(y - cy) <= G);
+    colWall(X1, Y0 + CG, Y1 - CG, (y) => Math.abs(y - cy) <= G);
+  }
   // Lairs: rough open ground where an elite waits (water and trees give way; the trail stays).
   for (const l of def.lairs ?? [])
     for (let y = l.ty - l.r; y <= l.ty + l.r; y++) for (let x = l.tx - l.r; x <= l.tx + l.r; x++) {

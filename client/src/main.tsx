@@ -75,6 +75,7 @@ import { TouchControls } from './touch';
 import { FullscreenAsk, PortraitCover } from './fullscreen';
 import { useTouch } from './touch';
 import { watchInstall } from './install';
+import { FeatureGuide, Prologue } from './guide';
 
 interface Character {
   id: number;
@@ -428,6 +429,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
       {game && qlog && <Win id="quests" title={'quest.log'} onClose={() => setQlog(false)}><Guard><QuestLog game={game} onClose={() => setQlog(false)} /></Guard></Win>}
       {game && <Guard><QuestTracker game={game} onOpen={() => setQlog(true)} /></Guard>}
       {game && <Guard><StoryScene game={game} /></Guard>}
+      {game && <Guard><GuideLayer game={game} /></Guard>}
       {game && <Guard><RiftTracker game={game} /></Guard>}
       {game && <Guard><RaidTracker game={game} /></Guard>}
       {game && <Guard><SiegeTracker game={game} /></Guard>}
@@ -947,6 +949,11 @@ watchInstall(); // the browser's install offer comes early: keep it for our own 
 loadImportedAssets().finally(() => createRoot(document.getElementById('root')!).render(<App />));
 
 /** The menu dock, following the game's state. */
+/** The opening story for a new character, and the guides for what each level opens. */
+function GuideLayer({ game }: { game: Game }) {
+  const hud = useSyncExternalStore(game.subscribe, game.getHud);
+  return <><Prologue hud={hud} /><FeatureGuide hud={hud} game={game} /></>;
+}
 function DockView({ game, open, act }: { game: Game; open: Parameters<typeof Dock>[0]['open']; act: Parameters<typeof Dock>[0]['act'] }) {
   const hud = useSyncExternalStore(game.subscribe, game.getHud);
   if (!hud.self) return null;

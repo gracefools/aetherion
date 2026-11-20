@@ -248,7 +248,6 @@ export async function createApp(cfg: Config) {
       zlibDeflateOptions: { level: 3, memLevel: 4 },
       serverMaxWindowBits: 11,
       clientNoContextTakeover: true,
-      clientMaxWindowBits: 11,
       threshold: 96,
       concurrencyLimit: 16,
     } : false,

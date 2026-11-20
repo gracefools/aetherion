@@ -1605,3 +1605,23 @@ test('U3: the installable app files are served (manifest, icons, service worker,
   assert.match(await (await fetch(base + '/sw.js')).text(), /offline\.html/);
   assert.equal((await fetch(base + '/offline.html')).status, 200);
 });
+
+test('T3: every browser can connect: a bare deflate offer (Firefox, Safari), a full one (Chrome) and none at all', async () => {
+  const httpM = await import('node:http');
+  const offer = (ext: string | null) => new Promise<{ status: number; ext: string }>((resolve, reject) => {
+    const u = new URL(base + '/ws');
+    const req = httpM.request({ host: u.hostname, port: u.port, path: '/ws', headers: {
+      Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==', Origin: base,
+      ...(ext ? { 'Sec-WebSocket-Extensions': ext } : {}),
+    } });
+    req.on('upgrade', (res, socket) => { socket.destroy(); resolve({ status: res.statusCode ?? 0, ext: String(res.headers['sec-websocket-extensions'] ?? '') }); });
+    req.on('response', (res) => { res.resume(); resolve({ status: res.statusCode ?? 0, ext: '' }); });
+    req.on('error', reject);
+    req.end();
+  });
+  for (const ext of ['permessage-deflate', 'permessage-deflate; client_max_window_bits', null]) {
+    const r = await offer(ext);
+    assert.equal(r.status, 101, `offer ${ext}`);
+    if (ext) assert.match(r.ext, /permessage-deflate/);
+  }
+});

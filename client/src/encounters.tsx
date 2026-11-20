@@ -106,7 +106,7 @@ export function GateDialog({ hud, game }: { hud: Hud; game: Game }) {
   return (
     <div className="hud gate panel" role="dialog" aria-label={t('dng.dialog', { name: def.name })}>
       <div className="sheethead"><div><h2>{def.name}</h2><div className="sub">{t('dng.rec', { n: def.level })}</div></div>
-        <button className="link" onClick={() => setHidden(hud.gate!)} aria-label={t('dng.close')}>{t('common.close')}</button></div>
+        <button className="link dlgclose" onClick={() => setHidden(hud.gate!)} aria-label={t('dng.close')}>{t('common.close')}</button></div>
       <p className="sub">{def.blurb}</p>
       <ol className="stagelist">{def.stages.map((s, i) => <li key={i}><b>{s.name}</b> <small>{s.spawns.map(([m, n]) => `${n > 1 ? n + '× ' : ''}${MONSTERS[m].name}`).join(', ')}</small></li>)}</ol>
       <div className="diffs" role="radiogroup" aria-label={t('dng.difficulty')}>

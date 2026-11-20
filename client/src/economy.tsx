@@ -30,7 +30,7 @@ export function BankerDialog({ hud, game, name, town }: { hud: Hud; game: Game; 
           <button role="tab" aria-selected={tab === 'bank'} className={tab === 'bank' ? 'on' : ''} onClick={() => setTab('bank')}>{t('bank.title')}</button>
           <button role="tab" aria-selected={tab === 'ah'} className={tab === 'ah' ? 'on' : ''} onClick={() => setTab('ah')}>{t('ah.title')}</button>
         </div>
-        <button className="link" onClick={() => game.closeTalk()} aria-label={t('npc.end')}>{t('common.close')}</button>
+        <button className="link dlgclose" onClick={() => game.closeTalk()} aria-label={t('npc.end')}>{t('common.close')}</button>
       </div>
       {tab === 'bank' ? <BankTab hud={hud} game={game} /> : <AuctionTab hud={hud} game={game} />}
     </div>

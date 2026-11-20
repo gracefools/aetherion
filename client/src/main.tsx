@@ -74,6 +74,7 @@ import { CtxMenu } from './ctxmenu';
 import { TouchControls } from './touch';
 import { FullscreenAsk, PortraitCover } from './fullscreen';
 import { useTouch } from './touch';
+import { watchInstall } from './install';
 
 interface Character {
   id: number;
@@ -614,7 +615,7 @@ function Hotbar({ hud, game }: { hud: Hud; game: Game }) {
     return (
       <div className="touchwheel" role="toolbar" aria-label={t('hotbar.label')}>
         {list.slice(p * WHEEL, p * WHEEL + WHEEL).map((el, i) => <div key={i} className={'wheelpos w' + i}>{el}</div>)}
-        {pages > 1 && <button className="wheelpage" aria-label={t('touch.page', { n: p + 1, of: pages })} onClick={() => setPage(p + 1)}>{p + 1}/{pages}</button>}
+        {pages > 1 && <button className="wheelpage" aria-label={t('touch.page', { n: p + 1, of: pages })} onClick={() => setPage(p + 1)}><Icon name="skills" size={20} /><small>{p + 1}/{pages}</small></button>}
       </div>
     );
   }
@@ -931,6 +932,7 @@ try { audio.unlock(); } catch { /* audio waits for a gesture */ }
 installUiSounds();
 
 // Imported sheets (if the build shipped any) are in place before the first sprite is drawn.
+watchInstall(); // the browser's install offer comes early: keep it for our own Install buttons
 loadImportedAssets().finally(() => createRoot(document.getElementById('root')!).render(<App />));
 
 /** The menu dock, following the game's state. */

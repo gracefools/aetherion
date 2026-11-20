@@ -11,6 +11,7 @@ import { t, useT, type Key } from './i18n';
 import { COLORBLIND } from '../../shared/src/settings';
 import { TOUCH_MODES } from '../../shared/src/settings';
 import { FULLSCREEN_MODES } from '../../shared/src/settings';
+import { AppSection, InstallButton } from './install';
 
 const useSettings = (): GameSettings => useSyncExternalStore(settings.subscribe, settings.get);
 const actionName = (a: Action) => t(`act.${a}` as Key);
@@ -181,6 +182,7 @@ function Interface() {
           {UI_SCALES.map((v) => <option key={v} value={v}>{Math.round(v * 100)}%</option>)}
         </select>
       </div>
+      <AppSection />
       <div className="srow">
         <span id="fsmode">{t('ui.fsMode')}</span>
         <select aria-labelledby="fsmode" value={s.fullscreen} onChange={(e: any) => settings.set({ fullscreen: e.target.value })}>
@@ -252,7 +254,10 @@ export function MenuSettings({ signedIn }: { signedIn: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="menusettings" onClick={() => setOpen(!open)} aria-label={t('settings.open')}>{t('settings.title')}</button>
+      <div className="menucorner">
+        <InstallButton className="menuinstall" />
+        <button className="menusettings" onClick={() => setOpen(!open)} aria-label={t('settings.open')}>{t('settings.title')}</button>
+      </div>
       {open && <SettingsPanel onClose={() => setOpen(false)} signedIn={signedIn} />}
     </>
   );

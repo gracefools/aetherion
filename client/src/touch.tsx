@@ -62,6 +62,30 @@ function Btn({ action, icon, label, big = false, off = false }: { action: Action
     </button>
   );
 }
+/** Presses an action once (down and up), as a key tap would. */
+const tapAction = (a: Action) => { send('keydown', a); send('keyup', a); };
+/** Auto hunting: a tap switches it on or off; holding it opens its settings. */
+function AutoBtn({ on }: { on: boolean }) {
+  const timer = useRef(0), held = useRef(false);
+  const start = (e: React.PointerEvent) => {
+    e.preventDefault();
+    held.current = false;
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => { held.current = true; tapAction('panel.auto'); navigator.vibrate?.(15); }, 500);
+  };
+  const end = () => {
+    clearTimeout(timer.current);
+    if (!held.current) tapAction('auto.toggle');
+    held.current = true; // a cancelled press does nothing
+  };
+  return (
+    <button className={'tbtn tauto' + (on ? ' on' : '')} aria-label={t(on ? 'touch.autoOff' : 'touch.autoOn')} aria-pressed={on} title={t('touch.autoHold')}
+      onPointerDown={start} onPointerUp={end} onPointerCancel={() => { clearTimeout(timer.current); held.current = true; }} onContextMenu={(e) => e.preventDefault()}>
+      <Icon name="auto" size={22} />
+      <small>{t('touch.auto')}</small>
+    </button>
+  );
+}
 /** The on-screen controls, shown in touch mode while playing. */
 export function TouchControls({ hud }: { hud: Hud; game: Game }) {
   useT();
@@ -74,6 +98,7 @@ export function TouchControls({ hud }: { hud: Hud; game: Game }) {
         <Btn action="attack" icon="sword" label={t('ctl.attack')} big />
       </div>
       <div className="tutil">
+        <AutoBtn on={hud.auto.on} />
         <Btn action="interact" icon="hero" label={hud.near ? hud.near.hint : t('ctl.interact')} off={!hud.near} />
         <Btn action="target" icon="target" label={t('ctl.target')} />
         <Btn action="potion.hp" icon="pot" label={t('touch.potion')} />

@@ -493,6 +493,7 @@ export class Game {
     this.canvas.addEventListener('contextmenu', this.onContext);
     this.canvas.addEventListener('pointerdown', this.onPress);
     this.canvas.addEventListener('pointerup', this.onRelease);
+    this.canvas.addEventListener('pointermove', this.onPinch);
     this.canvas.addEventListener('pointercancel', this.onRelease);
     this.canvas.addEventListener('wheel', this.onWheel, { passive: false });
     this.canvas.addEventListener('mousemove', this.onMouse);
@@ -536,6 +537,7 @@ export class Game {
     this.canvas.removeEventListener('contextmenu', this.onContext);
     this.canvas.removeEventListener('pointerdown', this.onPress);
     this.canvas.removeEventListener('pointerup', this.onRelease);
+    this.canvas.removeEventListener('pointermove', this.onPinch);
     this.canvas.removeEventListener('pointercancel', this.onRelease);
     this.canvas.removeEventListener('wheel', this.onWheel);
     this.unsubSettings();
@@ -709,13 +711,36 @@ export class Game {
   /** U3: a finger held still on the world for half a second opens the action menu (phones have no right button). */
   private pressTimer = 0;
   private ctxAt = 0;
+  /** Fingers on the world, for pinch zoom: spreading two fingers zooms in a step, pinching zooms out. */
+  private fingers = new Map<number, { x: number; y: number }>();
+  private pinchFrom = 0;
+  private spread() {
+    const [a, b] = [...this.fingers.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  }
+  private onPinch = (e: PointerEvent) => {
+    if (!this.fingers.has(e.pointerId)) return;
+    this.fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this.fingers.size !== 2 || !this.pinchFrom) return;
+    const d = this.spread(), z = settings.get().camera.zoom;
+    if (Math.abs(d - this.pinchFrom) < 70) return;
+    const n = Math.max(0, Math.min(2, z + (d > this.pinchFrom ? 1 : -1))) as 0 | 1 | 2;
+    this.pinchFrom = d;
+    if (n !== z) settings.set({ camera: { zoom: n } });
+  };
   private onPress = (e: PointerEvent) => {
     if (e.pointerType !== 'touch') return;
+    this.fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this.fingers.size === 2) { clearTimeout(this.pressTimer); this.goal = null; this.pinchFrom = this.spread(); return; }
     clearTimeout(this.pressTimer);
     const x = e.clientX, y = e.clientY;
     this.pressTimer = window.setTimeout(() => this.onContext(new MouseEvent('contextmenu', { clientX: x, clientY: y })), 520);
   };
-  private onRelease = () => clearTimeout(this.pressTimer);
+  private onRelease = (e?: PointerEvent) => {
+    clearTimeout(this.pressTimer);
+    if (e) this.fingers.delete(e.pointerId);
+    if (this.fingers.size < 2) this.pinchFrom = 0;
+  };
   private onContext = (e: MouseEvent) => {
     e.preventDefault();
     clearTimeout(this.pressTimer);
@@ -790,8 +815,11 @@ export class Game {
   };
   private resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
-    // Integer zoom (min 2x) keeps pixels crisp and caps the visible world at 1280x720 (inside the server AOI).
-    this.zoom = Math.max(2, Math.ceil(Math.max(w / 1280, h / 720))) + settings.get().camera.zoom;
+    // Integer zoom keeps pixels crisp and caps the visible world at 1280x720 (inside the server AOI).
+    // Phones (short side under 600px) start at 1x: at 2x a phone would show only a 420x195 slice of
+    // the world, far closer than any other screen; 1x shows about as much as a desktop does.
+    const base = Math.min(w, h) < 600 ? 1 : Math.max(2, Math.ceil(Math.max(w / 1280, h / 720)));
+    this.zoom = base + settings.get().camera.zoom;
     this.canvas.width = w;
     this.canvas.height = h;
   };

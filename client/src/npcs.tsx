@@ -159,7 +159,7 @@ export function NpcDialog({ hud, game, openBag }: { hud: Hud; game: Game; openBa
   return (
     <div className="hud npc panel" role="dialog" aria-label={o.name}>
       <div className="sheethead"><div><h2>{o.name}</h2><div className="sub">{t(ROLE[o.kind] ?? 'npc.role.lorekeeper')} · {ZONES[o.zone].town!.name}</div></div>
-        <button className="link" onClick={() => game.closeTalk()} aria-label={t('npc.end')}>{t('common.close')}</button></div>
+        <button className="link dlgclose" onClick={() => game.closeTalk()} aria-label={t('npc.end')}>{t('common.close')}</button></div>
       {o.kind === 'merchant' && <Merchant hud={hud} game={game} openBag={openBag} />}
       {o.kind === 'waykeeper' && <Waykeeper hud={hud} game={game} />}
       {o.kind === 'lorekeeper' && <Lorekeeper key={o.id} hud={hud} game={game} />}

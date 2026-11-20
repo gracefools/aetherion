@@ -8,6 +8,7 @@ import type { Hud } from './game/Game';
 import { t, useT } from './i18n';
 import { settings, touchActive } from './settings';
 import { Icon } from './ui/icons';
+import { installState, promptInstall, useInstall } from './install';
 
 const root = () => document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
 /** The page can go fullscreen here (not on iPhones). */
@@ -40,6 +41,7 @@ export function watchFullscreen() {
 /** Asked once, on a phone or tablet, when the player first enters the world. */
 export function FullscreenAsk({ hud }: { hud: Hud }) {
   useT();
+  useInstall(); // the install choice appears as soon as the browser offers it
   const s = useSyncExternalStore(settings.subscribe, settings.get);
   const [later, setLater] = useState(false);
   useEffect(() => watchFullscreen(), []);
@@ -51,10 +53,12 @@ export function FullscreenAsk({ hud }: { hud: Hud }) {
       <div>
         <b>{t(apple ? 'fs.titleApple' : 'fs.title')}</b>
         <p className="sub">{t(apple ? (isApple() ? 'fs.apple' : 'fs.install') : 'fs.text')}</p>
+        {installState() === 'prompt' && <p className="sub fsbest">{t('inst.fsBest')}</p>}
         <div className="actions">
+          {installState() === 'prompt' && <button className="primary" onClick={() => void promptInstall().then((ok) => ok && settings.set({ fullscreen: 'off' }))}>{t('inst.fsInstall')}</button>}
           {apple
             ? <button className="primary" onClick={() => settings.set({ fullscreen: 'off' })}>{t('fs.ok')}</button>
-            : <button className="primary" onClick={() => { settings.set({ fullscreen: 'on' }); void enterFullscreen(); }}>{t('fs.yes')}</button>}
+            : <button className={installState() === 'prompt' ? '' : 'primary'} onClick={() => { settings.set({ fullscreen: 'on' }); void enterFullscreen(); }}>{t('fs.yes')}</button>}
           {!apple && <button onClick={() => settings.set({ fullscreen: 'off' })}>{t('fs.no')}</button>}
           {!apple && <button className="link" onClick={() => setLater(true)}>{t('fs.later')}</button>}
         </div>

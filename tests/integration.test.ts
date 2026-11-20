@@ -24,7 +24,7 @@ before(async () => {
   const admin = new PgPool(parseDbUrl(dbUrl), 1);
   await admin.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await admin.close();
-  app = await createApp({ ...config, databaseUrl: dbUrl, host: '127.0.0.1', reconnectGraceMs: GRACE, autosaveMs: 400, authRateLimit: 10_000, mobHp: 1, levelGates: false } as Config);
+  app = await createApp({ ...config, databaseUrl: dbUrl, host: '127.0.0.1', reconnectGraceMs: GRACE, autosaveMs: 400, authRateLimit: 10_000, mobHp: 1, levelGates: false, admins: ['acc_mod'] } as Config);
   (app.world.opts as any).events = false; // world events and night monsters only when a test starts them
   base = `http://127.0.0.1:${await app.listen(0)}`;
 });
@@ -1544,4 +1544,37 @@ test('friends: request, accept, online status and place, remove; stored in Postg
   assert.equal(list(A).length, 0);
   assert.equal((await app.db.query('SELECT 1 FROM friends WHERE a=$1 OR b=$1', [A.p.id])).rows.length, 0);
   A.b.close();
+});
+
+test('T4 moderation: mute refuses chat, ban kicks and refuses login and joining, audit reports holdings, others are refused', async () => {
+  const m = await Bot.create(base, 'acc_mod', 'Warden', 'knight');
+  const v = await Bot.create(base, 'acc_vic', 'Rowdy', 'knight');
+  await m.connect();
+  await v.connect();
+  const sys = (b: Bot, re: RegExp) => b.chats.some((c) => !c.from && re.test(c.text));
+  v.raw({ t: 'mod', op: 'kick', arg: 'Warden' });
+  await v.until(() => sys(v, /^Unknown command$/), 2000, 'a player without the right is refused');
+  assert.equal(m.closed, false);
+  m.raw({ t: 'mod', op: 'mute', arg: 'Rowdy 5 spam' });
+  await v.until(() => sys(v, /muted you for 5 minutes/), 2000, 'the muted player is told');
+  v.raw({ t: 'chat', text: 'can anyone hear me' });
+  await v.until(() => sys(v, /^You are muted for 5 more minutes\.$/), 2000, 'chat refused');
+  assert.ok(!m.chats.some((c) => c.from === 'Rowdy'));
+  m.raw({ t: 'mod', op: 'unmute', arg: 'Rowdy' });
+  await v.until(() => sys(v, /lifted your mute/), 2000, 'unmuted');
+  m.raw({ t: 'mod', op: 'audit', arg: 'rowdy' });
+  await m.until(() => sys(m, /^Audit of Rowdy, level \d+, online: \d+ gold, \d+ items in the bag, 0 items and 0 gold in the bank\.$/), 2000, 'audit');
+  await m.until(() => sys(m, /^No recent trades\.$/), 2000, 'no trades yet');
+  m.raw({ t: 'mod', op: 'ban', arg: 'Rowdy 2 cheating' });
+  await v.until(() => v.closed, 3000, 'the banned player is removed');
+  assert.match(v.kicked ?? '', /^This account is banned until .* UTC\. Reason: cheating$/);
+  const r = await http(base, '/api/login', { username: 'acc_vic', password: 'bot-password-1' });
+  assert.equal(r.status, 403, 'and cannot log in');
+  assert.match(JSON.stringify(r.body), /banned until/);
+  await assert.rejects(v.connect(), /banned|Session expired/, 'nor join with an old session');
+  m.raw({ t: 'mod', op: 'unban', arg: 'Rowdy' });
+  await m.until(() => sys(m, /Lifted the ban on Rowdy/), 2000, 'unbanned');
+  assert.equal((await http(base, '/api/login', { username: 'acc_vic', password: 'bot-password-1' })).status, 200);
+  m.close();
+  await sleep(GRACE + 1200);
 });

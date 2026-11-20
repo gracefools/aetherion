@@ -641,6 +641,21 @@
   .skillfacts { display: grid; gap: 4px; margin-top: 4px; } .skillfacts ul, .tipfacts { margin: 0; padding-left: 16px; font-size: 12px; color: #d8dce8; } .skillfacts li::marker, .tipfacts li::marker { color: #c9a24a; }
   .fusions.locked .fusiongrid { opacity: .55; filter: grayscale(.6); } .fusiongrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
   .node.fusion.dim { opacity: .7; } .node.fusion.on { border-color: #c9a24a; box-shadow: 0 0 10px rgba(201,162,74,.3); }
+  /* U6: colour-blind correction over the game and its interface */
+  html[data-cb=protan] #root { filter: url(#cb-protan); } html[data-cb=deutan] #root { filter: url(#cb-deutan); } html[data-cb=tritan] #root { filter: url(#cb-tritan); }
+  .cbswatches { display: flex; gap: 4px; margin: 4px 0 8px; } .cbswatches i { width: 28px; height: 14px; border-radius: 3px; }
+  /* U6: high contrast */
+  html.hc .panel, html.hc .hud.panel, html.hc .tipcard { background: #05060a !important; border-color: #f2f2f2 !important; backdrop-filter: none !important; }
+  html.hc body, html.hc .sub, html.hc small { color: #ffffff !important; } html.hc .sub { opacity: 1 !important; }
+  html.hc button { border: 1px solid #f2f2f2 !important; } html.hc button.primary { background: #ffe08a !important; color: #000 !important; }
+  html.hc .vbar { outline: 1px solid #fff; } html.hc a, html.hc button.link { text-decoration: underline; }
+  /* U6: reduced motion */
+  html.rm *, html.rm *::before, html.rm *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition: none !important; scroll-behavior: auto !important; }
+  /* U4: right-click menu and drag and drop */
+  .ctxmenu { position: fixed; z-index: 60; min-width: 170px; padding: 4px; display: flex; flex-direction: column; gap: 2px; }
+  .ctxmenu .ctxhead { font-weight: 700; padding: 4px 8px; color: #ffe08a; border-bottom: 1px solid rgba(255,255,255,0.12); margin-bottom: 2px; }
+  .ctxmenu button { text-align: left; padding: 5px 8px; background: transparent; border: 0; } .ctxmenu button:hover, .ctxmenu button:focus { background: rgba(255,224,138,0.16); }
+  .dropok { outline: 2px dashed #ffe08a; outline-offset: 2px; }
 </style>
 </head>
 <body>

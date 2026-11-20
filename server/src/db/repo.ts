@@ -1,6 +1,7 @@
 // All SQL lives here. Game code never builds queries.
 import type { Appearance, Job } from '../../../shared/src/protocol';
 import type { Db, Queryer } from './pgwire';
+import type { AccountMod } from '../game/Moderation';
 
 /** A character's gold, bag, equipment and bank as stored together (an atomic inventory snapshot). */
 export interface Snapshot {
@@ -22,6 +23,9 @@ export interface Account {
   id: number;
   username: string;
   password_hash: string;
+  /** T4 */
+  banned_until?: Date | null;
+  ban_reason?: string;
 }
 export interface CharacterRow {
   id: number;
@@ -61,10 +65,45 @@ export class Repo {
     return r.rows[0];
   }
   async findAccount(username: string): Promise<Account | undefined> {
-    const r = await this.db.query<Account>('SELECT id, username, password_hash FROM accounts WHERE username_lower=$1', [
+    const r = await this.db.query<Account>('SELECT id, username, password_hash, banned_until, ban_reason FROM accounts WHERE username_lower=$1', [
       username.toLowerCase(),
     ]);
     return r.rows[0];
+  }
+  // ---------- T4: moderation ----------
+  async accountMod(accountId: number): Promise<AccountMod | undefined> {
+    return (await this.db.query<AccountMod>('SELECT username, is_admin, banned_until, ban_reason, muted_until FROM accounts WHERE id=$1', [accountId])).rows[0];
+  }
+  async accountOfCharacter(name: string): Promise<{ account_id: number; name: string } | undefined> {
+    return (await this.db.query<{ account_id: number; name: string }>('SELECT account_id, name FROM characters WHERE name_lower=$1', [name.toLowerCase()])).rows[0];
+  }
+  /** Bans (or with null lifts the ban on) an account; a ban also ends its sessions. */
+  async setBan(accountId: number, until: Date | null, reason: string) {
+    await this.db.query('UPDATE accounts SET banned_until=$2, ban_reason=$3 WHERE id=$1', [accountId, until, until ? reason : '']);
+    if (until) await this.db.query('DELETE FROM sessions WHERE account_id=$1', [accountId]);
+  }
+  setMute(accountId: number, until: Date | null) {
+    return this.db.query('UPDATE accounts SET muted_until=$2 WHERE id=$1', [accountId, until]);
+  }
+  modLog(admin: string, action: string, target: string, detail: string) {
+    return this.db.query('INSERT INTO mod_log(admin, action, target, detail) VALUES ($1,$2,$3,$4)', [admin, action, target, detail]);
+  }
+  async modLogs(target: string, limit = 20) {
+    return (await this.db.query<{ at: Date; admin: string; action: string; detail: string }>('SELECT at, admin, action, detail FROM mod_log WHERE lower(target)=$1 ORDER BY at DESC LIMIT $2', [target.toLowerCase(), limit])).rows;
+  }
+  /** A character's stored gold and items, with its ten latest trades and bank entries. */
+  async auditCharacter(name: string) {
+    const c = (await this.db.query<{ id: number; name: string; level: number; gold: number; bag: number; bank_items: number; bank_gold: number }>(
+      `SELECT id, name, level, gold, jsonb_array_length(CASE WHEN jsonb_typeof(inventory)='array' THEN inventory ELSE '[]'::jsonb END) AS bag,
+              jsonb_array_length(CASE WHEN jsonb_typeof(bank->'items')='array' THEN bank->'items' ELSE '[]'::jsonb END) AS bank_items,
+              COALESCE((bank->>'gold')::bigint, 0) AS bank_gold
+         FROM characters WHERE name_lower=$1`, [name.toLowerCase()])).rows[0];
+    if (!c) return undefined;
+    const id = Number(c.id);
+    const trades = (await this.db.query<{ at: Date; a_id: number; b_id: number; a_name: string; b_name: string; a_gave: any; b_gave: any }>(
+      'SELECT at, a_id, b_id, a_name, b_name, a_gave, b_gave FROM trade_log WHERE a_id=$1 OR b_id=$1 ORDER BY at DESC LIMIT 10', [id])).rows.map((t) => ({ ...t, a_id: Number(t.a_id), b_id: Number(t.b_id) }));
+    const bank = (await this.db.query<{ at: Date; op: string; detail: unknown }>('SELECT at, op, detail FROM bank_log WHERE character_id=$1 ORDER BY at DESC LIMIT 10', [id])).rows;
+    return { ...c, id, gold: Number(c.gold), bag: Number(c.bag), bank_items: Number(c.bank_items), bank_gold: Number(c.bank_gold), trades, bank };
   }
   touchLogin(id: number) {
     return this.db.query('UPDATE accounts SET last_login_at=now() WHERE id=$1', [id]);

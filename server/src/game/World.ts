@@ -65,6 +65,7 @@ import { AFFIX_DIFFS } from '../../../shared/src/traits';
 import { Finder } from './Finder';
 import { LFG_CHAT_MS, WORLD_CHAT_MS } from '../../../shared/src/social';
 import { Seasons } from './Seasons';
+import { Moderation } from './Moderation';
 
 export interface Conn {
   send(data: string): void;
@@ -238,6 +239,10 @@ export class Player implements Ent {
   room!: ZoneRoom;
   known = new Map<number, number>(); // entity id -> what this client was last sent: ver * PACK + sver
   chatTokens = 5;
+  /** T4: the account moderates (ban, mute, kick, audit). */
+  admin = false;
+  /** T4: chat is refused until then (ms since the epoch; 0 = not muted). */
+  mutedUntil = 0;
   constructor(
     readonly id: number,
     readonly accountId: number,
@@ -394,6 +399,8 @@ export interface WorldOpts {
   bossRespawnScale?: number;
   /** Auction listing fee and sales tax (AUCTION_FEE_PCT, AUCTION_TAX_PCT). */
   auction?: AuctionRates;
+  /** T4: account usernames that moderate (ADMIN_USERS), besides accounts marked is_admin. */
+  admins?: string[];
 }
 
 export class World implements CombatCtx {
@@ -461,6 +468,7 @@ export class World implements CombatCtx {
   readonly raids: Raids;
   readonly conquest: Conquest;
   readonly life: Lives;
+  readonly mod: Moderation;
   private lastSweep = 0;
   private inStep = false;
   /** Set by strike(): whether the last strike was a critical hit. */
@@ -485,6 +493,7 @@ export class World implements CombatCtx {
     this.raids = new Raids(this);
     this.conquest = new Conquest(this, repo);
     this.life = new Lives(this);
+    this.mod = new Moderation(this, repo, opts.admins);
   }
   /** Loads the database-backed parts of the world (factions, guilds). Called once before the server opens. */
   async load() {
@@ -1182,6 +1191,8 @@ export class World implements CombatCtx {
     const clean = text.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, MAX_CHAT_LEN);
     if (!clean) return;
     if (p.chatTokens < 1) return this.send(p, { t: 'sys', text: 'You are sending messages too quickly.' });
+    const muted = this.mod.muted(p);
+    if (muted) return this.send(p, { t: 'sys', text: muted });
     if (ch === 'guild') {
       p.chatTokens--;
       return this.guilds.chat(p, clean);

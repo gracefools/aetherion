@@ -137,14 +137,16 @@ export interface GameSettings {
     renderer: 'hd2d' | '2d';
   };
   camera: {
-    /** Extra integer zoom on top of the automatic zoom (0 = default, 1 = closer). */
-    zoom: 0 | 1;
+    /** Extra integer zoom on top of the automatic zoom (0 = default, 1 = closer, 2 = closest); the mouse wheel changes it. */
+    zoom: 0 | 1 | 2;
   };
   movement: {
     /** The walk key toggles walking instead of being held. */
     walkToggle: boolean;
     /** G1: area and cone skills land where the mouse points. */
     aimAtCursor: boolean;
+    /** U4: clicking the ground walks there; clicking a character to talk to walks up and talks. */
+    clickMove: boolean;
   };
   tutorial: {
     done: string[];
@@ -152,7 +154,18 @@ export interface GameSettings {
     skipped: boolean;
   };
   markers: MapMarker[];
+  /** U6: accessibility. */
+  access: {
+    /** Colour correction for colour-blind players: shifts the colours they confuse into ones they tell apart. */
+    colorblind: Colorblind;
+    /** Solid panels, brighter text and stronger borders. */
+    contrast: boolean;
+    /** No interface animations, no screen shake, far fewer particles. */
+    reduceMotion: boolean;
+  };
 }
+export const COLORBLIND = ['none', 'protan', 'deutan', 'tritan'] as const;
+export type Colorblind = (typeof COLORBLIND)[number];
 export const defaultGameSettings = (): GameSettings => ({
   keys: defaultBindings(),
   keysV: KEYS_VERSION,
@@ -160,9 +173,10 @@ export const defaultGameSettings = (): GameSettings => ({
   uiScale: 1,
   graphics: { quality: 'high', shake: true, damageNumbers: true, nameplates: true, weather: true, questMarkers: true, art: 'hd', renderer: 'hd2d' },
   camera: { zoom: 0 },
-  movement: { walkToggle: false, aimAtCursor: true },
+  movement: { walkToggle: false, aimAtCursor: true, clickMove: true },
   tutorial: { done: [], skipped: false },
   markers: [],
+  access: { colorblind: 'none', contrast: false, reduceMotion: false },
 });
 
 /** Tutorial steps, in order. Each is completed by the game event of the same name (client side). */
@@ -199,8 +213,11 @@ export function cleanGameSettings(raw: unknown): GameSettings {
     art: g.art === 'classic' ? 'classic' : 'hd',
     renderer: g.renderer === '2d' ? '2d' : 'hd2d',
   };
-  out.camera = { zoom: obj(r.camera).zoom === 1 ? 1 : 0 };
-  out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false), aimAtCursor: bool(obj(r.movement).aimAtCursor, true) };
+  const zr = obj(r.camera).zoom;
+  out.camera = { zoom: zr === 1 || zr === 2 ? zr : 0 };
+  const ac = obj(r.access);
+  out.access = { colorblind: COLORBLIND.includes(ac.colorblind as Colorblind) ? (ac.colorblind as Colorblind) : 'none', contrast: bool(ac.contrast, false), reduceMotion: bool(ac.reduceMotion, false) };
+  out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false), aimAtCursor: bool(obj(r.movement).aimAtCursor, true) , clickMove: bool(obj(r.movement).clickMove, true) };
   const t = obj(r.tutorial);
   out.tutorial = {
     done: Array.isArray(t.done) ? [...new Set(t.done.filter((s): s is string => (TUTORIAL_STEPS as readonly string[]).includes(s as string)))] : [],

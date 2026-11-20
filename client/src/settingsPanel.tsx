@@ -8,11 +8,12 @@ import {
 import { AudioSection } from './audio/ui';
 import { settings, toggleFullscreen } from './settings';
 import { t, useT, type Key } from './i18n';
+import { COLORBLIND } from '../../shared/src/settings';
 
 const useSettings = (): GameSettings => useSyncExternalStore(settings.subscribe, settings.get);
 const actionName = (a: Action) => t(`act.${a}` as Key);
-type Tab = 'audio' | 'controls' | 'graphics' | 'interface' | 'camera';
-const TABS: [Tab, Key][] = [['audio', 'settings.tab.audio'], ['controls', 'settings.tab.controls'], ['graphics', 'settings.tab.graphics'], ['interface', 'settings.tab.interface'], ['camera', 'settings.tab.camera']];
+type Tab = 'audio' | 'controls' | 'graphics' | 'interface' | 'camera' | 'access';
+const TABS: [Tab, Key][] = [['audio', 'settings.tab.audio'], ['controls', 'settings.tab.controls'], ['graphics', 'settings.tab.graphics'], ['interface', 'settings.tab.interface'], ['camera', 'settings.tab.camera'], ['access', 'settings.tab.access']];
 
 export function SettingsPanel({ onClose, signedIn, inGame = false }: { onClose: () => void; signedIn: boolean; inGame?: boolean }) {
   useT();
@@ -38,6 +39,7 @@ export function SettingsPanel({ onClose, signedIn, inGame = false }: { onClose: 
       </div>
       <div role="tabpanel" aria-label={t(TABS.find(([k]) => k === tab)![1])}>
         {tab === 'audio' && <AudioSection signedIn={signedIn} />}
+        {tab === 'access' && <Accessibility />}
         {tab === 'controls' && <Controls inGame={inGame} />}
         {tab === 'graphics' && <Graphics />}
         {tab === 'interface' && <Interface />}
@@ -185,18 +187,43 @@ function Interface() {
   );
 }
 
+/** U6: colour-blind correction, high contrast and reduced motion. */
+function Accessibility() {
+  const s = useSettings(), a = s.access;
+  const set = (patch: Partial<typeof a>) => settings.set({ access: { ...a, ...patch } });
+  return (
+    <>
+      <div className="srow">
+        <span id="cbmode">{t('acc.colorblind')}</span>
+        <select aria-labelledby="cbmode" value={a.colorblind} onChange={(e: any) => set({ colorblind: e.target.value })}>
+          {COLORBLIND.map((k) => <option key={k} value={k}>{t(`acc.cb.${k}` as Key)}</option>)}
+        </select>
+      </div>
+      <p className="sub">{t('acc.colorblindHelp')}</p>
+      <div className="cbswatches" aria-hidden="true">{['#e2523f', '#5fd35a', '#4a8ae0', '#ffd24a', '#a070ff', '#ff8a3a'].map((c) => <i key={c} style={{ background: c }} />)}</div>
+      <div className="switches">
+        <label className="switch"><input type="checkbox" checked={a.contrast} onChange={(e: any) => set({ contrast: e.target.checked })} />{t('acc.contrast')}</label>
+        <label className="switch"><input type="checkbox" checked={a.reduceMotion} onChange={(e: any) => set({ reduceMotion: e.target.checked })} />{t('acc.reduceMotion')}</label>
+      </div>
+      <p className="sub">{t('acc.note')}</p>
+    </>
+  );
+}
+
 function Camera() {
   const s = useSettings();
   return (
     <>
       <div className="srow">
         <span id="zoom">{t('cam.zoom')}</span>
-        <select aria-labelledby="zoom" value={s.camera.zoom} onChange={(e: any) => settings.set({ camera: { zoom: Number(e.target.value) === 1 ? 1 : 0 } })}>
+        <select aria-labelledby="zoom" value={s.camera.zoom} onChange={(e: any) => { const v = Number(e.target.value); settings.set({ camera: { zoom: v === 1 || v === 2 ? v : 0 } }); }}>
           <option value={0}>{t('cam.zoom.default')}</option>
           <option value={1}>{t('cam.zoom.close')}</option>
+          <option value={2}>{t('cam.zoom.closest')}</option>
         </select>
       </div>
       <div className="switches">
+        <label className="switch"><input type="checkbox" checked={s.movement.clickMove} onChange={(e: any) => settings.set({ movement: { ...s.movement, clickMove: e.target.checked } })} />{t('cam.clickMove')}</label>
         <label className="switch"><input type="checkbox" checked={s.movement.walkToggle} onChange={(e: any) => settings.set({ movement: { ...s.movement, walkToggle: e.target.checked } })} />{t('cam.walkToggle', { key: keyLabel(s.keys.walk[0] ?? '') })}</label>
         <label className="switch"><input type="checkbox" checked={s.movement.aimAtCursor} onChange={(e: any) => settings.set({ movement: { ...s.movement, aimAtCursor: e.target.checked } })} />{t('cam.aimAtCursor')}</label>
       </div>

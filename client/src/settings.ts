@@ -75,7 +75,52 @@ class SettingsStore {
     if (typeof document === 'undefined') return;
     document.documentElement.style.setProperty('--ui', String(this.s.uiScale));
     document.documentElement.lang = this.s.lang;
+    // U6: colour correction (an SVG filter on the game and its interface), contrast and motion
+    const a = this.s.access, root = document.documentElement;
+    installColorFilters();
+    root.dataset.cb = a.colorblind;
+    root.classList.toggle('hc', a.contrast);
+    root.classList.toggle('rm', a.reduceMotion);
   }
+}
+/**
+ * U6: colour-blind correction filters (daltonisation). The confusable colours are simulated (Machado
+ * et al. 2009, full severity), and the difference that is lost is shifted into channels the eye still
+ * reads; the result is one 3x3 matrix per kind, applied by an SVG filter.
+ */
+const SIM: Record<string, number[]> = {
+  protan: [0.152286, 1.052583, -0.204868, 0.114503, 0.786281, 0.099216, -0.003882, -0.048116, 1.051998],
+  deutan: [0.367322, 0.860646, -0.227968, 0.280085, 0.672501, 0.047413, -0.01182, 0.04294, 0.968881],
+  tritan: [1.255528, -0.076749, -0.178779, -0.078411, 0.930809, 0.147602, 0.004733, 0.691367, 0.3039],
+};
+const SHIFT: Record<string, number[]> = { protan: [0, 0, 0, 0.7, 1, 0, 0.7, 0, 1], deutan: [0, 0, 0, 0.7, 1, 0, 0.7, 0, 1], tritan: [1, 0, 0.7, 0, 1, 0.7, 0, 0, 0] };
+export function correctionMatrix(kind: string): number[] {
+  const S = SIM[kind], M = SHIFT[kind], I = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  const E = I.map((v, i) => v - S[i]); // what is lost
+  const out: number[] = [];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+    let v = I[r * 3 + c];
+    for (let k = 0; k < 3; k++) v += M[r * 3 + k] * E[k * 3 + c];
+    out.push(Math.round(v * 10000) / 10000);
+  }
+  return out;
+}
+function installColorFilters() {
+  if (document.getElementById('cb-filters')) return;
+  const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+  svg.id = 'cb-filters';
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('style', 'position:absolute;width:0;height:0');
+  for (const kind of ['protan', 'deutan', 'tritan']) {
+    const m = correctionMatrix(kind), f = document.createElementNS(ns, 'filter'), cm = document.createElementNS(ns, 'feColorMatrix');
+    f.id = 'cb-' + kind;
+    f.setAttribute('color-interpolation-filters', 'linearRGB');
+    cm.setAttribute('type', 'matrix');
+    cm.setAttribute('values', `${m[0]} ${m[1]} ${m[2]} 0 0 ${m[3]} ${m[4]} ${m[5]} 0 0 ${m[6]} ${m[7]} ${m[8]} 0 0 0 0 0 1 0`);
+    f.appendChild(cm);
+    svg.appendChild(f);
+  }
+  document.body.appendChild(svg);
 }
 function guessLang(): GameSettings['lang'] {
   return typeof navigator !== 'undefined' && /^id\b/i.test(navigator.language ?? '') ? 'id' : 'en';

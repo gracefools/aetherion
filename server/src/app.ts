@@ -17,6 +17,7 @@ import { migrate } from './db/migrate';
 import { parseDbUrl, PgError, PgPool } from './db/pgwire';
 import { Repo, type CharacterRow } from './db/repo';
 import { World, type Player } from './game/World';
+import { banText } from './game/Moderation';
 
 const Creds = z.object({
   username: z.string().regex(/^[A-Za-z0-9_]{3,16}$/, 'Username: 3-16 letters, digits or _'),
@@ -145,6 +146,8 @@ export async function createApp(cfg: Config) {
         const { username, password } = parse(Creds.extend({ password: z.string().max(72) }), await readJson(req));
         const acc = await repo.findAccount(username);
         if (!(await sessions.verifyLogin(acc?.password_hash, password)) || !acc) throw new HttpError(401, 'Wrong username or password');
+        const banned = banText(acc.banned_until, acc.ban_reason);
+        if (banned) throw new HttpError(403, banned);
         repo.touchLogin(acc.id).catch(() => {});
         return { token: await sessions.create(acc.id), username: acc.username };
       }
@@ -287,8 +290,12 @@ export async function createApp(cfg: Config) {
           if (!Number.isInteger(m.characterId)) return kick('Bad character');
           const row = await repo.getCharacter(m.characterId, accountId);
           if (!row) return kick('Character not found');
+          const mod = await repo.accountMod(accountId);
+          const banned = banText(mod?.banned_until, mod?.ban_reason);
+          if (banned) return kick(banned);
           if (ws.readyState !== 1) return;
           player = world.join(row, conn);
+          world.mod.attach(player, mod);
         })().catch((e) => {
           console.error('join failed', e);
           kick('Server error');
@@ -308,6 +315,7 @@ export async function createApp(cfg: Config) {
         case 'respec': return void world.respec(player);
         case 'rune': return void world.attune(player, m.slot, m.el);
         case 'chat': return world.chat(player, m.text, m.ch, m.to);
+        case 'mod': return void world.mod.command(player, m.op, m.arg);
         case 'auto': return world.auto(player, m);
         case 'quest': return void world.quest(player, m);
         case 'journal': return void world.journal(player, m);

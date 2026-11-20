@@ -7099,3 +7099,36 @@ test('season pass and wardrobe: season experience from play, levels claimed once
   }
   assert.equal(world.lifeOp(p, { op: 'look', slot: 'armor', base: 'cloth_robe' }), 'You have not collected that look');
 });
+
+test('U4/U6: zoom up to two steps, click-to-move and accessibility settings are kept and cleaned', () => {
+  const d = cleanGameSettings({});
+  assert.equal(d.camera.zoom, 0);
+  assert.equal(d.movement.clickMove, true);
+  assert.deepEqual(d.access, { colorblind: 'none', contrast: false, reduceMotion: false });
+  const s = cleanGameSettings({ camera: { zoom: 2 }, movement: { clickMove: false }, access: { colorblind: 'deutan', contrast: true, reduceMotion: 1 } });
+  assert.equal(s.camera.zoom, 2);
+  assert.equal(s.movement.clickMove, false);
+  assert.deepEqual(s.access, { colorblind: 'deutan', contrast: true, reduceMotion: false }, 'only real booleans');
+  assert.equal(cleanGameSettings({ camera: { zoom: 3 }, access: { colorblind: 'purple' } }).camera.zoom, 0);
+  assert.equal(cleanGameSettings({ access: { colorblind: 'purple' } }).access.colorblind, 'none');
+});
+
+test('T4: a muted player cannot chat; moderation commands are refused for players without the right', async () => {
+  const h = harness({ capacity: 10 }), { world } = h, a = h.join(0, 0, 'knight', 10), b = h.join(0, 0, 'knight', 10);
+  a.p.mutedUntil = Date.now() + 90_000;
+  a.out.length = 0;
+  world.chat(a.p, 'hello');
+  assert.ok(a.out.some((m: any) => m.t === 'sys' && m.text === 'You are muted for 2 more minutes.'));
+  assert.ok(!b.out.some((m: any) => m.t === 'chat' && m.text === 'hello'));
+  a.p.mutedUntil = 0;
+  b.out.length = 0;
+  world.chat(a.p, 'hello again');
+  assert.ok(b.out.some((m: any) => m.t === 'chat' && m.text === 'hello again'));
+  await world.mod.command(b.p, 'kick', a.p.name);
+  assert.ok(b.out.some((m: any) => m.t === 'sys' && m.text === 'Unknown command'));
+  world.mod.attach(b.p, { username: 'x', is_admin: true, banned_until: null, ban_reason: '', muted_until: null });
+  assert.equal(b.p.admin, true);
+  world.mod.attach(a.p, { username: 'x', is_admin: false, banned_until: null, ban_reason: '', muted_until: new Date(Date.now() + 60_000) });
+  assert.equal(a.p.admin, false);
+  assert.ok(a.p.mutedUntil > Date.now());
+});

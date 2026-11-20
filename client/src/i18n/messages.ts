@@ -32,6 +32,20 @@ export const MESSAGES: Record<string, Msg> = {
   conns: m('Too many connections', 'Terlalu banyak koneksi'), userTaken: m('Username already taken', 'Nama pengguna sudah dipakai'), userRule: m('Username: 3-16 letters, digits or _', 'Nama pengguna: 3-16 huruf, angka, atau _'),
   login: m('Wrong username or password', 'Nama pengguna atau kata sandi salah'), request: m('Request failed', 'Permintaan gagal'),
 
+  // ---- T4: moderation ----
+  banned: m('This account is banned. Reason: {a}', 'Akun ini diblokir. Alasan: {a}'), bannedUntil: m('This account is banned until {a} UTC. Reason: {b}', 'Akun ini diblokir sampai {a} UTC. Alasan: {b}'),
+  muted: m('You are muted.', 'Kamu dibisukan.'), mutedFor: m('You are muted for {a} more minutes.', 'Kamu dibisukan {a} menit lagi.'),
+  modUsage: m('Usage: /ban Name [hours] [reason], /unban Name, /mute Name [minutes] [reason], /unmute Name, /kick Name [reason], /audit Name', 'Cara pakai: /ban Nama [jam] [alasan], /unban Nama, /mute Nama [menit] [alasan], /unmute Nama, /kick Nama [alasan], /audit Nama'),
+  modKickR: m('Removed by a moderator: {a}', 'Dikeluarkan oleh moderator: {a}'), modKick: m('Removed by a moderator.', 'Dikeluarkan oleh moderator.'), modKicked: m('Kicked {a}.', '{a} dikeluarkan.'),
+  modSelf: m('You cannot do that to your own account.', 'Kamu tidak bisa melakukannya pada akunmu sendiri.'), modUnban: m('Lifted the ban on {a}.', 'Blokir {a} dicabut.'),
+  modBanH: m('Banned {a} for {b} hours.', '{a} diblokir selama {b} jam.'), modBanP: m('Banned {a} permanently.', '{a} diblokir permanen.'),
+  modMutedYou: m('A moderator muted you for {a} minutes.', 'Moderator membisukanmu selama {a} menit.'), modUnmutedYou: m('A moderator lifted your mute.', 'Moderator mencabut bisuanmu.'),
+  modMuted: m('Muted {a} for {b} minutes.', '{a} dibisukan selama {b} menit.'), modUnmuted: m('Lifted the mute on {a}.', 'Bisuan {a} dicabut.'),
+  modAudit: m('Audit of {a}, level {b}{c}: {d} gold, {e} items in the bag, {f} items and {g} gold in the bank.', 'Audit {a}, level {b}{c}: {d} emas, {e} barang di tas, {f} barang dan {g} emas di bank.'),
+  modNoTrades: m('No recent trades.', 'Tidak ada dagang terbaru.'),
+  modTrade: m('Trade on {a} with {b}: gave {c}, received {d}.', 'Dagang pada {a} dengan {b}: memberi {c}, menerima {d}.'), modGoldItems: m('{a} gold and {b} items', '{a} emas dan {b} barang'),
+  modBank: m('Bank on {a}: {b}', 'Bank pada {a}: {b}'),
+
   // ---- skills, runes ----
   skillNot: m('Skill not learned', 'Skill belum dipelajari'), skillNotK: m('Skill not learned (press K)', 'Skill belum dipelajari (tekan K)'), noPoints: m('No skill points', 'Tidak ada poin skill'),
   maxRank: m('Already at maximum rank', 'Sudah di peringkat tertinggi'), learnFirst: m('Learn {a} first', 'Pelajari {a} terlebih dahulu'), notJob: m('Not a skill of this job', 'Bukan skill kelas ini'), unknownSkill: m('Unknown skill', 'Skill tidak dikenal'),

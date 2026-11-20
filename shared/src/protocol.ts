@@ -80,6 +80,8 @@ export type ClientMsg =
   | { t: 'rune'; slot: number; el: string | null }
   | { t: 'respawn' }
   | { t: 'chat'; text: string; ch?: ChatChannel; to?: string }
+  /** T4: a moderation command (administrators only). */
+  | { t: 'mod'; op: string; arg?: string }
   | { t: 'party'; op: 'invite' | 'accept' | 'decline' | 'leave' | 'kick' | 'promote' | 'loot'; id?: number; name?: string; mode?: LootMode }
   | { t: 'dng'; op: 'enter' | 'leave' | 'ready'; id?: string; diff?: string; yes?: boolean }
   | { t: 'journal'; op: 'title' | 'claim' | 'login'; id?: string; kind?: 'daily' | 'weekly'; i?: number }

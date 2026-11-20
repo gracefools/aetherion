@@ -43,6 +43,8 @@ export const config = {
   maxConnectionsPerIp: num('MAX_CONNECTIONS_PER_IP', 20),
   /** Developer overlay (monster spawns, patrol/aggro/leash radii, AI state, routes). Off unless DEBUG_OVERLAY=1; never enable on a public server. */
   debugOverlay: env.DEBUG_OVERLAY === '1',
+  /** T4: account usernames with moderation rights (comma separated), besides accounts marked is_admin. */
+  admins: (env.ADMIN_USERS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   /** Auction house: listing fee (per day listed) and sales tax, in percent. */
   auctionFeePct: num('AUCTION_FEE_PCT', 5),
   auctionTaxPct: num('AUCTION_TAX_PCT', 10),

@@ -23,6 +23,8 @@ services:
       METRICS_TOKEN: ${METRICS_TOKEN:?set METRICS_TOKEN}
       # set to 1 when a reverse proxy (deploy/nginx.conf) sits in front
       TRUST_PROXY: ${TRUST_PROXY:-0}
+      # T4: account usernames with moderation rights (/ban, /mute, /kick, /audit), comma separated
+      ADMIN_USERS: ${ADMIN_USERS:-}
     ports: ["8080:8080"]
     stop_grace_period: 30s   # SIGTERM saves every player before exit
     depends_on:

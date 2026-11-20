@@ -187,7 +187,7 @@ export class Parties {
       loot: party.loot,
       members: party.members.map((id) => {
         const m = this.w.online.get(id)!;
-        return { id, name: m.name, job: m.job, level: m.level, hp: m.hp, mhp: m.maxHp, zone: m.room.zoneId, ch: m.room.channel, x: Math.round(m.x), y: Math.round(m.y), on: !!m.conn };
+        return { id, name: m.name, job: m.job, level: m.level, hp: m.hp, mhp: m.maxHp, zone: m.room.zoneId, ch: m.room.channel, x: Math.round(m.x), y: Math.round(m.y), on: !!m.conn, tgt: m.target && !m.target.dead ? m.target.id : 0 };
       }),
     };
   }

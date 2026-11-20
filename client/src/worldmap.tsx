@@ -108,6 +108,7 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
   const [hide, setHide] = useState(new Set<Kind>());
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState(null as { x: number; y: number } | null);
+  const [dest, setDest] = useState(null as { zone: string; x: number; y: number } | null);
   const [label, setLabel] = useState('');
   const [, tick] = useState(0);
   const strip = useRef(null as HTMLOListElement | null);
@@ -180,6 +181,7 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
                 <div className="actions"><button className="primary" disabled={hud.gold < teleportCost(sel)} onClick={() => game.objOp('tp', { to: sel })}>{t('map.travel', { town: z.town?.name ?? z.name, g: teleportCost(sel) })}</button></div>
               )}
               {sel !== hud.zoneId && !atWaystone && hud.disc.includes(waypointId(sel)) && <p className="sub">{t('map.travelHint')}</p>}
+              <GoHere game={game} hud={hud} sel={sel} dest={dest} onClose={onClose} />
               <fieldset className="legend">
                 <legend>{t('map.show')}</legend>
                 {LAYERS.map((k) => <label key={k} className="switch"><input type="checkbox" checked={!hide.has(k)} onChange={() => toggle(k)} /><span className={'pin ' + k}>{GLYPH[k]}</span>{t(`map.legend.${k}` as Key)}</label>)}
@@ -204,14 +206,30 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
             </>
           )}
         </div>
-        <RegionView region={sel} open={open} pins={pins} adding={adding} onPick={(x, y) => { setDraft({ x, y }); setAdding(false); }} draft={draft} />
+        <RegionView region={sel} open={open} pins={pins} adding={adding} onPick={(x, y) => { setDraft({ x, y }); setAdding(false); }} onGo={(x, y) => setDest({ zone: sel, x, y })} dest={dest?.zone === sel ? dest : null} draft={draft} />
       </div>
     </div>
   );
 }
 
+/** The spot chosen on the map (or the region's town), the way there, and the button that sets off. */
+function GoHere({ game, hud, sel, dest, onClose }: { game: Game; hud: Hud; sel: string; dest: { zone: string; x: number; y: number } | null; onClose: () => void }) {
+  const z = ZONES[sel], spot = dest?.zone === sel;
+  const goal = spot ? dest! : sel !== hud.zoneId && z.town ? { zone: sel, x: (z.town.tx + 0.5) * TILE, y: (z.town.ty + 3.5) * TILE } : null;
+  if (!goal) return <p className="sub">{t('map.goHint')}</p>;
+  const route = game.routeTo(goal), tp = route ? route.legs.filter((l) => l.kind === 'tp').length : 0;
+  return (
+    <div className="actions gohere">
+      <button className="primary" disabled={!route} onClick={() => { if (game.travelTo(goal, { label: spot ? z.name : z.town?.name ?? z.name })) onClose(); }}>
+        {t(spot ? 'map.goSpot' : 'map.goTown', { town: z.town?.name ?? z.name })}
+      </button>
+      <small className="sub">{!route ? t('map.goNoWay') : tp ? t('map.goVia', { n: tp, g: route.gold }) : t('map.goWalk')}{!spot && ` · ${t('map.goHint')}`}</small>
+    </div>
+  );
+}
+
 /** The region drawn from its tiles, with every pin as a focusable button over it. */
-function RegionView({ region, open, pins, adding, onPick, draft }: { region: string; open: boolean; pins: Pin[]; adding: boolean; onPick: (x: number, y: number) => void; draft: { x: number; y: number } | null }) {
+function RegionView({ region, open, pins, adding, onPick, onGo, dest, draft }: { region: string; open: boolean; pins: Pin[]; adding: boolean; onPick: (x: number, y: number) => void; onGo: (x: number, y: number) => void; dest: { x: number; y: number } | null; draft: { x: number; y: number } | null }) {
   const ref = useRef(null as HTMLCanvasElement | null);
   const z = ZONES[region], W = z.w * TILE, H = z.h * TILE;
   useEffect(() => {
@@ -249,13 +267,15 @@ function RegionView({ region, open, pins, adding, onPick, draft }: { region: str
     }
   }, [region, open, pins.length]);
   const click = (e: React.MouseEvent) => {
-    if (!adding) return;
+    if (!open || (e.target as HTMLElement).closest('button')) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    onPick(((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H);
+    const x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * H;
+    if (adding) onPick(x, y); else onGo(x, y);
   };
   return (
     <div className={'regionview' + (adding ? ' adding' : '')} onClick={click} style={{ aspectRatio: `${z.w} / ${z.h}` }} aria-label={t('map.regionMap', { name: z.name })} role="group">
       <canvas ref={ref} width={z.w * 4} height={z.h * 4} aria-hidden="true" />
+      {dest && <span className="pin dest" style={{ left: `${(dest.x / W) * 100}%`, top: `${(dest.y / H) * 100}%` }} aria-hidden="true">✚</span>}
       {pins.map((p, i) => (
         <span key={i} className={'pin ' + p.kind} style={{ left: `${(p.x / W) * 100}%`, top: `${(p.y / H) * 100}%` }} title={p.label} role="img" aria-label={p.label}>{GLYPH[p.kind]}</span>
       ))}

@@ -5,6 +5,7 @@ import {
   Act, Move, TICK_MS, TILE,
   type ChatChannel, type EntityMeta, type LootMode, type PartyState, type PlayerMeta, type SelfState, type ServerMsg, type SnapMsg, type WelcomeMsg,
 } from '../../../shared/src/protocol';
+import type { PartyMember } from '../../../shared/src/protocol';
 import { aimable, ABILITIES, ABILITY_LIST, freePoints, GCD_MS, jobActives, runeSpells, type AbilityDef, type Build } from '../../../shared/src/abilities';
 import { ANIM_COL, animDuration, animFrame, FRAME_H, FRAME_W, type Anim, type Appearance } from '../../../shared/src/appearance';
 import { Dmg, STATUS, STATUS_INDEX, statusNames } from '../../../shared/src/combat';
@@ -67,6 +68,7 @@ import { ambient, glowSprite, windOf } from './ambient';
 import { AUTO_MOUNT_MS, MOUNT_FORBIDDEN_KINDS } from '../../../shared/src/companions';
 import { clearLine, findPath, tileOf, tileXY } from '../../../shared/src/nav';
 import { tc } from '../i18n/content';
+import { planRoute, routeSummary, type Leg, type Place, type Route, type TravelCtx } from '../../../shared/src/travel';
 
 export interface ChatLine {
   id: number;
@@ -150,6 +152,10 @@ export interface Hud {
   level: [number, number];
   /** The object in reach, for the interaction hint. */
   near: { id: string; kind: string; name: string; hint: string } | null;
+  /** Smart travel in progress: where to, and how (teleports, their gold). */
+  travel: { to: string; tp: number; gold: number; follow: boolean } | null;
+  /** Following the party leader. */
+  follow: boolean;
   /** U4: the right-click menu, at screen coordinates, for what was under the cursor. */
   ctx: CtxMenu | null;
   /** Id of the NPC the player is talking to. */
@@ -341,7 +347,7 @@ export class Game {
     status: 'connecting', reason: '', zone: '', channel: 1, ping: 0, fps: 0, nearby: 0, chat: [], self: null, stats: null,
     hp: 0, res: 0, exp: 0, next: 1, statuses: [], statusUntil: [], target: null, attacking: false, dead: 0, canRespawn: false, toast: '',
     build: null, points: 0, cds: {}, cast: null, ally: null, notice: '', party: null, invite: null,
-    inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, ctx: null, talk: null, disc: [], zoneId: '',
+    inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, travel: null, follow: false, ctx: null, talk: null, disc: [], zoneId: '',
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
     guild: null, grank: 3, ginv: null, bank: emptyBank(), ah: null, ahhist: [], banklog: [],
@@ -655,13 +661,16 @@ export class Game {
   }
   // ---------- U4: click-to-move ----------
   /** Where a click sent the character, and what to do on arrival. Movement keys and auto hunting cancel it. */
-  private goal: { x: number; y: number; then?: () => void } | null = null;
+  private goal: { x: number; y: number; then?: () => void; near?: number } | null = null;
   private goalPath: number[] = [];
+  private goalLast = { x: 0, y: 0 };
+  private goalStuck = 0;
   private goalAt = 0;
   /** Walks to a spot; with `then`, does it on arrival (talk to someone, gather). */
-  walkTo(x: number, y: number, then?: () => void) {
+  walkTo(x: number, y: number, then?: () => void, near?: number) {
     if (!this.map || this.isDead || this.hud.status !== 'playing') return;
-    this.goal = { x, y, then };
+    this.goal = { x, y, then, near };
+    this.goalStuck = 0;
     this.goalPath = [];
     this.goalAt = 0;
   }
@@ -669,32 +678,184 @@ export class Game {
   private stepGoal(): { ix: number; iy: number } | null {
     const g = this.goal, map = this.map;
     if (!g || !map) return null;
-    const me = this.cur, near = g.then ? INTERACT_RANGE * 0.7 : 4;
+    // One step can be longer than the old 3px tolerance (running, mounted): the character then
+    // stepped over the spot and back, turning left and right for ever. Tolerances follow the step.
+    const st = stepSize((this.hud.stats?.moveMul ?? 1) * this.moveMul, !this.walkHeld), tol = Math.max(3, st * 0.55);
+    const me = this.cur, near = Math.max(g.near ?? (g.then ? INTERACT_RANGE * 0.7 : 4), st * 0.8);
     if (Math.hypot(g.x - me.x, g.y - me.y) <= near) {
       this.goal = null;
       g.then?.();
       return null;
     }
+    // pushing against something without getting anywhere: give the walk up
+    if (me.x === this.goalLast.x && me.y === this.goalLast.y) { if (++this.goalStuck > 10) return (this.goal = null); }
+    else { this.goalStuck = 0; this.goalLast.x = me.x; this.goalLast.y = me.y; }
     const toward = (tx: number, ty: number) => {
-      const dx = tx - me.x, dy = ty - me.y, ix = Math.abs(dx) > 3 ? Math.sign(dx) : 0, iy = Math.abs(dy) > 3 ? Math.sign(dy) : 0;
+      const dx = tx - me.x, dy = ty - me.y, ix = Math.abs(dx) > tol ? Math.sign(dx) : 0, iy = Math.abs(dy) > tol ? Math.sign(dy) : 0;
       return ix || iy ? { ix, iy } : null;
     };
-    if (clearLine(map, me.x, me.y, g.x, g.y)) return toward(g.x, g.y) ?? (this.goal = null);
+    // Straight when the way is clear, otherwise along a route. A route once taken is followed to its
+    // end: checking the straight line again at every step made the character leave the route, find
+    // the line blocked a step later, and turn back, left and right for ever.
+    if (!this.goalPath.length && clearLine(map, me.x, me.y, g.x, g.y)) return toward(g.x, g.y) ?? (this.goal = null);
     const now = performance.now();
     if (!this.goalPath.length && now >= this.goalAt) {
       this.goalAt = now + 500;
       const nav = navOf(map.def.id);
-      this.goalPath = findPath(nav, tileOf(me.x), tileOf(me.y), tileOf(g.x), tileOf(g.y)) ?? [];
+      this.goalPath = findPath(nav, tileOf(me.x), tileOf(me.y), tileOf(g.x), tileOf(g.y), 60_000) ?? []; // a walk across a whole region
       if (!this.goalPath.length) return (this.goal = null); // nowhere to walk to: give up quietly
     }
     const nav = navOf(map.def.id);
     while (this.goalPath.length) {
       const p = tileXY(nav, this.goalPath[0]);
-      if (Math.abs(p.x - me.x) <= 5 && Math.abs(p.y - me.y) <= 5) this.goalPath.shift();
+      if (Math.abs(p.x - me.x) <= Math.max(5, tol) && Math.abs(p.y - me.y) <= Math.max(5, tol)) this.goalPath.shift();
       else return toward(p.x, p.y);
     }
     return toward(g.x, g.y) ?? (this.goal = null);
   }
+  // ---------- smart travel: across regions, by portal or waystone, whichever is quicker ----------
+  private journey: { dest: Place; then?: () => void; near?: number; legs: Leg[]; i: number; wait: number; tries: number; follow: boolean } | null = null;
+  private travelCtx(): TravelCtx {
+    return { level: this.hud.self?.level ?? 1, gold: this.hud.gold, disc: this.hud.disc, inCombat: this.hud.attacking };
+  }
+  /** The route from here, for a preview (the world map shows it before setting off). */
+  routeTo(dest: Place): Route | null {
+    return this.map ? planRoute({ zone: this.map.def.id, x: this.cur.x, y: this.cur.y }, dest, this.travelCtx()) : null;
+  }
+  /**
+   * Sets off to a place anywhere in the world. `then` runs on arrival (talk, open, start hunting);
+   * `near` is how close counts as there. Movement keys cancel the journey.
+   */
+  travelTo(dest: Place, o: { then?: () => void; near?: number; label?: string; follow?: boolean; quiet?: boolean } = {}): boolean {
+    if (!this.map || this.isDead || this.hud.status !== 'playing') return false;
+    const route = this.routeTo(dest);
+    if (!route) {
+      if (!o.quiet) this.pushChat({ text: ZONES[dest.zone]?.kind === 'dungeon' ? 'Dungeons are entered at their gate' : 'There is no way there for you yet' });
+      return false;
+    }
+    if (this.hunter.on && !o.follow) this.stopAuto('Stopped: travelling');
+    this.journey = { dest, then: o.then, near: o.near, legs: route.legs, i: 0, wait: 0, tries: 0, follow: !!o.follow };
+    const sum = routeSummary(route);
+    this.setHud({ travel: { to: o.label ?? ZONES[dest.zone].name, tp: sum.tp, gold: route.gold, follow: !!o.follow } });
+    this.legStart();
+    return true;
+  }
+  cancelTravel(why = '') {
+    if (!this.journey) return;
+    this.journey = null;
+    this.goal = null;
+    this.setHud({ travel: null });
+    if (why) this.pushChat({ text: why });
+  }
+  /** Starts walking the current leg; after a portal or teleport, finds the leg that begins here (or plans again). */
+  private legStart() {
+    const j = this.journey;
+    if (!j || !this.map) return;
+    const zone = this.map.def.id;
+    if (j.legs[j.i].zone !== zone) {
+      const k = j.legs.findIndex((l, n) => n > j.i && l.zone === zone);
+      if (k >= 0) j.i = k;
+      else {
+        const r = this.routeTo(j.dest);
+        if (!r) return this.cancelTravel(j.follow ? '' : 'There is no way there from here');
+        j.legs = r.legs;
+        j.i = 0;
+      }
+    }
+    j.wait = 0;
+    const leg = j.legs[j.i];
+    // a spot in a tree or in water (a click on the map, the middle of a monster camp): the nearest ground instead
+    const at = leg.kind === 'walk' ? this.nearestGround(leg.x, leg.y) : leg;
+    this.walkTo(at.x, at.y, () => this.legArrive(), leg.kind === 'portal' ? 8 : leg.kind === 'tp' ? 96 : j.near ?? 12);
+  }
+  /** The reachable ground nearest to a point of this region (the point itself when it can be stood on). */
+  private nearestGround(x: number, y: number): { x: number; y: number } {
+    const nav = navOf(this.map!.def.id), w = nav.map.w, h = nav.map.h, tx = tileOf(x), ty = tileOf(y);
+    const ok = (a: number, b: number) => a > 0 && b > 0 && a < w - 1 && b < h - 1 && !!nav.reach[a + b * w];
+    if (ok(tx, ty)) return { x, y };
+    for (let r = 1; r <= 16; r++)
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++)
+        if (Math.max(Math.abs(dx), Math.abs(dy)) === r && ok(tx + dx, ty + dy)) return tileXY(nav, tx + dx + (ty + dy) * w);
+    return { x, y };
+  }
+  private legArrive() {
+    const j = this.journey;
+    if (!j) return;
+    const leg = j.legs[j.i];
+    if (leg.kind === 'walk') {
+      this.journey = null;
+      this.setHud({ travel: null });
+      return void j.then?.();
+    }
+    // a portal carries us by itself; the waykeeper is asked. Either way the region changes shortly.
+    if (leg.kind === 'tp') this.objOp('tp', { to: leg.to });
+    j.wait = performance.now() + (leg.kind === 'tp' ? 3000 : 2500);
+  }
+  private tickTravel() {
+    const j = this.journey;
+    if (!j || !this.map) return;
+    if (this.isDead) return this.cancelTravel();
+    if (j.legs[j.i].zone !== this.map.def.id) return this.legStart(); // carried to the next region
+    if (j.wait) {
+      // still here after the portal or the waystone should have taken us: try again a few times
+      if (performance.now() < j.wait) return;
+      if (++j.tries > 3) return this.cancelTravel(j.follow ? '' : 'The way is closed for now');
+      return this.legStart();
+    }
+    if (!this.goal) this.cancelTravel(j.follow ? '' : 'There is no path to that spot'); // the walk gave up (blocked)
+  }
+
+  // ---------- following the party leader ----------
+  /** While following with auto hunting on and the leader far away: the hunt waits and the walk goes on. */
+  private followPause = false;
+  private followAt = 0;
+  private leaderView(): { m: PartyMember; here: boolean } | null {
+    const p = this.hud.party, me = this.me?.id;
+    const m = p && p.leader !== me ? p.members.find((x) => x.id === p.leader) : undefined;
+    return m && this.map ? { m, here: m.zone === this.map.def.id } : null;
+  }
+  /** Follow the party leader: walk (or teleport) to wherever they go, hunt what they hunt, enter the Depths with them. */
+  setFollow(on: boolean) {
+    if (on && !this.leaderView()) return void this.pushChat({ text: this.hud.party ? 'You lead the party: there is nobody to follow' : 'You are not in a party.' });
+    this.followPause = false;
+    this.hunter.leader = on ? () => { const l = this.leaderView(); return l?.here ? { x: l.m.x, y: l.m.y, tgt: l.m.tgt ?? 0 } : null; } : null;
+    if (!on && this.journey?.follow) this.cancelTravel();
+    if (!on && this.hud.follow) this.pushChat({ text: 'Stopped following.' });
+    this.setHud({ follow: on });
+    if (on) this.pushChat({ text: 'Following the party leader. Move yourself to stop.' });
+  }
+  private tickFollow(now: number) {
+    if (!this.hud.follow || now < this.followAt) return;
+    this.followAt = now + 500;
+    const l = this.leaderView();
+    if (!l) return this.setFollow(false); // no party, or you became the leader
+    if (this.isDead || !l.m.on) return;
+    const zdef = ZONES[l.m.zone];
+    if (!zdef || zdef.kind === 'dungeon') { this.followPause = false; return; } // instances are entered together at the gate
+    const d = l.here ? Math.hypot(l.m.x - this.cur.x, l.m.y - this.cur.y) : Infinity;
+    const far = d > (this.hunter.on ? 420 : 150);
+    this.followPause = far && this.hunter.on;
+    if (!far) {
+      if (this.journey?.follow && d < 110) this.cancelTravel();
+      return;
+    }
+    const j = this.journey;
+    if (j?.follow && j.dest.zone === l.m.zone && Math.hypot(j.dest.x - l.m.x, j.dest.y - l.m.y) < 140) return; // already on the way
+    this.travelTo({ zone: l.m.zone, x: l.m.x, y: l.m.y }, { follow: true, quiet: true, near: 90, label: l.m.name });
+  }
+
+  /** A line in the chat log from the game itself. */
+  say(text: string) {
+    this.pushChat({ text });
+  }
+  // ---------- quests: go to what the objective needs, and hunt it ----------
+  /** Hunts only these monsters from here (a quest's targets), with the player's auto hunting settings. */
+  huntOnly(types: string[]) {
+    if (this.hunter.on) this.stopAuto();
+    this.startAuto();
+    if (this.hunter.on) this.hunter.focus = new Set(types);
+  }
+
   /** Walks up to a character and talks, or to a gathering spot and gathers. */
   approach(o: WorldObj) {
     this.walkTo(o.x, o.y, () => {
@@ -1388,6 +1549,7 @@ export class Game {
       case 'depths': return this.setHud({ depthBosses: m.bosses });
       case 'bounty': return this.setHud({ bounty: m.marks });
       case 'depthask':
+        if (this.journey && ZONES[this.journey.dest.zone]?.depth) return void this.sendMsg({ t: 'depth', op: 'enter' }); // going there on purpose (or with the leader)
         if (this.hud.depthAsk || performance.now() < this.depthQuietUntil) return;
         sound.notify();
         return this.setHud({ depthAsk: { zone: m.zone, level: m.level } });
@@ -1469,6 +1631,7 @@ export class Game {
   }
   private onWelcome(m: WelcomeMsg) {
     const zoneChanged = this.map?.def.id !== m.zone;
+    this.goal = null; // a walk does not carry over to another place; a journey picks up its next leg
     sound.zone(m.zone, zoneChanged, !!this.map);
     this.map = getZoneMap(m.zone);
     this.me = m.self;
@@ -1730,11 +1893,14 @@ export class Game {
     iy = Math.sign(iy);
     let run = this.walkHeld ? 0 : 1;
     // U4: a click-to-move walk; the movement keys or auto hunting take over from it
+    this.tickTravel();
+    if ((ix || iy) && this.hud.follow) this.setFollow(false); // taking the controls ends the following
+    const hunting = this.hunter.busy && !this.followPause;
     if (this.goal) {
-      if (ix || iy || this.hunter.busy) this.goal = null;
+      if (ix || iy || hunting) { this.goal = null; if (ix || iy) this.cancelTravel(); }
       else { const s = this.stepGoal(); if (s) { ix = s.ix; iy = s.iy; } }
-    }
-    if (this.hunter.busy) {
+    } else if ((ix || iy) && this.journey) this.cancelTravel();
+    if (hunting) {
       // a hand on the movement keys always wins, but only while held: a hunt carries on from where you let go
       if (ix || iy) {
         if (this.hunter.on) this.hunter.steer(performance.now());
@@ -1858,6 +2024,7 @@ export class Game {
       }
       this.updateAudio(now);
     }
+    this.tickFollow(now);
     if (now - this.fpsAt >= 1000) {
       const patch: Partial<Hud> = { fps: Math.round((this.frames * 1000) / (now - this.fpsAt)), nearby: this.remotes.size };
       if (this.isDead) {

@@ -14,6 +14,7 @@ import type { Game, Hud } from './game/Game';
 import { Icon } from './inventory';
 import { t, tm, tv, useT, type Key } from './i18n';
 import { toRail } from './rail';
+import { goQuest } from './questnav';
 
 const TYPE_NAME: Record<string, Key> = { main: 'qt.main', side: 'qt.side', daily: 'qt.daily', repeatable: 'qt.repeatable', dungeon: 'qt.dungeon', boss: 'qt.boss', collect: 'qt.collect', faction: 'qt.faction', explore: 'qt.explore' };
 const typeName = (q: QuestDef | undefined) => (q ? t(TYPE_NAME[q.type]) : '');
@@ -238,7 +239,8 @@ function AbandonButton({ name, onConfirm }: { name: string; onConfirm: () => voi
     : <button className="link" onClick={() => setArmed(true)}>{t('quest.abandon')}</button>;
 }
 
-/** On-screen tracker: the active quests and how far along each is. */
+const GO = '➜';
+/** On-screen tracker: the active quests and how far along each is; a click on a line goes there. */
 export function QuestTracker({ game, onOpen }: { game: Game; onOpen: () => void }) {
   useT();
   const hud = useHud(game), list = Object.keys(hud.quests.active).map((id) => QUESTS[id]).filter(Boolean).slice(0, 4);
@@ -248,10 +250,14 @@ export function QuestTracker({ game, onOpen }: { game: Game; onOpen: () => void 
       {list.map((q) => {
         const p = prog(hud, q), done = complete(hud, q);
         return (
-          <button key={q.id} className={'qt link' + (done ? ' done' : '')} onClick={onOpen} style={{ textAlign: 'left', textDecoration: 'none' }}>
-            <b>{q.name}</b>
-            {done ? <small>{t('quest.trackDone', { town: ZONES[q.zone].town!.name })}</small> : q.objectives.map((o, i) => <div key={i} className={'ob' + (p[i] >= o.n ? ' ok' : '')}>{o.label}: {Math.min(p[i], o.n)}/{o.n}</div>)}
-          </button>
+          <div key={q.id} className={'qt' + (done ? ' done' : '')}>
+            <button className="link qtname" onClick={onOpen} title={t('quest.openLog')}><b>{q.name}</b></button>
+            {done
+              ? <button className="link ob go" onClick={() => goQuest(game, hud, q.id)} title={t('quest.goTip')}>{GO} {t('quest.trackDone', { town: ZONES[q.zone].town!.name })}</button>
+              : q.objectives.map((o, i) => p[i] >= o.n
+                ? <div key={i} className="ob ok">{o.label}: {o.n}/{o.n}</div>
+                : <button key={i} className="link ob go" onClick={() => goQuest(game, hud, q.id, i)} title={t('quest.goTip')}>{GO} {o.label}: {Math.min(p[i], o.n)}/{o.n}</button>)}
+          </div>
         );
       })}
     </div>

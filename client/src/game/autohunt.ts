@@ -76,6 +76,10 @@ export class AutoHunter {
   private told = new Set<string>();
   private returning: { x: number; y: number } | null = null;
   private dir: Step | null = null;
+  /** Only these monster types are hunted (a quest's targets); null: as configured. */
+  focus: Set<string> | null = null;
+  /** Following a party leader: the hunting area moves with them and their target comes first. */
+  leader: (() => { x: number; y: number; tgt: number } | null) | null = null;
   /** Called when the hunter stops by its own decision (not by the Stop button). */
   onStop: (why: string) => void = () => {};
 
@@ -98,6 +102,7 @@ export class AutoHunter {
   /** Stops at once. With `walkTo`, the character first walks to that point (return to a safe location). */
   stop(why = 'Stopped', walkTo: { x: number; y: number } | null = null) {
     this.on = false;
+    this.focus = null;
     this.dir = null;
     this.path.length = 0;
     this.targetName = '';
@@ -191,7 +196,10 @@ export class AutoHunter {
     if (cfg.loot && cfg.onFull === 'stop' && h.bagFull()) return this.selfStop('your inventory is full');
 
     // --- target: keep a valid one, otherwise the one that is quickest to hit inside the hunting area ---
-    const mobs = h.monsters(), reach = h.range(), reachEff = reach > 100 ? reach * 0.85 : reach - 2;
+    const all = h.monsters(), mobs = this.focus ? all.filter((m) => this.focus!.has(m.type)) : all, reach = h.range(), reachEff = reach > 100 ? reach * 0.85 : reach - 2;
+    // with a leader: hunt around them, wherever they go
+    const lead = this.leader?.() ?? null;
+    if (lead) this.anchor = { x: lead.x, y: lead.y };
     for (const [id, until] of this.skip) if (until < now) this.skip.delete(id);
     // one sweep of walking distances from here answers "how far to a spot I can hit it from" for every monster
     const field = walkField(this.nav, tileOf(me.x), tileOf(me.y), cfg.radius * 2 + 16);
@@ -204,9 +212,11 @@ export class AutoHunter {
       }
       return spots.get(m.id)!;
     };
-    const tid = chooseTarget(cfg, me, this.anchor, radius, mobs, h.targetId(), (m) => spotOf(m)?.steps ?? Infinity, (id) => this.skip.has(id));
+    let tid = chooseTarget(cfg, me, this.anchor, radius, mobs, h.targetId(), (m) => spotOf(m)?.steps ?? Infinity, (id) => this.skip.has(id));
+    // the leader's target comes first, when it is in sight and not given up on
+    if (lead?.tgt && !this.skip.has(lead.tgt) && all.some((m) => m.id === lead.tgt && m.hp > 0)) tid = lead.tgt;
     if (tid !== h.targetId()) h.setTarget(tid);
-    const t = mobs.find((m) => m.id === tid);
+    const t = all.find((m) => m.id === tid);
     if (!t) {
       this.targetName = '';
       // nothing to hunt: go back to the middle of the hunting area and wait there

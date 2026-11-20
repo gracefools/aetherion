@@ -7176,3 +7176,55 @@ test('fullscreen on phones: asked once by default, then kept as chosen', () => {
   assert.equal(cleanGameSettings({ fullscreen: 'off' }).fullscreen, 'off');
   assert.equal(cleanGameSettings({ fullscreen: 'always' }).fullscreen, 'ask');
 });
+
+test('smart travel: walks when near, teleports when that is shorter, respects level, gold and attunement', async () => {
+  const { planRoute, TELEPORT_WALK } = await import('../shared/src/travel');
+  const { waypointId, zoneObjects: zo } = await import('../shared/src/places');
+  const { REGIONS: REG, ZONES: Z, tileCenter: tc } = await import('../shared/src/world');
+  const town = (z: string) => ({ zone: z, x: tc(Z[z].town!.tx), y: tc(Z[z].town!.ty + 3) });
+  const all = REG.map(waypointId), rich = { level: 200, gold: 1e9, disc: all };
+  // inside one region: a single walk, never a detour through a waystone
+  const here = planRoute(town('eldoria'), { zone: 'eldoria', x: tc(20), y: tc(20) }, rich)!;
+  assert.deepEqual(here.legs.map((l) => l.kind), ['walk']);
+  // far away with every waystone attuned: one teleport, then the walk
+  const far = REG[REG.length - 1], viaTp = planRoute(town('eldoria'), town(far), rich)!;
+  assert.ok(viaTp.legs.some((l) => l.kind === 'tp'), 'teleports across the world');
+  assert.equal(viaTp.legs.at(-1)!.kind, 'walk');
+  assert.ok(viaTp.gold > 0);
+  // the same journey with no waystone attuned: portals only, and longer
+  const onFoot = planRoute(town('eldoria'), town(far), { ...rich, disc: [] })!;
+  assert.ok(onFoot && onFoot.legs.every((l) => l.kind !== 'tp') && onFoot.legs.some((l) => l.kind === 'portal'));
+  assert.ok(onFoot.cost > viaTp.cost, 'walking the whole way is the longer route');
+  // each leg starts in the region the one before led to
+  let zone = 'eldoria';
+  for (const l of onFoot.legs) { assert.equal(l.zone, zone); if (l.kind !== 'walk') zone = l.to; }
+  assert.equal(zone, far);
+  // no gold: no teleport; in combat: no teleport
+  assert.ok(planRoute(town('eldoria'), town(far), { ...rich, gold: 0 })!.legs.every((l) => l.kind !== 'tp'));
+  assert.ok(planRoute(town('eldoria'), town(far), { ...rich, inCombat: true })!.legs.every((l) => l.kind !== 'tp'));
+  // a region above the character's level cannot be reached; a dungeon never
+  const high = REG.find((z) => Z[z].level[0] > 5)!;
+  assert.equal(planRoute(town('eldoria'), town(high), { level: 1, gold: 1e9, disc: all }), null);
+  const dungeon = Object.values(Z).find((z) => z.kind === 'dungeon')!;
+  assert.equal(planRoute(town('eldoria'), { zone: dungeon.id, x: 100, y: 100 }, rich), null);
+  // a neighbour through a nearby portal is walked to rather than teleported to when the portal is close
+  const p = Z.eldoria.portals[0], nextTo = { zone: 'eldoria', x: tc(p.tx - 1), y: tc(p.ty) };
+  const near = planRoute(nextTo, { zone: p.to, x: tc(p.toTx + 2), y: tc(p.toTy) }, rich)!;
+  assert.deepEqual(near.legs.map((l) => l.kind), ['portal', 'walk']);
+  assert.ok(near.cost < TELEPORT_WALK);
+  assert.ok(zo('eldoria').some((o) => o.kind === 'waykeeper'));
+});
+
+test('quests that take you there: every objective of every quest has somewhere to go', async () => {
+  const { questPlaces } = await import('../client/src/questnav');
+  const { QUESTS: QS } = await import('../shared/src/quests');
+  const { ZONES: Z } = await import('../shared/src/world');
+  const missing: string[] = [];
+  for (const q of Object.values(QS)) for (const o of q.objectives) {
+    if (o.kind === 'collect' && !['iron_ore', 'moonleaf', 'star_shard'].includes(o.item)) continue; // dropped items have no single place
+    const places = questPlaces([], o);
+    if (!places.length) missing.push(`${q.id}: ${o.kind} ${o.label}`);
+    for (const pl of places) assert.ok(Z[pl.place.zone], `${q.id}: ${pl.place.zone}`);
+  }
+  assert.deepEqual(missing.slice(0, 10), [], `objectives with nowhere to go (${missing.length})`);
+});

@@ -119,6 +119,8 @@ export interface PartyMember {
   ch: number;
   x: number;
   y: number;
+  /** The monster this member is fighting (entity id), 0 for none: followers hunt their leader's target. */
+  tgt?: number;
   on: boolean; // false while the member's connection is down (reconnect grace)
 }
 export interface PartyState {

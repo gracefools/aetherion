@@ -58,7 +58,7 @@ import { STATUS } from '../../shared/src/combat';
 import { TradeInvite, TradePanel } from './trade';
 import { GuildInvite, GuildPanel } from './guild';
 import { CompanionsPanel, DepthAsk, DuelInvite, DuelStatus, MatchBar, MatchReady, PvpZoneBadge } from './pvp';
-import { toRail } from './rail';
+import { toRail, TopTabs } from './rail';
 import { TraitBadge } from './traitsUi';
 import { TalentPicker } from './talentsUi';
 import { StatusBar } from './statusUi';
@@ -419,7 +419,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
       <canvas ref={canvas} className="world" />
       <div className="winlayer" />
       <div className="hud rail"><canvas ref={mini} width={144} height={144} className="minimap" role="button" tabIndex={0} title={t('map.open')} aria-label={t('map.open')} onClick={() => setMap(true)} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') setMap(true); }} /></div>
-      <div className="topstack">{(['boss', 'target', 'event', 'siege', 'pvp', 'toast', 'banner'] as const).map((s) => <div key={s} className={'slot-' + s} />)}</div>
+      <div className="topstack">{(['boss', 'target'] as const).map((s) => <div key={s} className={'slot-' + s} />)}<TopTabs />{(['event', 'siege', 'pvp', 'toast', 'banner'] as const).map((s) => <div key={s} className={'slot-' + s} />)}</div>
       {game && <Guard><HudView game={game} onExit={onExit} input={input} sheet={sheet} setSheet={setSheet} book={book} setBook={setBook} bag={bag} setBag={(b) => { setBag(b); if (b) markTutorial('inventory'); }} setOpts={setOpts} auto={auto} setAuto={setAuto} setMap={setMap} /></Guard>}
       {opts && <Win id="settings" title={'settings.title'} width={520} onClose={() => setOpts(false)}><Guard><SettingsPanel onClose={() => setOpts(false)} signedIn inGame /></Guard></Win>}
       {game && map && <Win id="map" title={'map.title'} width={980} onClose={() => setMap(false)}><Guard><WorldMap game={game} onClose={() => setMap(false)} /></Guard></Win>}
@@ -807,6 +807,11 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
                 <div className="vbar hp"><i style={{ width: `${(m.hp / m.mhp) * 100}%` }} /><span>{m.on ? (m.hp <= 0 ? t('party.fallen') : `${m.hp} / ${m.mhp}`) : t('party.disconnected')}</span></div>
                 {m.zone !== hud.party!.members.find((x) => x.id === me.id)?.zone && <small className="sub">{t('party.elsewhere')}</small>}
               </button>
+              {hud.party!.leader === m.id && (
+                <span className="pctl">
+                  <button className={'small followbtn' + (hud.follow ? ' on' : '')} aria-pressed={hud.follow} onClick={() => game.setFollow(!hud.follow)} title={t('party.followTip')}>{t(hud.follow ? 'party.following' : 'party.follow')}</button>
+                </span>
+              )}
               {hud.party!.leader === me.id && (
                 <span className="pctl">
                   <button className="small" onClick={() => game.partyOp('promote', m.id)} aria-label={t('party.makeLeader', { name: m.name })} title={t('party.makeLeaderTip')}><Icon name="star" size={14} /></button>
@@ -856,6 +861,12 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       <Guard><MatchReady hud={hud} game={game} /></Guard>
       <TipLayer />
       <Guard><TouchControls hud={hud} game={game} /></Guard>
+      {hud.travel && !hud.travel.follow && (
+        <div className="hud travelbar panel" role="status">
+          <Icon name="map" size={16} /> <span>{t('travel.to', { name: tm(hud.travel.to) })}{hud.travel.tp > 0 && <small className="sub"> · {t('travel.tp', { n: hud.travel.tp, g: hud.travel.gold })}</small>}</span>
+          <button className="small" onClick={() => game.cancelTravel()}>{t('common.cancel')}</button>
+        </div>
+      )}
       <Guard><FullscreenAsk hud={hud} /></Guard>
       <PortraitCover />
       <Guard><CtxMenu hud={hud} game={game} whisper={(name) => { const el = input.current; if (el) { el.value = `/w ${name} `; el.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(() => el.focus(), 0); } }} /></Guard>

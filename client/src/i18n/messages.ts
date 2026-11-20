@@ -46,6 +46,13 @@ export const MESSAGES: Record<string, Msg> = {
   modTrade: m('Trade on {a} with {b}: gave {c}, received {d}.', 'Dagang pada {a} dengan {b}: memberi {c}, menerima {d}.'), modGoldItems: m('{a} gold and {b} items', '{a} emas dan {b} barang'),
   modBank: m('Bank on {a}: {b}', 'Bank pada {a}: {b}'),
 
+  // ---- smart travel and following ----
+  trDungeon: m('Dungeons are entered at their gate', 'Dungeon dimasuki lewat gerbangnya'), trNoWay: m('There is no way there for you yet', 'Belum ada jalan ke sana untukmu'),
+  trNoWayHere: m('There is no way there from here', 'Tidak ada jalan ke sana dari sini'), trClosed: m('The way is closed for now', 'Jalannya tertutup untuk saat ini'),
+  trNoPath: m('There is no path to that spot', 'Tidak ada jalur ke titik itu'), trAuto: m('Stopped: travelling', 'Berhenti: sedang bepergian'),
+  flLead: m('You lead the party: there is nobody to follow', 'Kamu pemimpin party: tidak ada yang bisa diikuti'), flOn: m('Following the party leader. Move yourself to stop.', 'Mengikuti pemimpin party. Gerakkan karaktermu untuk berhenti.'),
+  flOff: m('Stopped following.', 'Berhenti mengikuti.'),
+
   // ---- skills, runes ----
   skillNot: m('Skill not learned', 'Skill belum dipelajari'), skillNotK: m('Skill not learned (press K)', 'Skill belum dipelajari (tekan K)'), noPoints: m('No skill points', 'Tidak ada poin skill'),
   maxRank: m('Already at maximum rank', 'Sudah di peringkat tertinggi'), learnFirst: m('Learn {a} first', 'Pelajari {a} terlebih dahulu'), notJob: m('Not a skill of this job', 'Bukan skill kelas ini'), unknownSkill: m('Unknown skill', 'Skill tidak dikenal'),

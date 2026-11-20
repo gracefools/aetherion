@@ -765,6 +765,20 @@
   .sharelink { word-break: break-all; margin: 2px 0 8px; }
   .appsection .srow > .installbtn, .appsection .sharebtns { justify-self: start; width: max-content; }
   .fsbest { color: #9fe39b; }
+  /* event boxes share one place, chosen by tabs */
+  .topstack > .tabbedout { display: none !important; }
+  .toptabs { display: flex; gap: 4px; pointer-events: auto; }
+  .toptabs button { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; font-size: 12px; border-radius: 12px !important; background: rgba(22,26,40,.85); color: var(--dim); }
+  .toptabs button.on { color: #1a1408; background: linear-gradient(#d2ac55, #a57f2e); border-color: #e5c877; font-weight: 700; }
+  /* smart travel, following, quests that take you there */
+  .travelbar { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 5px 10px; z-index: 6; pointer-events: auto; white-space: nowrap; }
+  html.touch .travelbar { bottom: auto; top: calc(64px / var(--ui, 1)); }
+  .followbtn.on { background: linear-gradient(#5fd35a, #2f8a3a); color: #06210a; border-color: #9fe39b; font-weight: 700; }
+  .qtracker .qt { display: block; } .qtracker .qtname { text-decoration: none; padding: 0; text-align: left; color: inherit; }
+  .qtracker .ob.go { display: block; width: 100%; text-align: left; padding: 1px 0; text-decoration: none; color: inherit; cursor: pointer; } .qtracker .ob.go:hover { color: #ffe08a; }
+  .regionview { cursor: crosshair; } .regionview .pin.dest { position: absolute; translate: -50% -50%; color: #ffe08a; font-size: 20px; text-shadow: 0 0 4px #000, 0 0 8px #000; pointer-events: none; animation: destpulse 1s ease-in-out infinite; }
+  @keyframes destpulse { 50% { scale: 1.35; } }
+  .gohere { align-items: center; flex-wrap: wrap; }
 </style>
 </head>
 <body>

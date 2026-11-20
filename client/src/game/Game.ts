@@ -1236,7 +1236,7 @@ export class Game {
     this.sendMsg({ t: 'pvp', op, ...a });
   }
   /** Pets and mounts (M15). */
-  compOp(op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount', a: { uid?: string; id?: string; name?: string } = {}) {
+  compOp(op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount' | 'feed', a: { uid?: string; id?: string; name?: string; food?: string } = {}) {
     this.sendMsg({ t: 'comp', op, ...a });
   }
   /** Challenges the player with this name, if they are in sight. */

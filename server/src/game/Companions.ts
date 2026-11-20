@@ -1,6 +1,6 @@
 // Pets and mounts on the server (M15): collection, summoning, naming, levelling, riding.
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
-import { MAX_PETS, MOUNT_FORBIDDEN_KINDS, MOUNTS, PET_EXP_SHARE, PET_IDS, PET_MAX_LEVEL, PET_NAME, PET_REACH, PET_SKILLS, petExpToNext, PETS, petSkillPower } from '../../../shared/src/companions';
+import { addTierExp, feedExp, gradeOf, MAX_PET_TIER, MAX_PETS, MOUNT_FORBIDDEN_KINDS, MOUNTS, PET_EXP_SHARE, PET_IDS, PET_MAX_LEVEL, PET_NAME, PET_REACH, PET_SKILLS, PET_TIER_NAMES, petExpToNext, PETS, petSkillPower, rollGrade } from '../../../shared/src/companions';
 import { STATUS_INDEX } from '../../../shared/src/combat';
 import { Act } from '../../../shared/src/protocol';
 import { applyStatus, emit } from './entity';
@@ -18,8 +18,9 @@ export function learnCompanion(w: World, p: Player, base: string): string {
   if (b?.kind === 'pet') {
     if (!b.ref || !PETS[b.ref]) return 'Unknown pet';
     if (p.comp.pets.length >= MAX_PETS) return `You can keep at most ${MAX_PETS} pets`;
-    p.comp.pets.push({ uid: newUid(), kind: b.ref, name: PETS[b.ref].name, level: 1, exp: 0 });
-    w.send(p, { t: 'sys', text: `${PETS[b.ref].name} joins your companions. Summon it from the companions panel (P).` });
+    const gr = rollGrade(() => w.rnd());
+    p.comp.pets.push({ uid: newUid(), kind: b.ref, name: PETS[b.ref].name, level: 1, exp: 0, tier: 0, tx: 0, gr });
+    w.send(p, { t: 'sys', text: `${PETS[b.ref].name} joins your companions with grade ${gradeOf(gr)} (${gr}%). Summon it from the companions panel (P).` });
   } else if (b?.kind === 'mount') {
     if (!b.ref || !MOUNTS[b.ref]) return 'Unknown mount';
     if (p.comp.mounts.includes(b.ref)) return 'You already have this mount';
@@ -67,6 +68,22 @@ export function companionOp(w: World, p: Player, m: any): string {
       c.pets.splice(i, 1);
       break;
     }
+    case 'feed': { // the pet `uid` eats the pet `food`: tier exp, the food is gone
+      const pet = typeof m.uid === 'string' ? c.pets.find((x) => x.uid === m.uid) : undefined;
+      const fi = typeof m.food === 'string' ? c.pets.findIndex((x) => x.uid === m.food) : -1;
+      if (!pet || fi < 0) return 'You do not have that pet';
+      const food = c.pets[fi];
+      if (food === pet) return 'A pet cannot eat itself';
+      if (c.pet === food.uid) return 'Dismiss that pet before feeding it to another';
+      if (pet.tier >= MAX_PET_TIER) return 'This pet is already Mythic';
+      const gain = feedExp(pet, food), before = pet.tier, next = addTierExp(pet.tier, pet.tx, gain);
+      pet.tier = next.tier;
+      pet.tx = next.tx;
+      c.pets.splice(fi, 1);
+      w.send(p, { t: 'sys', text: `${pet.name} ate ${food.name} (+${gain} tier exp).` });
+      if (pet.tier > before) w.send(p, { t: 'sys', text: `${pet.name} rose to ${PET_TIER_NAMES[pet.tier]}!` });
+      break;
+    }
     case 'mount': {
       const id = m.id;
       if (typeof id !== 'string' || !c.mounts.includes(id)) return 'You do not have that mount';
@@ -111,7 +128,7 @@ export function petAct(w: World, p: Player, tick: number) {
   const pet = p.comp.pet ? p.comp.pets.find((x) => x.uid === p.comp.pet) : undefined, sk = pet && PET_SKILLS[pet.kind];
   if (!pet || !sk || p.dead || tick < p.petSkillAt) return;
   if ((tick - p.lastCombat) * TICK_MS > COMBAT_TIMEOUT_MS) return; // only in a fight
-  const power = petSkillPower(pet.level), idx = PET_IDS.indexOf(pet.kind);
+  const power = petSkillPower(pet.level, pet.tier), idx = PET_IDS.indexOf(pet.kind);
   if (sk.kind === 'heal' || sk.kind === 'shield') {
     if (p.hp >= p.maxHp * (sk.below ?? 1)) return;
     const n = Math.max(1, Math.round(p.maxHp * sk.mul * power));

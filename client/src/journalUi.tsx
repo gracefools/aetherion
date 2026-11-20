@@ -3,13 +3,14 @@
 import React, { useState, useSyncExternalStore } from 'react';
 import { ITEMS } from '../../shared/src/items';
 import {
-  ACHIEVEMENTS, CODEX_BONUS, CODEX_SETS, codexCard, codexComplete, codexNeed, loginGold, LOGIN_REWARDS, MISSIONS, missionReward, TITLES, type Bonus,
+  ACHIEVEMENTS, loginGold, LOGIN_REWARDS, MISSIONS, missionReward, TITLES, type Bonus,
 } from '../../shared/src/journal';
 import { MONSTERS } from '../../shared/src/monsters';
 import { REGIONS, ZONES } from '../../shared/src/world';
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
 import { SeasonTab } from './seasonUi';
+import { CodexTab } from './codexUi';
 
 const BONUS_KEY: Record<string, string> = { atk: 'stat.atk', matk: 'stat.matk', maxHp: 'stat.hp', def: 'stat.def', mdef: 'stat.mdef', crit: 'stat.crit', critDmg: 'stat.critDmg', healPower: 'stat.heal', moveMul: 'stat.speed', lifesteal: 'stat.lifesteal', dodge: 'stat.dodge' };
 export const bonusText = (b: Bonus) => Object.entries(b).map(([k, v]) => `+${v}${k === 'crit' || k === 'dodge' || k === 'lifesteal' ? '' : '%'} ${t(BONUS_KEY[k] as any)}`).join(', ');
@@ -106,31 +107,7 @@ export function JournalPanel({ game, onClose }: { game: Game; onClose: () => voi
           </div>
         </div>
       )}
-      {tab === 'codex' && (
-        <div className="jrbody">
-          <p className="sub">{t('jr.codexHelp')}</p>
-          {REGIONS.map((z) => {
-            const done = codexComplete(j.k, z), set = CODEX_SETS[z];
-            return (
-              <section key={z} className={'codexset' + (done ? ' on' : '')} aria-label={ZONES[z].name}>
-                <h3>{ZONES[z].name} <small className="sub">{set.filter((id) => codexCard(j.k, id)).length} / {set.length} · {done ? t('jr.setDone') : t('jr.setBonus')}: {bonusText(CODEX_BONUS[z])}</small></h3>
-                <div className="cards">
-                  {set.map((id) => {
-                    const have = codexCard(j.k, id), n = Math.min(codexNeed(id), j.k[id] ?? 0);
-                    return (
-                      <div key={id} className={'card' + (have ? ' on' : '')} title={`${MONSTERS[id].name}: ${n} / ${codexNeed(id)}`}>
-                        <b>{have || n ? MONSTERS[id].name : '???'}</b>
-                        <small>{t('common.lv', { n: MONSTERS[id].level })}{MONSTERS[id].boss ? ' · ★' : MONSTERS[id].elite ? ' · ◆' : ''}</small>
-                        <small>{n} / {codexNeed(id)}</small>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
+      {tab === 'codex' && <CodexTab hud={hud} />}
     </div>
   );
 }

@@ -5411,7 +5411,7 @@ test('M15 pets: whistles join the collection, a summoned pet gives its bonus, fo
   assert.deepEqual(p.comp.pets.map((x) => [x.kind, x.name, x.level]), [['ember_kit', 'Ember Kit', 1]]);
   const uid = p.comp.pets[0].uid, atk0 = p.stats.atk;
   assert.equal(world.companion(p, { op: 'summon', uid }), '');
-  assert.equal(p.stats.atk, Math.round(atk0 * (1 + petBonus(PETS.ember_kit, 1) / 100)), 'the pet\'s bonus applies');
+  assert.equal(p.stats.atk, Math.round(atk0 * (1 + petBonus(PETS.ember_kit, 1) / 100)) + petFlat(PETS.ember_kit, p.comp.pets[0]), 'the pet\'s bonus applies, with its grade');
   assert.deepEqual(p.meta().pet, ['ember_kit', 'Ember Kit', 1], 'others see the pet');
   assert.equal(other.p.known.has(p.id), false, 'and are sent the new look');
   // naming
@@ -5428,8 +5428,67 @@ test('M15 pets: whistles join the collection, a summoned pet gives its bonus, fo
   assert.equal(p.meta().pet, undefined);
   assert.equal(p.progDirty, true, 'saved with the character');
   // stored data is checked
-  const c = cleanCompanions({ pets: [{ uid: 'a', kind: 'ember_kit', name: 'X!', level: 99, exp: -1 }, { uid: 'a', kind: 'ember_kit' }, { uid: 'b', kind: 'dragon' }], pet: 'a', mounts: ['frost_elk', 'frost_elk', 'pegasus'], riding: 'frost_elk' });
-  assert.deepEqual(c, { pets: [{ uid: 'a', kind: 'ember_kit', name: 'Ember Kit', level: PET_MAX_LEVEL, exp: 0 }], pet: 'a', mounts: ['frost_elk'], riding: '' }, 'nobody logs in riding; bad entries are dropped');
+  const c = cleanCompanions({ pets: [{ uid: 'a', kind: 'ember_kit', name: 'X!', level: 99, exp: -1 }, { uid: 'a', kind: 'ember_kit' }, { uid: 'b', kind: 'dragon' }], pet: 'a', mounts: ['frost_elk', 'frost_elk', 'pegasus'], riding: 'frost_elk' }, () => 0);
+  assert.deepEqual(c, { pets: [{ uid: 'a', kind: 'ember_kit', name: 'Ember Kit', level: PET_MAX_LEVEL, exp: 0, tier: 0, tx: 0, gr: 30 }], pet: 'a', mounts: ['frost_elk'], riding: '' }, 'nobody logs in riding; bad entries are dropped; an old pet gets a grade');
+});
+
+import { addTierExp, feedExp, gradeOf, PET_FLAT_TOP, PET_GRADES, petFlat, rollGrade } from '../shared/src/companions';
+test('pet grades and tiers: a weighted grade rolled once, flat bonus by tier and level, feeding pets climbs Normal to Mythic', () => {
+  // grade bands and the example: 50% of a 600 attack top is +5 a level, +300 at level 60
+  assert.deepEqual(PET_GRADES.map((g) => [g.g, g.lo, g.hi]), [['D', 30, 50], ['C', 51, 60], ['B', 61, 70], ['A', 71, 80], ['S', 81, 90], ['SS', 91, 100]]);
+  assert.equal(PET_GRADES.reduce((n, g) => n + g.w, 0), 100);
+  assert.deepEqual([30, 50, 51, 60, 61, 70, 71, 80, 81, 90, 91, 100].map(gradeOf), ['D', 'D', 'C', 'C', 'B', 'B', 'A', 'A', 'S', 'S', 'SS', 'SS']);
+  assert.equal(PET_FLAT_TOP.atk[4], 600);
+  assert.equal(petFlat(PETS.ember_kit, { level: 1, tier: 4, gr: 50 }), 5);
+  assert.equal(petFlat(PETS.ember_kit, { level: 30, tier: 4, gr: 50 }), 150);
+  assert.equal(petFlat(PETS.ember_kit, { level: 60, tier: 4, gr: 50 }), 300);
+  assert.equal(petFlat(PETS.ember_kit, { level: 60, tier: 4, gr: 100 }), 600);
+  assert.equal(petFlat(PETS.frost_owlet, { level: 60, tier: 4, gr: 100 }), 8, 'crit is in points');
+  // the roll: every value in range, the bands near their weights
+  let seed = 7; const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const n = 20000, by: Record<string, number> = {};
+  for (let i = 0; i < n; i++) { const g = rollGrade(rng); assert.ok(g >= 30 && g <= 100 && Number.isInteger(g)); by[gradeOf(g)] = (by[gradeOf(g)] ?? 0) + 1; }
+  for (const g of PET_GRADES) assert.ok(Math.abs(by[g.g] / n - g.w / 100) < 0.015, `grade ${g.g}: ${by[g.g] / n}`);
+  // tier exp: 10 / 100 / 500 / 1000; eaten pets give 5 / 10 / 20 / 50 / 200; another kind 40%
+  assert.deepEqual([0, 1, 2, 3, 4].map((tier) => feedExp({ kind: 'ember_kit' }, { kind: 'ember_kit', tier })), [5, 10, 20, 50, 200]);
+  assert.deepEqual([0, 1, 2, 3, 4].map((tier) => feedExp({ kind: 'ember_kit' }, { kind: 'bog_toad', tier })), [2, 4, 8, 20, 80]);
+  assert.deepEqual(addTierExp(0, 5, 5), { tier: 1, tx: 0 });
+  assert.deepEqual(addTierExp(0, 0, 200), { tier: 2, tx: 90 }, 'leftover carries over several tiers');
+  assert.deepEqual(addTierExp(3, 990, 200), { tier: 4, tx: 0 }, 'Mythic keeps no exp');
+  let st = { tier: 0, tx: 0 }, eaten = 0;
+  while (st.tier < 4) { st = addTierExp(st.tier, st.tx, 5); eaten++; }
+  assert.equal(eaten, 322, '322 Normal pets of the same kind make a Mythic');
+  // a tier multiplies the percentage bonus and the skill
+  assert.equal(petBonus(PETS.ember_kit, 60, 4), Math.round(petBonus(PETS.ember_kit, 60) * 2 * 10) / 10);
+  assert.ok(Math.abs(petSkillPower(60, 4) / petSkillPower(60) - 2) < 0.01);
+
+  // on the server: whistles give a graded Normal pet; feeding
+  const h = harness({ capacity: 10 }), { world } = h;
+  const a = h.join(0, 0, 'berserker', 20), p = a.p;
+  give(p, spec('pet_ember_kit', { qty: 3 }));
+  give(p, spec('pet_bog_toad', { qty: 1 }));
+  for (let i = 0; i < 4; i++) assert.equal(world.inventory(p, { op: 'use', uid: p.inv.find((x) => x.base.startsWith('pet_'))!.uid }), '');
+  assert.equal(p.comp.pets.length, 4);
+  for (const x of p.comp.pets) assert.ok(x.tier === 0 && x.tx === 0 && x.gr >= 30 && x.gr <= 100);
+  assert.ok(a.out.some((m) => m.t === 'sys' && /joins your companions with grade (D|C|B|A|S|SS) \(\d+%\)/.test(m.text)));
+  const [k1, k2, k3] = p.comp.pets.filter((x) => x.kind === 'ember_kit'), toad = p.comp.pets.find((x) => x.kind === 'bog_toad')!;
+  assert.equal(world.companion(p, { op: 'summon', uid: k1.uid }), '');
+  assert.equal(world.companion(p, { op: 'feed', uid: k2.uid, food: k1.uid }), 'Dismiss that pet before feeding it to another');
+  assert.equal(world.companion(p, { op: 'feed', uid: k1.uid, food: k1.uid }), 'A pet cannot eat itself');
+  const atk0 = p.stats.atk;
+  assert.equal(world.companion(p, { op: 'feed', uid: k1.uid, food: k2.uid }), '', 'the summoned pet can be upgraded');
+  assert.deepEqual([k1.tier, k1.tx], [0, 5]);
+  assert.equal(world.companion(p, { op: 'feed', uid: k1.uid, food: k3.uid }), '');
+  assert.deepEqual([k1.tier, k1.tx], [1, 0], 'two Normal pets of the same kind make it Rare');
+  assert.ok(p.stats.atk > atk0, 'the new tier raises the stats at once');
+  assert.ok(a.out.some((m) => m.t === 'sys' && /rose to Rare/.test(m.text)));
+  assert.equal(world.companion(p, { op: 'feed', uid: k1.uid, food: toad.uid }), '');
+  assert.deepEqual([k1.tier, k1.tx], [1, 2], 'another kind gives 40%');
+  assert.deepEqual(p.comp.pets.map((x) => x.uid), [k1.uid], 'eaten pets are gone');
+  k1.tier = 4;
+  give(p, spec('pet_ember_kit', { qty: 1 }));
+  world.inventory(p, { op: 'use', uid: p.inv.find((x) => x.base === 'pet_ember_kit')!.uid });
+  assert.equal(world.companion(p, { op: 'feed', uid: k1.uid, food: p.comp.pets[1].uid }), 'This pet is already Mythic');
 });
 
 import { PET_IDS, PET_SKILLS, petSkillPower } from '../shared/src/companions';
@@ -5440,7 +5499,7 @@ test('G10 pets fight: each pet has a skill on its own cooldown, used only in a f
   assert.ok(petSkillPower(60) > petSkillPower(20) && petSkillPower(20) > petSkillPower(1));
   const h = harness({ capacity: 10 }), { world } = h;
   const summon = (p: any, kind: string, level = 1) => {
-    p.comp.pets.push({ uid: 'u_' + kind + p.id, kind, name: 'Pal', level, exp: 0 });
+    p.comp.pets.push({ uid: 'u_' + kind + p.id, kind, name: 'Pal', level, exp: 0, tier: 0, tx: 0, gr: 30 });
     assert.equal(world.companion(p, { op: 'summon', uid: 'u_' + kind + p.id }), '');
   };
   const a = h.join(0, 0, 'knight', 30), p = a.p;

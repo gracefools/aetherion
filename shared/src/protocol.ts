@@ -100,7 +100,7 @@ export type ClientMsg =
   | { t: 'pvp'; op: 'duel' | 'accept' | 'decline' | 'forfeit' | 'arena' | 'leave' | 'rank' | 'buy' | 'queue' | 'unqueue' | 'maccept' | 'mdecline' | 'pmode'; id?: number; by?: string; base?: string; mode?: string }
   | { t: 'finder'; op: 'join' | 'leave' | 'state'; dungeon?: string; diff?: string }
   | { t: 'season'; op: 'view'; ladder?: string }
-  | { t: 'comp'; op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount'; uid?: string; id?: string; name?: string }
+  | { t: 'comp'; op: 'summon' | 'dismiss' | 'rename' | 'release' | 'mount' | 'dismount' | 'feed'; uid?: string; id?: string; name?: string; food?: string }
   | { t: 'ping'; c: number };
 
 export type ChatChannel = 'zone' | 'party' | 'whisper' | 'guild' | 'world' | 'lfg';

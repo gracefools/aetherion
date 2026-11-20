@@ -1,7 +1,7 @@
 // PvP and companions (M15): the Arena Master, duel challenges and the duel in progress, the
 // zone's PvP rule, the rankings, and the companions panel (P) for pets and mounts.
 import React, { useEffect, useState } from 'react';
-import { MOUNTS, PET_MAX_LEVEL, PET_STAGE_NAMES, petBonus, petExpToNext, PETS, petStage } from '../../shared/src/companions';
+import { addTierExp, feedExp, gradeOf, MAX_PET_TIER, MOUNTS, PET_GRADE_COLOR, PET_MAX_LEVEL, PET_STAGE_NAMES, PET_TIER_COLOR, PET_TIER_NEED, petBonus, petExpToNext, petFlat, PETS, petStage, type OwnedPet } from '../../shared/src/companions';
 import { JOB_DEFS } from '../../shared/src/jobs';
 import { DEPTH_MONSTER } from '../../shared/src/depths';
 import { ZONES } from '../../shared/src/world';
@@ -227,8 +227,52 @@ function HonorShop({ hud, game }: { hud: Hud; game: Game }) {
   );
 }
 
+/** A pet's tier and grade, as two coloured chips. */
+export function TierChips({ p }: { p: { tier: number; gr: number } }) {
+  const g = gradeOf(p.gr);
+  return <>
+    <span className="chip tierchip" style={{ color: PET_TIER_COLOR[p.tier], borderColor: PET_TIER_COLOR[p.tier] }}>{t(`comp.tier.${p.tier}` as Key)}</span>
+    <span className="chip gradechip" style={{ color: PET_GRADE_COLOR[g] }} title={t('comp.gradeHelp')}>{t('comp.grade', { g, n: p.gr })}</span>
+  </>;
+}
+/** Another pet to feed to this one: the exp it gives, the tier it reaches, and a warning before a costly meal. */
+function FeedPicker({ target, pets, out, game, onDone }: { target: OwnedPet; pets: OwnedPet[]; out: string; game: Game; onDone: () => void }) {
+  const [ask, setAsk] = useState('');
+  const foods = pets.filter((x) => x.uid !== target.uid && x.uid !== out).sort((a, b) => (a.kind === target.kind ? 0 : 1) - (b.kind === target.kind ? 0 : 1) || a.tier - b.tier || a.gr - b.gr);
+  const warns = (f: OwnedPet) => [
+    f.tier > target.tier ? t('comp.feed.warnHigher', { a: t(`comp.tier.${f.tier}` as Key), b: t(`comp.tier.${target.tier}` as Key) }) : '',
+    f.tier >= 3 ? t('comp.feed.warnRare', { tier: t(`comp.tier.${f.tier}` as Key) }) : '',
+    f.gr >= 81 ? t('comp.feed.warnGrade', { g: gradeOf(f.gr) }) : '',
+  ].filter(Boolean);
+  const eat = (f: OwnedPet) => { game.compOp('feed', { uid: target.uid, food: f.uid }); setAsk(''); };
+  const box = React.useRef(null as HTMLDivElement | null);
+  useEffect(() => { box.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, []);
+  return (
+    <div className="feedpick" ref={box} role="group" aria-label={t('comp.feed.title', { name: target.name })}>
+      <div className="feedhead">
+        <b>{t('comp.feed.title', { name: target.name })}</b>
+        <span className="chips"><TierChips p={target} /><span className="chip">{t('comp.tierExp', { a: target.tx, b: PET_TIER_NEED[target.tier], next: t(`comp.tier.${target.tier + 1}` as Key) })}</span></span>
+        <button className="small link" onClick={onDone}>{t('common.close')}</button>
+      </div>
+      <p className="sub">{t('comp.feed.help')}</p>
+      {!foods.length && <p className="sub">{t('comp.feed.none')}</p>}
+      <div className="feedlist">{foods.map((f) => {
+        const gain = feedExp(target, f), after = addTierExp(target.tier, target.tx, gain), w = warns(f);
+        return (
+          <div key={f.uid} className={'feedrow' + (w.length ? ' risky' : '')}>
+            <div className="feedmain"><b>{f.name}</b> <small className="sub">{PETS[f.kind].name} · {t('common.lv', { n: f.level })}</small><div className="chips"><TierChips p={f} />{f.kind !== target.kind && <span className="chip">{t('comp.feed.otherKind')}</span>}</div></div>
+            <div className="feedgain"><b>+{gain}</b> <small>{t('comp.feed.exp')}</small>{after.tier > target.tier && <div style={{ color: PET_TIER_COLOR[after.tier] }}>→ {t(`comp.tier.${after.tier}` as Key)}</div>}</div>
+            {ask === f.uid
+              ? <span className="confirm" role="alertdialog" aria-label={t('comp.feed.ask', { name: f.name })}>{w.map((x) => <span key={x} className="warnline">⚠ {x}</span>)} <button className="small danger" onClick={() => eat(f)}>{t('comp.feed.yes')}</button> <button className="small" onClick={() => setAsk('')}>{t('comp.keep')}</button></span>
+              : <button className={'small' + (w.length ? '' : ' primary')} onClick={() => (w.length ? setAsk(f.uid) : eat(f))}>{w.length ? '⚠ ' : ''}{t('comp.feed.do')}</button>}
+          </div>
+        );
+      })}</div>
+    </div>
+  );
+}
 /** Pixel art of a companion, on its own canvas, for the panel. */
-function Portrait({ sheet, w, h, scale = 3 }: { sheet: HTMLCanvasElement | null; w: number; h: number; scale?: number }) {
+export function Portrait({ sheet, w, h, scale = 3 }: { sheet: HTMLCanvasElement | null; w: number; h: number; scale?: number }) {
   const ref = React.useRef(null as HTMLCanvasElement | null);
   useEffect(() => {
     const c = ref.current, g = c?.getContext('2d');
@@ -244,7 +288,7 @@ function Portrait({ sheet, w, h, scale = 3 }: { sheet: HTMLCanvasElement | null;
 const MAX_MOUNT_BONUS = Math.max(...Object.values(MOUNTS).map((m) => m.speed - 1));
 export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () => void }) {
   useT();
-  const c = hud.comp, [renaming, setRenaming] = useState(''), [name, setName] = useState(''), [releasing, setReleasing] = useState('');
+  const c = hud.comp, [renaming, setRenaming] = useState(''), [name, setName] = useState(''), [releasing, setReleasing] = useState(''), [feeding, setFeeding] = useState('');
   return (
     <div className="hud qlog panel" role="dialog" aria-label={t('comp.title')}>
       <div className="sheethead"><h2>{t('comp.title')}</h2><button className="link panelx" onClick={onClose} aria-label={t('comp.close')}>{t('common.close')}</button></div>
@@ -268,16 +312,23 @@ export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; 
                   {PET_STAGE_NAMES[petStage(p.level)] && <span className="chip stage">{PET_STAGE_NAMES[petStage(p.level)]}</span>}
                   <span className="chip">{d.name}</span>
                   <span className="chip">{t('common.lv', { n: p.level })}</span>
+                  <TierChips p={p} />
                 </div>
                 <div className="meterbar exp" role="meter" aria-valuenow={p.level < PET_MAX_LEVEL ? p.exp : 1} aria-valuemin={0} aria-valuemax={p.level < PET_MAX_LEVEL ? petExpToNext(p.level) : 1} aria-label={t('comp.expBar')}>
                   <i style={{ width: `${p.level < PET_MAX_LEVEL ? Math.min(100, (p.exp / petExpToNext(p.level)) * 100) : 100}%` }} />
                   <small>{p.level < PET_MAX_LEVEL ? t('comp.exp', { a: p.exp, b: petExpToNext(p.level) }) : t('common.max')}</small>
                 </div>
-                <div className="sub bonusline">{t('comp.bonus', { v: `${petBonus(d, p.level)}${d.pct ? '%' : ''}`, stat: t(`comp.stat.${d.stat}` as Key) })}</div>
-                {PET_SKILLS[p.kind] && <div className="petskill"><b>✦ {t(`pet.skill.${p.kind}` as Key)}</b> <small className="sub">{Math.round(PET_SKILLS[p.kind].cdMs / 1000)}s</small><div className="sub">{t(`pet.desc.${p.kind}` as Key, { n: Math.round(PET_SKILLS[p.kind].mul * petSkillPower(p.level) * 100) })}</div></div>}
+                <div className="meterbar tierexp" role="meter" aria-valuenow={p.tier < MAX_PET_TIER ? p.tx : 1} aria-valuemin={0} aria-valuemax={p.tier < MAX_PET_TIER ? PET_TIER_NEED[p.tier] : 1} aria-label={t('comp.tierBar')}>
+                  <i style={{ width: `${p.tier < MAX_PET_TIER ? Math.min(100, (p.tx / PET_TIER_NEED[p.tier]) * 100) : 100}%`, background: PET_TIER_COLOR[Math.min(MAX_PET_TIER, p.tier + 1)] }} />
+                  <small>{p.tier < MAX_PET_TIER ? t('comp.tierExp', { a: p.tx, b: PET_TIER_NEED[p.tier], next: t(`comp.tier.${p.tier + 1}` as Key) }) : t('comp.tierMax')}</small>
+                </div>
+                <div className="sub bonusline">{t('comp.bonus', { v: `${petBonus(d, p.level, p.tier)}${d.pct ? '%' : ''}`, stat: t(`comp.stat.${d.stat}` as Key) })}</div>
+                <div className="sub bonusline">{t('comp.flat', { v: petFlat(d, p), stat: t(`comp.stat.${d.stat}` as Key), top: petFlat(d, { ...p, level: PET_MAX_LEVEL }) })}</div>
+                {PET_SKILLS[p.kind] && <div className="petskill"><b>✦ {t(`pet.skill.${p.kind}` as Key)}</b> <small className="sub">{Math.round(PET_SKILLS[p.kind].cdMs / 1000)}s</small><div className="sub">{t(`pet.desc.${p.kind}` as Key, { n: Math.round(PET_SKILLS[p.kind].mul * petSkillPower(p.level, p.tier) * 100) })}</div></div>}
                 <div className="actions">
                   {out ? <button className="small" onClick={() => game.compOp('dismiss')}>{t('comp.dismiss')}</button> : <button className="small primary" onClick={() => game.compOp('summon', { uid: p.uid })}>{t('comp.summon')}</button>}
                   <button className="small" onClick={() => { setRenaming(p.uid); setName(p.name); }}>{t('comp.rename')}</button>
+                  {p.tier < MAX_PET_TIER && <button className={'small' + (feeding === p.uid ? ' on' : '')} onClick={() => setFeeding(feeding === p.uid ? '' : p.uid)}>{t('comp.feed.open')}</button>}
                   {releasing === p.uid
                     ? <span className="confirm" role="alertdialog" aria-label={t('comp.releaseAsk', { name: p.name })}>{t('comp.releaseWarn')} <button className="small danger" onClick={() => { game.compOp('release', { uid: p.uid }); setReleasing(''); }}>{t('comp.release')}</button> <button className="small" onClick={() => setReleasing('')}>{t('comp.keep')}</button></span>
                     : <button className="small link" onClick={() => setReleasing(p.uid)}>{t('comp.release')}</button>}
@@ -287,6 +338,10 @@ export function CompanionsPanel({ hud, game, onClose }: { hud: Hud; game: Game; 
           );
         })}
       </div>
+      {(() => { // the feeding list sits under the pets, full width, for the pet chosen
+        const fp = c.pets.find((x) => x.uid === feeding);
+        return fp && fp.tier < MAX_PET_TIER ? <FeedPicker key={fp.uid} target={fp} pets={c.pets} out={c.pet} game={game} onDone={() => setFeeding('')} /> : null;
+      })()}
       <h3>{t('comp.mounts')} <small className="sub">{c.mounts.length}</small></h3>
       {!c.mounts.length && <p className="sub">{t('comp.noMounts')}</p>}
       <div className="comps">

@@ -2095,6 +2095,7 @@ export const CONTENT_ID: Record<string, string> = {
 };
 /** Names that are the same in Indonesian (people, places, named bosses). */
 export const CONTENT_KEPT: string[] = [
+  'D', 'C', 'B', 'A', 'S', 'SS', // pet grades
 "Aetherite",
 "Steak",
 "Abyssal Golem",

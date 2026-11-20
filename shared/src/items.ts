@@ -230,7 +230,7 @@ export const DAILY_STONES = 3;
 export const MONSTER_GOLD = 0.1;
 /** Chance that a kill drops a Random Rune Scroll. */
 export const SCROLL_DROP = { normal: 0.012, elite: 0.15 };
-export const PET_DROP_ELITE = 0.03;
+export const PET_DROP_ELITE = 0.05;
 export const PET_WHISTLES = ['pet_ember_kit', 'pet_moss_sprout', 'pet_frost_owlet', 'pet_bog_toad', 'pet_iron_pup', 'pet_star_mote'];
 /** Reins of the ground mounts: dropped by dungeon bosses, now that no shop sells them. */
 export const GROUND_MOUNTS = ['mount_plains_strider', 'mount_ashen_charger', 'mount_frost_elk', 'mount_void_skiff'];

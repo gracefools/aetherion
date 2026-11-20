@@ -49,8 +49,65 @@ export const PET_SKILLS: Record<string, PetSkill> = {
 };
 /** How far from its owner a pet reaches a monster. */
 export const PET_REACH = 260;
-/** The skill grows with the pet: 1% a level and 15% more at each evolution. */
-export const petSkillPower = (level: number) => Math.round((1 + 0.01 * (level - 1)) * (1 + 0.15 * petStage(level)) * 1000) / 1000;
+/** The skill grows with the pet: 1% a level and 15% more at each evolution; its tier multiplies it. */
+export const petSkillPower = (level: number, tier = 0) => Math.round((1 + 0.01 * (level - 1)) * (1 + 0.15 * petStage(level)) * petTierMul(tier) * 1000) / 1000;
+
+// Tiers: a pet climbs from Normal to Mythic by eating other pets. A tier multiplies the pet's
+// percentage bonus and its skill, and raises the flat bonus its grade gives.
+export const PET_TIERS = ['normal', 'rare', 'epic', 'legend', 'mythic'] as const;
+export const PET_TIER_NAMES = ['Normal', 'Rare', 'Epic', 'Legend', 'Mythic'];
+export const PET_TIER_COLOR = ['#c8ccd6', '#5aa8ff', '#b86bff', '#ffb43a', '#ff5a6a'];
+export const MAX_PET_TIER = PET_TIERS.length - 1;
+/** Tier exp to climb from tier i to tier i+1 (Normal to Rare, Rare to Epic, ...). */
+export const PET_TIER_NEED = [10, 100, 500, 1000];
+/** Tier exp a pet gives when eaten, by its own tier. */
+export const PET_FEED_EXP = [5, 10, 20, 50, 200];
+/** A pet of another kind gives this share of its exp. */
+export const PET_OFFKIND_SHARE = 0.4;
+export const PET_TIER_MULS = [1, 1.2, 1.4, 1.7, 2];
+export const petTierMul = (tier: number) => PET_TIER_MULS[Math.max(0, Math.min(MAX_PET_TIER, tier | 0))];
+/** The flat bonus at level 60 with a 100% grade, by stat and tier. */
+export const PET_FLAT_TOP: Record<PetDef['stat'], number[]> = {
+  atk: [60, 150, 250, 400, 600],
+  matk: [60, 150, 250, 400, 600],
+  def: [90, 225, 375, 600, 900],
+  maxHp: [600, 1500, 2500, 4000, 6000],
+  crit: [1, 2.5, 4, 6, 8],
+  dodge: [1, 2.5, 4, 6, 8],
+};
+/** Grades: rolled once when the pet first joins, a percentage of the tier's flat bonus. */
+export const PET_GRADES = [
+  { g: 'D', lo: 30, hi: 50, w: 35 },
+  { g: 'C', lo: 51, hi: 60, w: 25 },
+  { g: 'B', lo: 61, hi: 70, w: 18 },
+  { g: 'A', lo: 71, hi: 80, w: 12 },
+  { g: 'S', lo: 81, hi: 90, w: 7 },
+  { g: 'SS', lo: 91, hi: 100, w: 3 },
+] as const;
+export const PET_GRADE_COLOR: Record<string, string> = { D: '#9aa0ac', C: '#8fd18a', B: '#5aa8ff', A: '#b86bff', S: '#ffb43a', SS: '#ff5a6a' };
+export const gradeOf = (pct: number) => (PET_GRADES.find((b) => pct >= b.lo && pct <= b.hi) ?? PET_GRADES[0]).g;
+/** A weighted band, then an even percentage inside it. */
+export function rollGrade(rng: () => number = Math.random): number {
+  let r = rng() * 100;
+  for (const b of PET_GRADES) {
+    if (r < b.w) return b.lo + Math.floor(rng() * (b.hi - b.lo + 1));
+    r -= b.w;
+  }
+  return 30;
+}
+/** The flat bonus from the grade: the tier's top value, times the grade, times level / 60. */
+export function petFlat(d: PetDef, p: { level: number; tier: number; gr: number }): number {
+  const v = (PET_FLAT_TOP[d.stat][Math.max(0, Math.min(MAX_PET_TIER, p.tier))] * p.gr * Math.min(p.level, PET_MAX_LEVEL)) / (100 * PET_MAX_LEVEL);
+  return d.stat === 'crit' || d.stat === 'dodge' ? Math.round(v * 10) / 10 : Math.round(v);
+}
+/** Tier exp a pet gives when eaten by another. */
+export const feedExp = (target: { kind: string }, food: { kind: string; tier: number }) => Math.round(PET_FEED_EXP[Math.max(0, Math.min(MAX_PET_TIER, food.tier))] * (food.kind === target.kind ? 1 : PET_OFFKIND_SHARE));
+/** The tier and tier exp after gaining some: leftover carries on; a Mythic pet keeps none. */
+export function addTierExp(tier: number, tx: number, gain: number): { tier: number; tx: number } {
+  tx += gain;
+  while (tier < MAX_PET_TIER && tx >= PET_TIER_NEED[tier]) { tx -= PET_TIER_NEED[tier]; tier++; }
+  return { tier, tx: tier >= MAX_PET_TIER ? 0 : tx };
+}
 /** The pet kinds in a fixed order (their index travels in events). */
 export const PET_IDS = Object.keys(PETS);
 /** Pets evolve at levels 20, 40 and 60: a new name, a larger body and a stronger bonus. */
@@ -60,8 +117,8 @@ export const petStage = (level: number) => PET_STAGES.filter((l) => level >= l).
 /** Share of the owner's experience the summoned pet gains. */
 export const PET_EXP_SHARE = 0.15;
 export const petExpToNext = (level: number) => Math.round(120 * Math.pow(level, 1.35));
-/** The pet's bonus: from base to top over levels 1-20, then a quarter of the top more at each evolution. */
-export const petBonus = (d: PetDef, level: number) => Math.round((d.base + ((d.top - d.base) * (Math.min(level, 20) - 1)) / 19 + d.top * 0.25 * petStage(level)) * 10) / 10;
+/** The pet's bonus: from base to top over levels 1-20, then a quarter of the top more at each evolution; the tier multiplies it. */
+export const petBonus = (d: PetDef, level: number, tier = 0) => Math.round((d.base + ((d.top - d.base) * (Math.min(level, 20) - 1)) / 19 + d.top * 0.25 * petStage(level)) * petTierMul(tier) * 10) / 10;
 export const PET_NAME = /^[A-Za-z][A-Za-z ]{1,13}$/;
 
 export interface MountDef {
@@ -97,6 +154,11 @@ export interface OwnedPet {
   name: string;
   level: number;
   exp: number;
+  /** Tier (0 Normal .. 4 Mythic) and the tier exp toward the next. */
+  tier: number;
+  tx: number;
+  /** Grade: 30-100, a percentage of the tier's flat bonus, rolled once. */
+  gr: number;
 }
 export interface Companions {
   pets: OwnedPet[];
@@ -109,14 +171,20 @@ export interface Companions {
 export const emptyCompanions = (): Companions => ({ pets: [], pet: '', mounts: [], riding: '' });
 export const MAX_PETS = 24;
 
-export function cleanCompanions(raw: unknown): Companions {
+/** Restores a saved collection. A pet saved before grades existed gets its grade rolled now, once. */
+export function cleanCompanions(raw: unknown, rng: () => number = Math.random): Companions {
   const r = (raw && typeof raw === 'object' ? raw : {}) as any, out = emptyCompanions(), uids = new Set<string>();
   if (Array.isArray(r.pets))
     for (const p of r.pets.slice(0, MAX_PETS)) {
       if (!p || !PETS[p.kind] || typeof p.uid !== 'string' || p.uid.length > 40 || uids.has(p.uid)) continue;
       uids.add(p.uid);
       const level = Number.isInteger(p.level) ? Math.max(1, Math.min(PET_MAX_LEVEL, p.level)) : 1;
-      out.pets.push({ uid: p.uid, kind: p.kind, name: typeof p.name === 'string' && PET_NAME.test(p.name) ? p.name : PETS[p.kind].name, level, exp: Number.isInteger(p.exp) && p.exp > 0 && level < PET_MAX_LEVEL ? Math.min(p.exp, petExpToNext(level) - 1) : 0 });
+      const tier = Number.isInteger(p.tier) ? Math.max(0, Math.min(MAX_PET_TIER, p.tier)) : 0;
+      out.pets.push({
+        uid: p.uid, kind: p.kind, name: typeof p.name === 'string' && PET_NAME.test(p.name) ? p.name : PETS[p.kind].name, level, exp: Number.isInteger(p.exp) && p.exp > 0 && level < PET_MAX_LEVEL ? Math.min(p.exp, petExpToNext(level) - 1) : 0,
+        tier, tx: Number.isInteger(p.tx) && p.tx > 0 && tier < MAX_PET_TIER ? Math.min(p.tx, PET_TIER_NEED[tier] - 1) : 0,
+        gr: Number.isInteger(p.gr) && p.gr >= 30 && p.gr <= 100 ? p.gr : rollGrade(rng),
+      });
     }
   if (typeof r.pet === 'string' && uids.has(r.pet)) out.pet = r.pet;
   if (Array.isArray(r.mounts)) out.mounts = [...new Set(r.mounts.filter((m: unknown) => typeof m === 'string' && MOUNTS[m]))] as string[];
@@ -126,9 +194,12 @@ export function cleanCompanions(raw: unknown): Companions {
 export function applyCompanions(s: Stats, c: Companions) {
   const owned = c.pet ? c.pets.find((p) => p.uid === c.pet) : undefined, def = owned && PETS[owned.kind];
   if (def) {
-    const v = petBonus(def, owned!.level);
+    const v = petBonus(def, owned!.level, owned!.tier);
     if (def.pct) s[def.stat] = Math.round(s[def.stat] * (1 + v / 100));
     else s[def.stat] = Math.round((s[def.stat] + v) * 10) / 10;
+    // the grade's flat bonus (no percentage)
+    const f = petFlat(def, owned!);
+    s[def.stat] = def.stat === 'crit' || def.stat === 'dodge' ? Math.round((s[def.stat] + f) * 10) / 10 : s[def.stat] + f;
   }
   if (c.riding && MOUNTS[c.riding]) s.moveMul = Math.round(s.moveMul * MOUNTS[c.riding].speed * 1000) / 1000;
 }

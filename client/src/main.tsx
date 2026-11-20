@@ -73,6 +73,7 @@ import { abilityFacts, SkillFacts } from './skillInfo';
 import { CtxMenu } from './ctxmenu';
 import { TouchControls } from './touch';
 import { FullscreenAsk, PortraitCover } from './fullscreen';
+import { useTouch } from './touch';
 
 interface Character {
   id: number;
@@ -588,10 +589,35 @@ function Slot({ def: base, hotkey, hud, game, locked, combo, gauge }: { def: Abi
   );
 }
 
+/** Skills on the touch wheel at once (more are on further pages). */
+const WHEEL = 4;
 function Hotbar({ hud, game }: { hud: Hud; game: Game }) {
   useT();
   useSyncExternalStore(settings.subscribe, settings.get); // key labels follow the bindings
   const me = hud.self!, b = hud.build!, s = hud.stats!;
+  const touch = useTouch();
+  const [page, setPage] = useState(0);
+  if (touch) {
+    // Touch: a wheel of four around the attack button, with pages, holding only what can be used
+    const list: React.ReactNode[] = [];
+    jobActives(me.job).forEach((def, i) => { if (b.skills[def.id] > 0) list.push(<Slot key={def.id} def={def} hotkey={keyOf(`skill.${i + 1}` as Action)} hud={hud} game={game} locked="" combo={comboNext(hud, me.job) === def.id} />); });
+    if (PATH_INDEX[hud.asc.path] && me.level >= ASCENSION_LEVEL)
+      list.push(<Slot key="ult" def={ABILITIES[PATH_INDEX[hud.asc.path].ult]} hotkey={keyOf('ultimate')} hud={hud} game={game} locked={hud.ult >= ULT_MAX ? '' : t('asc.charging', { n: Math.floor(hud.ult) })} gauge={hud.ult / ULT_MAX} />);
+    if (me.level >= FUSION_LEVEL) fusionsFor(b.runes.slots).slice(0, 3).forEach((f, i) => {
+      const lv = Math.min(...f.els.map((el) => (b.runes.slots.includes(el) ? (b.runes.lv[el] ?? 1) + s.runeLevel : 0)));
+      if (lv >= FUSION_RUNE_LEVEL) list.push(<Slot key={f.id} def={f} hotkey={keyOf(`fusion.${i + 1}` as Action)} hud={hud} game={game} locked="" />);
+    });
+    b.runes.slots.forEach((el, sl) => el && runeSpells(el).forEach((def, i) => {
+      if ((b.runes.lv[el] ?? 1) + s.runeLevel >= def.unlock!) list.push(<Slot key={def.id} def={def} hotkey={runeKey(sl, i)} hud={hud} game={game} locked="" />);
+    }));
+    const pages = Math.max(1, Math.ceil(list.length / WHEEL)), p = page % pages;
+    return (
+      <div className="touchwheel" role="toolbar" aria-label={t('hotbar.label')}>
+        {list.slice(p * WHEEL, p * WHEEL + WHEEL).map((el, i) => <div key={i} className={'wheelpos w' + i}>{el}</div>)}
+        {pages > 1 && <button className="wheelpage" aria-label={t('touch.page', { n: p + 1, of: pages })} onClick={() => setPage(p + 1)}>{p + 1}/{pages}</button>}
+      </div>
+    );
+  }
   return (
     <div className="hud hotbar" role="toolbar" aria-label={t('hotbar.label')}>
       <div className="slots">

@@ -72,9 +72,12 @@ export function TouchControls({ hud }: { hud: Hud; game: Game }) {
       <Stick />
       <div className="tbtns">
         <Btn action="attack" icon="sword" label={t('ctl.attack')} big />
+      </div>
+      <div className="tutil">
         <Btn action="interact" icon="hero" label={hud.near ? hud.near.hint : t('ctl.interact')} off={!hud.near} />
         <Btn action="target" icon="target" label={t('ctl.target')} />
         <Btn action="potion.hp" icon="pot" label={t('touch.potion')} />
+        <Btn action="potion.mp" icon="drop" label={t('touch.potionMp')} />
         <Btn action="dodge" icon="burst" label={t('touch.dodge')} />
       </div>
     </div>

@@ -30,6 +30,16 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
+  # Optional public address through a Cloudflare Tunnel (see deploy/CLOUDFLARE.md, option C):
+  #   docker compose -f deploy/docker-compose.yml --profile tunnel up -d   (needs CF_TUNNEL_TOKEN in deploy/.env)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:-}
+    depends_on: [game]
+    restart: unless-stopped
   backup:
     image: postgres:16
     environment:

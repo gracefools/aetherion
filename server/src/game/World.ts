@@ -210,6 +210,8 @@ export class Player implements Ent {
   gold = 0;
   kit = false;
   invDirty = false;
+  /** T7: the character's inventory saves, one after another, so an older save never lands after a newer one. */
+  saving: Promise<unknown> = Promise.resolve();
   potionReady = 0;
   /** Unique passives granted by equipped items. */
   passives: string[] = [];
@@ -554,7 +556,7 @@ export class World implements CombatCtx {
     await this.repo.saveState(all.map(saveRow));
     await Promise.all(all.filter((p) => p.buildDirty).map((p) => this.repo.saveBuild(p.id, p.build.skills, p.build.runes)));
     await Promise.all(all.filter((p) => p.discDirty).map((p) => this.repo.saveDiscoveries(p.id, [...p.disc])));
-    await Promise.all(all.filter((p) => p.invDirty).map((p) => this.repo.saveItems(this.snapshot(p))));
+    await Promise.all(all.map((p) => (p.invDirty ? this.saveInv(p) : p.saving))); // and any save still under way
     await Promise.all(all.filter((p) => p.progDirty).map((p) => this.repo.saveProgress(p.id, p.quests, p.rep, p.comp, p.journal, p.asc, p.life)));
     await this.guilds.save();
     for (const p of all) p.conn?.close();
@@ -1029,10 +1031,7 @@ export class World implements CombatCtx {
       p.discDirty = false;
       this.repo.saveDiscoveries(p.id, [...p.disc]).catch((e) => console.error('discoveries save failed', e));
     }
-    if (p.invDirty) {
-      p.invDirty = false;
-      this.repo.saveItems(this.snapshot(p)).catch((e) => console.error('inventory save failed', e));
-    }
+    if (p.invDirty) this.saveInv(p);
     if (p.progDirty) {
       p.progDirty = false;
       this.repo.saveProgress(p.id, p.quests, p.rep, p.comp, p.journal, p.asc, p.life).catch((e) => console.error('progress save failed', e));
@@ -2093,8 +2092,23 @@ export class World implements CombatCtx {
     }
   }
 
+  /**
+   * T7: stores a character's gold, bag, equipment and bank now. The snapshot is taken at once; the
+   * write waits for the character's previous one, so saves land in order.
+   */
+  saveInv(p: Player) {
+    p.invDirty = false;
+    const snap = this.snapshot(p);
+    p.saving = p.saving.then(() => this.repo.saveItems(snap)).catch((e) => {
+      console.error('inventory save failed', e);
+      p.invDirty = true; // try again on the next pass
+    });
+    return p.saving;
+  }
   private housekeep(now: number) {
     this.lastHousekeep = now;
+    // T7: loot, gold and trades are stored within a second of happening, not at the next autosave
+    for (const p of this.online.values()) if (p.invDirty) this.saveInv(p);
     for (const p of this.online.values()) {
       if (p.chatTokens < 5) p.chatTokens += 0.5; // 5 burst, 1 message / 2s sustained
       if (!p.conn && p.disconnectedAt && now - p.disconnectedAt >= this.opts.reconnectGraceMs) this.despawn(p);

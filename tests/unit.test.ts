@@ -1672,7 +1672,7 @@ test('gear tiers: better armour and weapons make the character look grander, pla
   assert.notEqual(appearanceKey(p.ap, 'knight'), appearanceKey({ ...p.ap, gt: 0 }, 'knight'), 'a new look, a new sprite sheet');
 });
 
-test('M6 starter kit is granted once; equipped gear changes stats, weapon specialisation and appearance', () => {
+test('M6 starter kit is granted once; equipped gear changes stats, weapon specialisation and appearance', async () => {
   const { world, join, step, items } = harness({ kit: true });
   const a = join(0, 0, 'knight', 5), b = join(40, 0, 'mage');
   const w0 = a.out.find((m) => m.t === 'welcome');
@@ -1684,8 +1684,10 @@ test('M6 starter kit is granted once; equipped gear changes stats, weapon specia
   // rejoining does not grant the kit again
   world.disconnect(a.p, a.conn);
   step(2);
-  assert.equal(items.at(-1).equipment.kit, true, 'the kit flag is saved');
-  const again = world.join({ ...a.row, inventory: items.at(-1).inventory, equipment: items.at(-1).equipment, gold: 0 }, a.conn);
+  await a.p.saving; // T7: saves are written in order, a moment later
+  const mine = items.filter((r) => r.id === a.p.id).at(-1);
+  assert.equal(mine.equipment.kit, true, 'the kit flag is saved');
+  const again = world.join({ ...a.row, inventory: mine.inventory, equipment: mine.equipment, gold: 0 }, a.conn);
   assert.deepEqual(again.inv.map((i) => [i.base, i.qty]), [['hp_potion', 3]]);
   // equip a greatsword: weapon slot 1 -> different weapon rule, visible to others
   step(2);
@@ -1929,6 +1931,7 @@ test('M6 persistence: inventory, equipment and gold are saved on logout and by a
   await (world as any).autosave?.();
   world.disconnect(p, conn);
   step(2);
+  await p.saving;
   const rec = items.filter((r) => r.id === p.id).at(-1);
   assert.ok(rec, 'saved');
   assert.equal(rec.gold, 777);
@@ -2699,6 +2702,23 @@ test('sigils lift passives past their maximum rank; fusions join auto hunting at
   assert.deepEqual(autoAbilities('mage', build, 90).filter((d) => d.kind === 'fusion').map((d) => d.id), ['fu_steam']);
   assert.equal(cleanAutoConfig({}).ult, true, 'the ultimate is used automatically by default');
   assert.equal(cleanAutoConfig({ ult: false }).ult, false, 'and can be switched off');
+});
+
+test('T7: loot and gold are saved within a second, in order, without waiting for the autosave', async () => {
+  const h = harness({ capacity: 10 }), { world, items } = h, p = h.join(0, 0, 'knight', 10).p;
+  items.length = 0;
+  p.gold += 500;
+  p.invDirty = true;
+  (world as any).housekeep(Date.now());
+  await p.saving;
+  assert.equal(items.length, 1, 'stored at the next housekeeping pass (once a second)');
+  assert.equal(items[0].gold, p.gold);
+  // two changes in a row: both are stored, in the order they happened
+  p.gold += 1; world.saveInv(p);
+  p.gold += 1; world.saveInv(p);
+  await p.saving;
+  assert.deepEqual(items.slice(-2).map((s: any) => s.gold), [p.gold - 1, p.gold]);
+  assert.equal(p.invDirty, false);
 });
 
 test('M8 gathering: range and cooldown per node, shared by the channel, respawning; no energy or daily limit', () => {

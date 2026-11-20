@@ -149,3 +149,39 @@ export function AscensionPanel({ game, onClose }: { game: Game; onClose: () => v
     </div>
   );
 }
+
+/**
+ * The ascension at a glance, for the character sheet: the path and its milestones, what the path
+ * adds now and at the next milestone, the mastery points spent and what they give, and the skills
+ * awakened. Read-only; choices are made in the Ascension panel.
+ */
+export function AscensionSummary({ hud }: { hud: Hud }) {
+  useT();
+  const me = hud.self, a = hud.asc;
+  if (!me) return null;
+  const n = milestonesAt(me.level), path = PATH_INDEX[a.path], next = MILESTONES.find((m) => m > me.level);
+  const mastery = MASTERY_STATS.filter((k) => (a.mastery[k] ?? 0) > 0);
+  return (
+    <div className="ascsum">
+      <div className="ascsum-head">
+        <b>{path ? path.title : me.level < ASCENSION_LEVEL ? t('asc.sumLocked', { n: ASCENSION_LEVEL }) : t('asc.pickOne')}</b>
+        <ol className="milestones" aria-label={t('asc.milestones', { list: MILESTONES.join(' · '), n })}>
+          {MILESTONES.map((m) => <li key={m} className={me.level >= m ? 'on' : ''}><i /><small>{t('common.lv', { n: m })}</small></li>)}
+        </ol>
+      </div>
+      {path && (
+        <div className="chips">
+          {n > 0 ? <span className="chip better">{t('asc.bonusNow', { n })}: {pathBonusText(path, n)}</span> : <span className="chip">{t('asc.sumNone')}</span>}
+          {next && <span className="chip">{t('asc.sumNext', { lv: next })}: {pathBonusText(path, n + 1)}</span>}
+        </div>
+      )}
+      {mastery.length > 0 && (
+        <div className="chips">
+          <span className="sub">{t('asc.mastery')}:</span>
+          {mastery.map((k) => <span key={k} className="chip">{t(STAT_KEY[k] as any)} +{Math.round((a.mastery[k] ?? 0) * MASTERY_VALUE[k] * 10) / 10}{k === 'crit' ? '' : '%'}</span>)}
+        </div>
+      )}
+      {a.awake.length > 0 && <p className="sub">{t('asc.sumAwake', { n: a.awake.length, list: a.awake.map((id) => ABILITIES[id]?.name ?? id).join(', ') })}</p>}
+    </div>
+  );
+}

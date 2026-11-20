@@ -441,6 +441,64 @@ export class AudioEngine {
     return false;
   }
   /** Plays an effect. Returns false when it was skipped (muted, out of range, throttled, not loaded). */
+  /**
+   * A modern impact layer, synthesized: a deep thump that drops in pitch, a short crisp transient
+   * of filtered noise, and for a critical hit a bright ring. Played under the hit sample so a blow
+   * lands with weight. Goes through the effects bus, its volume and stereo position like any effect.
+   */
+  private noise: AudioBuffer | null = null;
+  private lastPunch = -1e9;
+  punch(o: { dx?: number; dy?: number; vol?: number; crit?: boolean } = {}): boolean {
+    const ctx = this.ctx;
+    if (!ctx || this.state !== 'running' || !this.sfxBus || !this.settings.sfxOn || this.settings.muteAll) return false;
+    // many blows at once (an area attack) make one punch, not a roar
+    const at = performance.now();
+    if (at - this.lastPunch < 40) return false;
+    this.lastPunch = at;
+    let vol = (o.vol ?? 1) * (o.crit ? 1.25 : 1), pan = 0;
+    if (o.dx !== undefined) { const s = spatial(o.dx, o.dy ?? 0); if (s.vol < 0.02) return false; vol *= s.vol; pan = s.pan; }
+    const t = ctx.currentTime, out = ctx.createGain(), p = ctx.createStereoPanner();
+    out.gain.value = 0.55 * vol;
+    p.pan.value = pan;
+    out.connect(p).connect(this.sfxBus);
+    // the thump: a sine falling from 150 Hz to 48 Hz with a quick decay
+    const sub = ctx.createOscillator(), sg = ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(o.crit ? 170 : 150, t);
+    sub.frequency.exponentialRampToValueAtTime(48, t + 0.11);
+    sg.gain.setValueAtTime(0.0001, t);
+    sg.gain.exponentialRampToValueAtTime(0.9, t + 0.004);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    sub.connect(sg).connect(out);
+    sub.start(t); sub.stop(t + 0.18);
+    // the transient: 30 ms of noise through a band-pass, the snap of contact
+    if (!this.noise) {
+      this.noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.05), ctx.sampleRate);
+      const d = this.noise.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
+    n.buffer = this.noise;
+    bp.type = 'bandpass'; bp.frequency.value = o.crit ? 3600 : 2400; bp.Q.value = 0.9;
+    ng.gain.setValueAtTime(0.7, t);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+    n.connect(bp).connect(ng).connect(out);
+    n.start(t); n.stop(t + 0.05);
+    // a critical hit rings: a bright triangle sliding down
+    if (o.crit) {
+      const r = ctx.createOscillator(), rg = ctx.createGain();
+      r.type = 'triangle';
+      r.frequency.setValueAtTime(1500, t);
+      r.frequency.exponentialRampToValueAtTime(700, t + 0.22);
+      rg.gain.setValueAtTime(0.0001, t);
+      rg.gain.exponentialRampToValueAtTime(0.28, t + 0.01);
+      rg.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      r.connect(rg).connect(out);
+      r.start(t); r.stop(t + 0.3);
+    }
+    setTimeout(() => { try { out.disconnect(); p.disconnect(); } catch { /* already gone */ } }, 400);
+    return true;
+  }
   play(id: string, o: PlayOpts = {}): boolean {
     const ctx = this.ctx, e = this.manifest.get(id);
     if (!ctx || !e || this.state !== 'running' || !this.sfxBus) return false;

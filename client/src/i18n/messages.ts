@@ -319,6 +319,9 @@ mailCountItems: m('Taken from the letter: {a} gold and {b} items.', 'Diambil dar
   mBack: m('Someone did not accept the match: you are back in line, in your place.', 'Ada yang tidak menerima laga: kamu kembali mengantre, di tempatmu semula.'),
   boundTrade: m('Bound items cannot be traded', 'Barang terikat tidak bisa diperdagangkan'), boundMarket: m('Bound items cannot be sold on the market', 'Barang terikat tidak bisa dijual di pasar'),
   boundMail: m('Bound items cannot be sent by mail', 'Barang terikat tidak bisa dikirim lewat surat'),
+  zoneLevel: m('{a} is for level {b} and up', '{a} untuk level {b} ke atas'),
+  gatherStop: m('Gathering was interrupted.', 'Mengumpulkan terhenti.'),
+  scrollsEldoria: m('Rune Scrolls are sold only by the Rune Merchant of Eldoria', 'Gulungan Rune hanya dijual oleh Pedagang Rune di Eldoria'),
   matchWon: m('Victory!', 'Menang!'), matchLost: m('Defeat.', 'Kalah.'), matchDraw: m('A draw.', 'Seri.'),
 
   // ---- companions ----

@@ -128,7 +128,9 @@ class GameSound {
     }
     if (d.flags & Dmg.Crit) audio.play('combat.critical_hit', pos);
     if (!d.targetMt) return void audio.play('combat.physical_hit', { ...pos, vary: 0.07 });
-    audio.play('combat.monster_hit', { ...pos, vary: 0.1, vol: d.byMe ? 1 : 0.7 });
+    // a modern blow: the synthesized punch carries the weight, the sample the texture of the hit
+    audio.punch({ ...pos, vol: d.byMe ? 1 : 0.55, crit: !!(d.flags & Dmg.Crit) });
+    audio.play('combat.monster_hit', { ...pos, vary: 0.1, vol: d.byMe ? 0.7 : 0.5 });
     // the local player's weapon is heard landing; ranged weapons land a moment after the release
     if (d.byMe && d.basic) {
       const w = weaponOf(d.job, d.weapon);

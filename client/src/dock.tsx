@@ -151,10 +151,11 @@ export function Dock({ hud, act, open }: { hud: Hud; act: DockActions; open: Par
   const charId = hud.self?.id ?? 0;
   const [seen, setSeen] = useState(() => seenMenus(charId)) as [Set<string>, (s: Set<string>) => void];
   const fresh = seen.size === 0;
-  const visible = groups.map(([g, items]) => [g, items.filter((it) => !menuLock(it.id, hud))] as [Key, Item[]]).filter(([, items]) => items.length);
+  // locked menus stay in their place, greyed with a lock and the level that opens them
+  const visible = groups;
   useEffect(() => {
     if (!fresh || !charId) return;
-    const all = new Set(visible.flatMap(([, items]) => items.map((it) => it.id as string)));
+    const all = new Set(visible.flatMap(([, items]) => items.filter((it) => !menuLock(it.id, hud)).map((it) => it.id as string)));
     markSeen(charId, all);
     setSeen(all);
   }, [fresh, charId]);
@@ -168,12 +169,21 @@ export function Dock({ hud, act, open }: { hud: Hud; act: DockActions; open: Par
   };
   return (
     <nav className={'hud dock' + (mini ? ' mini' : '')} aria-label={t('dock.title')}>
+      <div className="dockabove" />
       {visible.map(([g, items]) => (
         <div key={g} className="dockgroup" role="group" aria-label={t(g)}>
           <span className="docklabel">{t(g)}</span>
           <div className="dockrow">
             {items.map((it) => {
               const key = it.action ? keyOf(it.action) : '';
+              const lock = menuLock(it.id, hud);
+              if (lock) return (
+                <button key={it.id} className="dockbtn locked" disabled aria-disabled="true" aria-label={`${t(it.aria ?? it.label)} · ${t('dock.locked', { n: lock })}`} title={`${t(it.label)} · ${t('dock.locked', { n: lock })}`}>
+                  <span className="dockicon" aria-hidden="true"><Icon name={it.icon} size={20} /></span>
+                  <span className="dockname">{t(it.label)}</span>
+                  <i className="docklock" aria-hidden="true"><Icon name="lock" size={10} />{lock}</i>
+                </button>
+              );
               const isNew = !fresh && !seen.has(it.id);
               return (
                 <button key={it.id} className={'dockbtn' + (open[it.id] || it.on ? ' on' : '') + (isNew ? ' new' : '')} onClick={() => click(it)} aria-label={t(it.aria ?? it.label)} aria-pressed={it.id === 'exit' ? undefined : !!(open[it.id] || it.on)}

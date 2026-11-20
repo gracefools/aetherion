@@ -9,7 +9,6 @@ import { ITEMS, type ItemSpec } from '../../../shared/src/items';
 import { award, consume, count, give, sendInv } from './Inventory';
 import type { Monster } from './Monster';
 import type { Player, World } from './World';
-import { bindSpec } from '../../../shared/src/items';
 
 const TALK_RANGE = INTERACT_RANGE * 2.2;
 const spec = (base: string, qty: number): ItemSpec => ({ base, rar: 0, ilvl: 1, aff: [], up: 0, qty });
@@ -97,7 +96,7 @@ export class Quests {
         s.hist.unshift({ id: q.id, at: now });
         if (s.hist.length > HISTORY_SIZE) s.hist.length = HISTORY_SIZE;
         this.w.grantExp(p, Math.round(q.reward.exp));
-        award(this.w, p, Math.round(q.reward.gold * this.w.goldRate), q.reward.items.map(([b, n]) => spec(b, n)));
+        award(this.w, p, Math.round(q.reward.gold * this.w.goldRate), q.reward.items.map(([b, n]) => spec(b, n)), false, '', true);
         for (const [f, n] of q.reward.rep) this.addRep(p, f, n);
         this.w.send(p, { t: 'sys', text: `Quest complete: ${q.name}. ${q.reward.exp} EXP, ${Math.round(q.reward.gold * this.w.goldRate)} gold.`, cue: 'questdone' });
         this.w.journals.onQuest(p);
@@ -127,7 +126,7 @@ export class Quests {
         const [base, price, need] = line, have = repLevel(p.rep[f.id] ?? 0);
         if (have < need) return `Requires ${REP_LEVELS[need].name} reputation with ${f.name}`;
         if (p.gold < price) return 'Not enough gold';
-        if (!give(p, bindSpec(spec(base, 1)))) return 'Inventory is full';
+        if (!give(p, spec(base, 1))) return 'Inventory is full';
         p.gold -= price;
         p.invDirty = true;
         sendInv(this.w, p);
@@ -149,7 +148,7 @@ export class Quests {
       // faction announcement: everyone nearby hears it, the player gets the faction's gift
       this.w.announce(p.room, `${p.name} is now ${REP_LEVELS[l].name} with ${f.name}.`, 'rep');
       const gift = REP_GIFT[l];
-      if (gift) award(this.w, p, 0, gift.map(([b, k]) => spec(b, k)));
+      if (gift) award(this.w, p, 0, gift.map(([b, k]) => spec(b, k)), false, '', true);
     }
   }
 

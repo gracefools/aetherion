@@ -122,6 +122,10 @@ export const levelTier = (level: number) => Math.max(1, Math.ceil(level / LEVEL_
 export const expToNext = (level: number) => Math.round(40 * Math.pow(level, 1.8) * 3 ** (levelTier(level) - 1));
 /** Damage after armour. Diminishing: every 25 defence is another "100% effective HP" step. */
 export const mitigate = (raw: number, def: number) => (raw * 100) / (100 + Math.max(0, def) * 4);
+/** Normal and elite monsters have this much more health than their table says (bosses as listed). */
+export const MOB_HP_MUL = 2;
+/** Damage over time that defence turns aside like a blow: poison and bleeding by defence, burns by magic defence. */
+export const DOT_MAGIC: Record<string, boolean> = { poison: false, bleed: false, burn: true };
 export const missChance = (attackerLevel: number, targetLevel: number) => Math.max(2, Math.min(25, 5 + (targetLevel - attackerLevel) * 2));
 /**
  * Share of a monster's EXP received by level difference. Monsters at your level or above, or up

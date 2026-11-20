@@ -90,7 +90,7 @@ export function clearStatuses(e: Ent) {
 }
 
 /** Expires statuses and returns damage-over-time ticks to apply: [amount, srcId] pairs. */
-export function tickStatuses(e: Ent, tick: number, out: number[]) {
+export function tickStatuses(e: Ent, tick: number, out: number[], kinds?: string[]) {
   if (!e.st.length) return;
   let changed = false;
   for (let i = e.st.length - 1; i >= 0; i--) {
@@ -104,6 +104,7 @@ export function tickStatuses(e: Ent, tick: number, out: number[]) {
     if (dot && tick >= s.nextDot) {
       s.nextDot += 20;
       out.push(Math.max(1, Math.round(s.power * dot * s.stacks)), s.src);
+      kinds?.push(STATUS[s.i].id);
     }
   }
   if (changed) refresh(e);

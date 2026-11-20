@@ -218,6 +218,7 @@ export function invOp(w: World, p: Player, m: any): string {
       const b = typeof m.base === 'string' && (SHOP_STOCK.includes(m.base) || SHOP_COMPANIONS.includes(m.base) || rune) ? ITEMS[m.base] : undefined;
       if (!b) return 'Not for sale';
       if (rune ? !nearRunesmith(p) : !nearShop(p)) return rune ? 'You need to be at the Rune Merchant' : 'You need to be at a shop';
+      if (rune && p.room.zoneId !== 'eldoria') return 'Rune Scrolls are sold only by the Rune Merchant of Eldoria';
       // some things are sold once to each character: one starter pet, the first mount, one of each scroll
       const once = SHOP_ONCE[b.id], n = once ? 1 : qty;
       if (once && p.journal.s.b.includes(once)) return 'You have already bought that; a shop sells it only once';
@@ -413,7 +414,7 @@ export function sortInventory(p: Player, by: SortKey) {
  * auto hunting, their loot rules decide which of those items are collected at all.
  */
 /** `mailOverflow`: items that do not fit are sent by mail with this subject instead of being left behind. */
-export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunted = false, mailOverflow = '') {
+export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunted = false, mailOverflow = '', bound = false) {
   gold = Math.round(gold * w.guilds.bonus(p, 'treasury'));
   const got: ItemSpec[] = [];
   let full = false;
@@ -422,8 +423,8 @@ export function award(w: World, p: Player, gold: number, items: ItemSpec[], hunt
     p.autoStats.skipped += items.length - keep.length;
     items = keep;
   }
-  // rewards (anything but what monsters drop) come bound
-  if (!hunted) items = items.map(bindSpec);
+  // quest rewards come bound; everything else stays tradable until it is worn
+  if (bound) items = items.map(bindSpec);
   const left: ItemSpec[] = [];
   for (const s of items) (give(p, s) ? got : ((full = true), left)).push(s);
   if (hunted && p.autoOn) {

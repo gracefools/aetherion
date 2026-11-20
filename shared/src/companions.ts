@@ -88,6 +88,8 @@ export const FLY_LEVEL = 120;
 export const isFlying = (c: Companions | null | undefined) => !!c?.riding && !!MOUNTS[c.riding]?.fly;
 /** Riding is not possible inside dungeon instances and the arena (their zones are of kind 'dungeon'). */
 export const MOUNT_FORBIDDEN_KINDS = ['dungeon'];
+/** After moving this long without a pause, a player who owns a mount climbs onto it. */
+export const AUTO_MOUNT_MS = 3000;
 
 export interface OwnedPet {
   uid: string;

@@ -23,6 +23,8 @@ export interface WorldObj {
 }
 export const INTERACT_RANGE = 64;
 export const NODE_RESPAWN_MS = 45000;
+/** Gathering takes this long, standing still and out of combat. */
+export const GATHER_MS = 5000;
 export const WAYSTONE_RANGE = 220;
 export const isNpc = (o: WorldObj) => o.kind === 'merchant' || o.kind === 'waykeeper' || o.kind === 'lorekeeper' || o.kind === 'runesmith' || o.kind === 'banker' || o.kind === 'arenamaster' || o.kind === 'riftwarden' || o.kind === 'raidherald' || o.kind === 'steward';
 /** How close a player must stand to the Rune Merchant to buy. */
@@ -154,14 +156,26 @@ export function zoneObjects(zoneId: string): WorldObj[] {
   const rnd = mulberry(def.seed ^ 0x9e3779b9);
   const far = (x: number, y: number, min: number) => Math.hypot(x - tx, y - ty) >= min && Math.hypot(x - def.spawn.tx, y - def.spawn.ty) >= min && list!.every((o) => Math.hypot(o.x / TILE - x, o.y / TILE - y) >= 7);
   const open = (x: number, y: number) => seen[x + y * map.w] && tileAt(map, x, y) === T.Grass;
-  // Resource nodes: eight per region, spread over reachable grass.
+  // Resource nodes: two gathering spots per region, always in the same places, four nodes each:
+  // one for the region's first resource and one for its second (a mine, a meadow...), so a player
+  // learns where to go rather than searching the whole map.
   const res = REGION_RES[zoneId] ?? ['iron_ore', 'moonleaf'];
-  for (let n = 0, tries = 0; n < 8 && tries < 4000; tries++) {
-    const x = 3 + Math.floor(rnd() * (map.w - 6)), y = 3 + Math.floor(rnd() * (map.h - 6));
-    if (!open(x, y) || !far(x, y, 12)) continue;
-    const r = res[n % 4 === 3 ? 1 : 0];
-    list.push({ id: `node:${zoneId}:${n}`, kind: 'node', name: NODE_NAMES[r], zone: zoneId, x: tileCenter(x), y: tileCenter(y), res: r });
-    n++;
+  let n = 0;
+  for (let spot = 0; spot < 2; spot++) {
+    const r = res[spot];
+    for (let tries = 0; tries < 4000; tries++) {
+      const cx = 6 + Math.floor(rnd() * (map.w - 12)), cy = 6 + Math.floor(rnd() * (map.h - 12));
+      if (!open(cx, cy) || !far(cx, cy, 14)) continue;
+      // the spot's nodes: open, reachable grass within a few tiles of its centre, two tiles apart
+      const here: [number, number][] = [];
+      for (let k = 0; k < 60 && here.length < 4; k++) {
+        const x = cx + Math.round((rnd() - 0.5) * 7), y = cy + Math.round((rnd() - 0.5) * 7);
+        if (open(x, y) && here.every(([hx, hy]) => Math.hypot(hx - x, hy - y) >= 2)) here.push([x, y]);
+      }
+      if (here.length < 4) continue;
+      for (const [x, y] of here) list.push({ id: `node:${zoneId}:${n++}`, kind: 'node', name: NODE_NAMES[r], zone: zoneId, x: tileCenter(x), y: tileCenter(y), res: r });
+      break;
+    }
   }
   // Hidden caches: the most enclosed reachable spots far from any road (best of many candidates).
   const hidden = (x: number, y: number) => {

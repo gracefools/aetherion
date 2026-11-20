@@ -237,7 +237,7 @@
   .pin { font-style: normal; line-height: 1; }
   .regionview .pin { position: absolute; transform: translate(-50%, -50%); font-size: 14px; text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: auto; cursor: default; }
   .pin.you { color: #ffd24a; font-size: 18px; } .pin.party { color: #5fb8ff; } .pin.town { color: #f0e6c8; } .pin.waystone { color: #c9a8ff; }
-  .pin.dungeon { color: #ff9a6a; } .pin.hunt { color: #e2523f; font-size: 11px; } .pin.elite { color: #ffb347; } .pin.boss { color: #ff5a5a; font-size: 18px; }
+  .pin.gather { color: #9af0b0; font-size: 13px; text-shadow: 0 0 6px rgba(150,255,170,.8); } .pin.dungeon { color: #ff9a6a; } .pin.hunt { color: #e2523f; font-size: 11px; } .pin.elite { color: #ffb347; } .pin.boss { color: #ff5a5a; font-size: 18px; }
   .pin.exit { color: #9fe0a0; } .pin.marker { color: #5fd3c0; } .pin.marker.draft { opacity: .7; } .pin.pvp { color: #ff6a50; font-size: 18px; }
   .coach { position: absolute; z-index: 1; left: 10px; bottom: 210px; width: 270px; font-size: 13px; padding: 8px 10px !important; border-color: #5a4a2a; pointer-events: auto; }
   .coach p { margin: 4px 0; } .coach .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0; }
@@ -613,6 +613,30 @@
   .emptyrune b { font-size: 18px; line-height: 1; } .emptyrune small { position: absolute; right: 3px; bottom: 1px; font-size: 9px; }
   /* between the chat (left) and the menu dock (right) on narrower screens the hotbar shrinks to fit */
   @media (min-width: 901px) and (max-width: 1500px) { .hotbar { transform: translateX(-50%) scale(.82); transform-origin: 50% 100%; } }
+  /* the minimap opens the world map */
+  .rail .minimap { pointer-events: auto; cursor: pointer; } .rail .minimap:hover { box-shadow: 0 0 0 1px #0b0d14, 0 0 0 2px rgba(255,224,138,.75); }
+  /* chat: every tab stays in view, wrapping onto a second line rather than scrolling sideways */
+  .chattabs { flex-wrap: wrap; overflow: visible !important; row-gap: 3px; } .chattab { padding: 3px 7px !important; }
+  /* a locked menu: visible in its place, greyed, with the level that opens it */
+  .dockbtn.locked { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
+  .dockbtn.locked .docklock { position: absolute; right: 1px; bottom: 0; display: inline-flex; align-items: center; gap: 1px; font: 700 8px/1 system-ui, sans-serif; color: #e8e4dc; font-style: normal; text-shadow: 0 0 2px #000; }
+  /* the skill points reminder rides on top of the dock, so an expanded dock never covers it */
+  .dock .dockabove { position: absolute; right: 0; bottom: calc(100% + 6px); display: flex; justify-content: flex-end; pointer-events: none; }
+  .dock .dockabove .pointsbtn { position: static !important; pointer-events: auto; right: auto !important; bottom: auto !important; }
+  .ascsum { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid #3a3f55; border-radius: 8px; background: rgba(201,162,74,.06); margin-bottom: 8px; }
+  .ascsum-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; } .ascsum-head b { color: #ffe08a; font: 600 15px Georgia, serif; }
+  .ascsum .milestones { --hue: #c9a24a; }
+  /* the controls card */
+  .controls { z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow: auto; padding: 12px 16px !important; }
+  .ctlgroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 20px; }
+  .ctlgroups h4 { margin: 0 0 6px; color: #ffe08a; font: 600 13px Georgia, serif; letter-spacing: .04em; text-transform: uppercase; }
+  .ctlrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dotted #2c3348; font-size: 13px; }
+  .ctlrow .caps { display: inline-flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; } .ctlrow kbd { margin: 0; }
+  .hud.stats .chipbtn { padding: 1px 8px; font-size: 11px; pointer-events: auto; }
+  /* the title backdrop behind sign-in and character select */
+  .titleart { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; image-rendering: pixelated; }
+  .screen { position: relative; z-index: 1; }
+  .screen > .panel { background: rgba(14,17,28,.86); backdrop-filter: blur(3px); box-shadow: 0 12px 40px rgba(0,0,0,.6), 0 0 0 1px rgba(201,162,74,.25); }
 </style>
 </head>
 <body>

@@ -134,7 +134,8 @@ function RuneMerchant({ hud, game }: { hud: Hud; game: Game }) {
       </div>
       <h3>{t('npc.rune.scrolls')}</h3>
       <p className="sub">{t('npc.rune.scrollsHelp', { n: ownedRunes(b).length })}</p>
-      {RUNE_STOCK.map((id) => (
+      {hud.zoneId !== 'eldoria' && <p className="sub">{t('npc.rune.onlyEldoria')}</p>}
+      {hud.zoneId === 'eldoria' && RUNE_STOCK.map((id) => (
         <div key={id} className="shoprow">
           <Icon base={id} size={24} /><span>{ITEMS[id].name}<small> {ITEMS[id].desc}</small></span>
           <button className="small" disabled={hud.journal.s.b.includes(id) || hud.gold < ITEMS[id].price} title={t('shop.once')} onClick={() => game.invOp('buy', { base: id, qty: 1 })} aria-label={t('shop.buy', { name: ITEMS[id].name, g: ITEMS[id].price })}>{hud.journal.s.b.includes(id) ? t('shop.bought') : `${ITEMS[id].price}g`}</button>

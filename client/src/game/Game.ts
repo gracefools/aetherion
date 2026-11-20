@@ -64,6 +64,7 @@ import { PET_IDS, PET_SKILLS, PETS } from '../../../shared/src/companions';
 import { DODGE } from '../../../shared/src/combat';
 import { BG, BG_BASES, BG_SHRINE, MATCH_ZONE, type MatchView } from '../../../shared/src/matches';
 import { ambient, glowSprite, windOf } from './ambient';
+import { AUTO_MOUNT_MS, MOUNT_FORBIDDEN_KINDS } from '../../../shared/src/companions';
 
 export interface ChatLine {
   id: number;
@@ -840,6 +841,9 @@ export class Game {
   /** Guilds (M14); the server checks every permission. */
   /** Gets on the last mount ridden (or the best one this level allows), or off the current one. */
   private lastMount = '';
+  /** When the current stretch of movement began (0: standing), and whether it already mounted up. */
+  private moveSince = 0;
+  private autoMounted = false;
   toggleMount() {
     const c = this.hud.comp, lv = this.hud.self?.level ?? 0;
     if (c.riding) {
@@ -1227,6 +1231,7 @@ export class Game {
         this.pushChat({ text: `Duel with ${m.with}: it begins in ${Math.max(0, Math.round((m.starts - Date.now()) / 1000))} seconds. Stay close.` });
         return this.setHud({ duel: { with: m.with, id: m.id, starts: m.starts, ends: m.ends }, dinv: null });
       case 'pvprank': return this.setHud({ pvprank: { rows: m.rows, me: m.me } });
+      case 'chan': return this.setHud({ cast: m.name ? { name: m.name, at: performance.now(), ms: m.ms } : null });
       case 'mq': return this.setHud({ mq: m.mode, mqN: m.mode ? m.n ?? this.hud.mqN : 0, mqSince: !m.mode ? 0 : m.waited !== undefined ? Date.now() - m.waited : this.hud.mq === m.mode && this.hud.mqSince ? this.hud.mqSince : Date.now() });
       case 'mfound':
         if (m.mode && !m.ok && !this.hud.mfound) sound.notify();
@@ -1557,6 +1562,16 @@ export class Game {
     }
     this.moving = ix !== 0 || iy !== 0 ? (run ? Move.Run : Move.Walk) : Move.Idle;
     if (this.moving && !this.hunter.busy) this.tut('move');
+    // after three seconds on the move, a rider climbs onto their mount (once per stretch of travel,
+    // so dismounting by hand is respected until the player stops and sets off again)
+    const t = performance.now();
+    if (!this.moving) { this.moveSince = 0; this.autoMounted = false; }
+    else if (!this.moveSince) this.moveSince = t;
+    else if (!this.autoMounted && t - this.moveSince >= AUTO_MOUNT_MS) {
+      this.autoMounted = true;
+      const c = this.hud.comp, lv = this.hud.self?.level ?? 0, kind = this.map?.def.kind ?? '';
+      if (!c.riding && !this.isDead && !this.hud.attacking && !MOUNT_FORBIDDEN_KINDS.includes(kind) && c.mounts.some((id) => MOUNTS[id] && lv >= MOUNTS[id].level)) this.toggleMount();
+    }
     if (!this.moving) return;
     this.dir = ix < 0 ? 1 : ix > 0 ? 2 : iy < 0 ? 3 : 0;
     const s = ++this.seq;
@@ -2055,6 +2070,19 @@ export class Game {
         o.title = tr(`npc.title.${ob.kind}` as any);
       } else {
         const opened = ob.kind === 'cache' && this.hud.disc.includes(ob.id), spent = ob.kind === 'node' && (this.nodeCd.get(ob.id) ?? 0) > now;
+        if (ob.kind === 'node' && !spent) {
+          // ready to gather: a ring of light that breathes on the ground, a soft halo, and sparkles rising
+          const col = ob.res === 'iron_ore' ? '255,200,120' : ob.res === 'star_shard' ? '200,170,255' : '150,255,170', k = 0.5 + 0.5 * Math.sin(now / 420 + ob.x);
+          g.save();
+          g.globalAlpha = 0.35 + 0.25 * k;
+          g.drawImage(glowSprite(col, 24), ob.x - 26, ob.y - 14, 52, 30);
+          g.globalAlpha = 0.55 + 0.35 * k;
+          g.strokeStyle = `rgb(${col})`;
+          g.lineWidth = 1.5;
+          g.beginPath(); g.ellipse(ob.x, ob.y + 4, 13 + k * 3, 6 + k * 1.4, 0, 0, Math.PI * 2); g.stroke();
+          g.restore();
+          if (settings.get().graphics.quality !== 'low' && Math.random() < 0.08) ambient.puff(ob.x + (Math.random() - 0.5) * 18, ob.y - 4 - Math.random() * 10, `rgb(${col})`, now, 2, 900);
+        }
         o.sheet = propSprite(ob.kind === 'cache' ? (opened ? 'cache_open' : 'cache') : ob.res!);
         o.sx = 0; o.sy = 0; o.sw = 32; o.ox = 16; o.oy = 24; o.alpha = spent ? 0.3 : 1;
         o.label = ''; o.labelY = 30; o.color = '#ffffff'; o.title = '';

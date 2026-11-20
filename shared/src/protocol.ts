@@ -298,6 +298,8 @@ export type ServerMsg =
   | { t: 'duel'; with: string; id: number; starts: number; ends: number; result?: string }
   | { t: 'pvprank'; rows: any[]; me: any }
   /** G8: the matchmaking line you are in (null: none), and the match you are in (null: it is over for you). */
+  /** A timed task the player is doing (gathering): its name and length; an empty name ends it. */
+  | { t: 'chan'; name: string; ms: number }
   | { t: 'mq'; mode: 'ranked' | 'ranked2' | 'bg' | null; n?: number; waited?: number }
   | { t: 'match'; v: MatchView | null }
   /** A match was found and waits for your answer (mode null: the question is gone); ok once you accepted. */

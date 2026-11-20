@@ -7,6 +7,7 @@ import { MONSTER_TOWN_CHASE, MONSTER_TOWN_CLEAR, nearTown } from '../../../share
 import { clearLine, findPath, navOf, spawnFault, tileOf, tileXY, type Nav } from '../../../shared/src/nav';
 import { applyStatus, clearStatuses, emit, NO_MODS, pushDmg, tickStatuses, type Ent } from './entity';
 import type { Player, ZoneRoom } from './World';
+import { MOB_HP_MUL } from '../../../shared/src/combat';
 
 /** Services the world provides to the AI. */
 export interface CombatCtx {
@@ -45,6 +46,9 @@ export const PATHS_PER_TICK = 12;
 let pathTick = -1, pathsLeft = 0;
 const ticks = (ms: number) => Math.ceil(ms / TICK_MS);
 const q = (v: number) => Math.round(v * 100) / 100;
+
+/** Set by the world from its options: the health multiplier of normal and elite monsters. */
+export const MOB_TUNING = { hp: MOB_HP_MUL };
 
 export class Monster implements Ent {
   readonly isPlayer = false;
@@ -141,7 +145,7 @@ export class Monster implements Ent {
 
   constructor(readonly id: number, readonly def: MonsterDef, readonly room: ZoneRoom, public x: number, public y: number, scale?: MonsterScale) {
     this.level = def.level + (scale?.level ?? 0);
-    this.hp = this.maxHp = Math.round(def.hp * (scale?.hp ?? 1));
+    this.hp = this.maxHp = Math.round(def.hp * (scale?.hp ?? 1) * (def.boss ? 1 : MOB_TUNING.hp));
     this.atkScale = scale?.atk ?? 1;
     this.expScale = scale?.exp ?? 1;
     this.goldScale = scale?.gold ?? 1;

@@ -5,7 +5,7 @@ import { teleportCost, zoneObjects } from '../shared/src/places';
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp, MAX_MESSAGE_BYTES } from '../server/src/app';
-import { config } from '../server/src/config';
+import { config, type Config } from '../server/src/config';
 import { parseDbUrl, PgPool } from '../server/src/db/pgwire';
 import fs from 'node:fs';
 import { stepSize, tileCenter, ZONES } from '../shared/src/world';
@@ -24,7 +24,7 @@ before(async () => {
   const admin = new PgPool(parseDbUrl(dbUrl), 1);
   await admin.exec('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await admin.close();
-  app = await createApp({ ...config, databaseUrl: dbUrl, host: '127.0.0.1', reconnectGraceMs: GRACE, autosaveMs: 400, authRateLimit: 10_000 });
+  app = await createApp({ ...config, databaseUrl: dbUrl, host: '127.0.0.1', reconnectGraceMs: GRACE, autosaveMs: 400, authRateLimit: 10_000, mobHp: 1, levelGates: false } as Config);
   (app.world.opts as any).events = false; // world events and night monsters only when a test starts them
   base = `http://127.0.0.1:${await app.listen(0)}`;
 });
@@ -649,9 +649,11 @@ test('M8: travel, gathering, crafting and discoveries over the network, persiste
   w.relocate(p, p.room, node.x, node.y);
   await a.until(() => a.zone === 'verdant' && Math.abs(a.x - node.x) < 1, 2000, 'at the node');
   a.loots.length = 0;
+  // gathering takes GATHER_MS standing still; asking again once it is done finds the node spent
   a.raw({ t: 'obj', op: 'gather', id: node.id });
+  await a.until(() => a.loots.length === 1, GATHER_MS + 3000, 'gathered once');
   a.raw({ t: 'obj', op: 'gather', id: node.id });
-  await a.until(() => a.loots.length === 1 && a.nos.some((n) => n.a === 'obj'), 2000, 'gathered once');
+  await a.until(() => a.nos.some((n) => n.a === 'obj'), 2000, 'the node is spent');
   assert.equal(a.nos.find((n) => n.a === 'obj')!.why, 'Nothing left to gather here yet');
   assert.ok(a.inv.some((i) => i.base === node.res));
   assert.ok(a.nodes.some(([id]) => id === node.id));
@@ -1056,6 +1058,7 @@ test('M13 quest progress and reputation are stored with the character; factions 
 // ---------------------------------------------------------------------------------------------
 import { AUCTION_MAX_LISTINGS, BANK_SIZE, GUILD_CREATE_COST, guildExpToNext, listingFee, saleTax, DEFAULT_AUCTION_RATES } from '../shared/src/economy';
 import { BASIC_COMBO } from '../shared/src/combat';
+import { GATHER_MS } from '../shared/src/places';
 
 /** A bot that records every message and can send a command and wait for its answer. */
 async function econBot(user: string, name: string, job: any = 'knight') {

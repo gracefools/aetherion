@@ -24,7 +24,7 @@ import { MailPanel } from './mailUi';
 import { FriendsPanel } from './friendsUi';
 import { RiftTracker } from './riftUi';
 import { RaidTracker, SiegeTracker } from './conquestUi';
-import { AscensionPanel } from './ascensionUi';
+import { AscensionSummary, AscensionPanel } from './ascensionUi';
 import { LifePanel } from './lifeUi';
 import { FUSION_LEVEL, FUSION_RUNE_LEVEL, fusionsFor } from '../../shared/src/awakening';
 import { ASCENSION_LEVEL, COMBO_LEVEL, COMBO_WINDOW_MS, comboOf, PATH_INDEX, ULT_MAX } from '../../shared/src/ascension';
@@ -67,6 +67,8 @@ import { toTop } from './rail';
 import { TipLayer } from './tooltip';
 import { tip as tipOn } from './tooltip';
 import { hdMountSprite, hdPetSprite } from './game/hdcomp';
+import { toDockTop } from './rail';
+import { TitleBackdrop } from './titleArt';
 
 interface Character {
   id: number;
@@ -410,7 +412,7 @@ function Play({ token, character, onExit }: { token: string; character: Characte
     <div className="play">
       <canvas ref={canvas} className="world" />
       <div className="winlayer" />
-      <div className="hud rail"><canvas ref={mini} width={144} height={144} className="minimap" /></div>
+      <div className="hud rail"><canvas ref={mini} width={144} height={144} className="minimap" role="button" tabIndex={0} title={t('map.open')} aria-label={t('map.open')} onClick={() => setMap(true)} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') setMap(true); }} /></div>
       <div className="topstack">{(['boss', 'target', 'event', 'siege', 'pvp', 'toast', 'banner'] as const).map((s) => <div key={s} className={'slot-' + s} />)}</div>
       {game && <Guard><HudView game={game} onExit={onExit} input={input} sheet={sheet} setSheet={setSheet} book={book} setBook={setBook} bag={bag} setBag={(b) => { setBag(b); if (b) markTutorial('inventory'); }} setOpts={setOpts} auto={auto} setAuto={setAuto} setMap={setMap} /></Guard>}
       {opts && <Win id="settings" title={'settings.title'} width={520} onClose={() => setOpts(false)}><Guard><SettingsPanel onClose={() => setOpts(false)} signedIn inGame /></Guard></Win>}
@@ -435,6 +437,32 @@ function Play({ token, character, onExit }: { token: string; character: Characte
         quests: () => setQlog(!qlog), map: () => setMap(!map), auto: () => setAuto(!auto), guild: () => setGuild(!guild),
         settings: () => setOpts(!opts), help: () => setTut(!tut), exit: onExit, journal: () => setJournal(!journal), mail: () => setMail(!mail), friends: () => setFriendsP(!friendsP), ascension: () => setAscp(!ascp), life: () => setLifep(!lifep), finder: () => setFinderP(!finderP),
       }} />}
+    </div>
+  );
+}
+
+/** The controls at a glance: every binding as a key cap, grouped by what it is for. */
+function ControlsCard({ onClose }: { onClose: () => void }) {
+  useT();
+  useSyncExternalStore(settings.subscribe, settings.get);
+  const k = (a: Action) => keyOf(a);
+  const groups: [Key, [string, string[]][]][] = [
+    ['ctl.move', [[t('ctl.moveKeys'), ['move.up', 'move.left', 'move.down', 'move.right'].map((a) => k(a as Action))], [t('act.walk'), [k('walk')]], [t('act.dodge'), [k('dodge')]], [t('act.mount.toggle'), [k('mount.toggle')]]]],
+    ['ctl.fight', [[t('ctl.target'), [t('ctl.click'), k('target')]], [t('ctl.attack'), [k('attack')]], [t('ctl.skills'), [`${k('skill.1')}–${k('skill.7')}`]], [t('ctl.runes'), [runeKey(0, 0), runeKey(0, 1), runeKey(0, 2)]], [t('ctl.potions'), [k('potion.hp'), k('potion.mp')]], [t('ctl.interact'), [k('interact')]]]],
+    ['ctl.menus', [[t('bag.title'), [k('panel.bag')]], [t('book.title'), [k('panel.skills')]], [t('sheet.title'), [k('panel.character')]], [t('quest.log'), [k('panel.quests')]], [t('map.title'), [k('panel.map')]], [t('comp.title'), [k('panel.companions')]], [t('guild.title'), [k('panel.guild')]], [t('settings.title'), [k('panel.settings')]], [t('tut.panel'), [k('panel.tutorial')]]]],
+  ];
+  return (
+    <div className="hud controls panel" role="dialog" aria-label={t('dock.controls')}>
+      <div className="sheethead"><h3>{t('dock.controls')}</h3><button className="link panelx" onClick={onClose} aria-label={t('common.close')}>{t('common.close')}</button></div>
+      <div className="ctlgroups">
+        {groups.map(([g, rows]) => (
+          <section key={g}>
+            <h4>{t(g)}</h4>
+            {rows.map(([label, keys]) => <div key={label} className="ctlrow"><span>{label}</span><span className="caps">{keys.filter(Boolean).map((x, i) => <kbd key={i}>{x}</kbd>)}</span></div>)}
+          </section>
+        ))}
+      </div>
+      <p className="sub">{t('ctl.rebind')}</p>
     </div>
   );
 }
@@ -474,6 +502,8 @@ function CharacterSheet({ hud, onClose }: { hud: Hud; onClose: () => void }) {
       )}
       {tab === 'prog' && (
         <div className="sheettab">
+          <h3>{t('asc.title')}</h3>
+          <AscensionSummary hud={hud} />
           <h3>{t('sheet.progression')}</h3>
           <div className="tiers">{d.tiers.map((x) => <span key={x.title} className={me.level >= x.level ? 'on' : ''}>{x.title} <small>{t('common.lv', { n: x.level })}</small></span>)}</div>
           <div className="tierbonus" aria-label={t('tier.label')}>
@@ -740,7 +770,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       {hud.cast && <div className="hud castbar" role="progressbar" aria-label={t('hud.casting', { name: hud.cast.name })}><i key={hud.cast.at} style={{ animationDuration: `${hud.cast.ms}ms` }} /><span>{hud.cast.name}</span></div>}
       {hud.notice && <div className="hud notice" role="alert">{tm(hud.notice)}</div>}
       {book && me && s && hud.build && <Win id="skills" title={'book.title'} onClose={() => setBook(false)}><Guard><SkillBook hud={hud} game={game} onClose={() => setBook(false)} /></Guard></Win>}
-      {me && hud.points > 0 && !book && <button className="hud pointsbtn" onClick={() => setBook(true)}>{t(hud.points > 1 ? 'hud.points' : 'hud.point', { n: hud.points })} · {keyOf('panel.skills')}</button>}
+      {me && hud.points > 0 && !book && toDockTop(<button className="hud pointsbtn" onClick={() => setBook(true)}>{t(hud.points > 1 ? 'hud.points' : 'hud.point', { n: hud.points })} · {keyOf('panel.skills')}</button>)}
       {hud.toast && toTop('toast', <div className="hud toast" role="status">{tm(hud.toast)}</div>)}
       {hud.dead > 0 && hud.status === 'playing' && (
         <div className="hud fallen panel" role="alertdialog" aria-label={t('dead.title')}>
@@ -750,13 +780,8 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
           <p className="sub">{t('dead.auto', { n: hud.dead })}</p>
         </div>
       )}
-      {toRail(<div className="hud stats">{t('hud.nearby', { n: hud.nearby })} · {hud.ping} ms · {hud.fps} fps <button className="link" onClick={() => setKeysOpen(!keysOpen)} aria-expanded={keysOpen}>{t('dock.controls')}</button></div>)}
-      <div className={'hud keys' + (keysOpen ? ' open' : '')}>{t('hud.keys', {
-        move: ['move.up', 'move.left', 'move.down', 'move.right'].map((a) => keyOf(a as Action)).join(''), walk: keyOf('walk'), target: keyOf('target'), attack: keyOf('attack'),
-        skills: `${keyOf('skill.1')}-${keyOf('skill.7')}`, runes: `${runeKey(0, 0)} ${runeKey(0, 1)} ${runeKey(0, 2)}`, potions: `${keyOf('potion.hp')} ${keyOf('potion.mp')}`,
-        interact: keyOf('interact'), bag: keyOf('panel.bag'), book: keyOf('panel.skills'), auto: keyOf('panel.auto'), quests: keyOf('panel.quests'), map: keyOf('panel.map'),
-        guild: keyOf('panel.guild'), comps: keyOf('panel.companions'), settings: keyOf('panel.settings'), help: keyOf('panel.tutorial'),
-      })}</div>
+      {toRail(<div className="hud stats">{t('hud.nearby', { n: hud.nearby })} · {hud.ping} ms · {hud.fps} fps <button className="small chipbtn" onClick={() => setKeysOpen(!keysOpen)} aria-expanded={keysOpen}><Icon name="settings" size={11} className="inl" /> {t('dock.controls')}</button></div>)}
+      {keysOpen && <ControlsCard onClose={() => setKeysOpen(false)} />}
       {sheet && me && s && <Win id="character" title={'sheet.title'} onClose={() => setSheet(false)}><Guard><CharacterSheet hud={hud} onClose={() => setSheet(false)} /></Guard></Win>}
       {bag && me && s && <Win id="bag" title={'bag.title'} width={720} onClose={() => setBag(false)}><Guard><InventoryPanel hud={hud} game={game} onClose={() => setBag(false)} /></Guard></Win>}
       {(auto || hud.auto.on) && me && s && <Guard><AutoPanel hud={hud} game={game} onClose={() => setAuto(false)} /></Guard>}
@@ -818,6 +843,7 @@ function App() {
   }, [character]);
   return (
     <>
+      {!character && <TitleBackdrop />}
       {!token ? <Auth onAuth={auth} />
         : !character ? <Characters token={token} onPlay={setCharacter} onLogout={logout} />
           : <Play token={token} character={character} onExit={() => setCharacter(null)} />}
@@ -835,6 +861,9 @@ function App() {
 (window as any).__settings = settings;
 (window as any).__sound = sound;
 void audio.init();
+// try to start the music at once: browsers that allow it (a site visited often) play the title theme
+// straight away; the others wait for the first click or key, as before
+try { audio.unlock(); } catch { /* audio waits for a gesture */ }
 installUiSounds();
 
 // Imported sheets (if the build shipped any) are in place before the first sprite is drawn.

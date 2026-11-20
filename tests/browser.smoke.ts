@@ -491,7 +491,8 @@ try {
       await p1.waitForFunction((n) => (window as any).__game.debug().hud.dungeon?.stage === n, st + 1, { timeout: 8000 });
     }
     const boss = [...run.alive][0];
-    (boss as any).def = { ...boss.def, aggro: 0 }; // hold still for the screenshot
+    (boss as any).def = { ...boss.def, aggro: 0, atk: 0 }; // hold still for the screenshot, and do no harm: a death empties the room
+    (boss as any).atkScale = 0;
     // while the phase change is watched the player must live: a death empties the room and resets the boss.
     // Phase two calls sentries, so they are cleared and the player kept whole until the boss falls.
     const guard = setInterval(() => {
@@ -1353,15 +1354,15 @@ try {
     await map.getByRole('button', { name: 'Add a marker' }).click();
     const view = map.getByRole('group', { name: 'Map of Verdant Reach' }), box = (await view.boundingBox())!;
     await p1.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.25);
-    await map.getByLabel('Marker name').fill('Moonleaf patch');
+    await map.getByLabel('Marker name').fill('Quiet meadow');
     await map.getByRole('button', { name: 'Save', exact: true }).click();
-    await map.getByRole('img', { name: 'Moonleaf patch' }).waitFor();
+    await map.getByRole('img', { name: 'Quiet meadow' }).waitFor();
     const mk = (await gs()).markers[0];
     assert.equal(mk.zone, 'verdant');
     assert.ok(Math.abs(mk.y / (ZONES.verdant.h * 32) - 0.25) < 0.05, `the marker sits where it was clicked (${mk.y})`);
     // layers can be hidden
     await map.getByRole('checkbox', { name: 'Your markers' }).uncheck();
-    await map.getByRole('img', { name: 'Moonleaf patch' }).waitFor({ state: 'detached' });
+    await map.getByRole('img', { name: 'Quiet meadow' }).waitFor({ state: 'detached' });
     await map.getByRole('checkbox', { name: 'Your markers' }).check();
     await p1.screenshot({ path: '.run/m16-map.png' });
     await p1.keyboard.press('Escape');
@@ -1379,7 +1380,11 @@ try {
     await p1.waitForFunction(() => (window as any).__settings.get().keys.attack[0] === 'KeyQ');
     assert.deepEqual((await gs()).keys['rune.1.1'], [], 'the key moved, it is not used twice');
     await p1.getByRole('button', { name: 'Close Settings', exact: true }).click();
-    await p1.waitForFunction(() => /Q attack/.test(document.querySelector('.hud.keys')?.textContent ?? ''));
+    // the controls card shows the new key on the Attack row
+    await p1.getByRole('button', { name: 'Controls', exact: true }).click();
+    const ctl = p1.getByRole('dialog', { name: 'Controls' });
+    await ctl.locator('.ctlrow', { hasText: 'Attack' }).locator('kbd', { hasText: 'Q' }).waitFor();
+    await ctl.getByRole('button', { name: 'Close' }).click();
     // the rebound key attacks: the server starts an auto-attack on a monster next to the player
     const dummy = w.spawn(L.room, 'mossling', L.x + 30, L.y);
     dummy.noRespawn = true;
@@ -1676,16 +1681,18 @@ try {
   // this browser forgets its audio settings: after the reload they can only come from the account
   await p1.evaluate(() => localStorage.removeItem('aetherion.audio'));
   await p1.reload();
-  // No interaction yet on the fresh page: audio must not have started, and the page says so.
+  // No interaction yet on the fresh page: the title music starts at once where the browser allows it;
+  // otherwise audio waits, the page says so, and pressing the button starts it.
   await p1.locator('.charcard').first().waitFor();
-  await p1.waitForFunction(() => (window as any).__audio.debug().state === 'locked');
-  assert.equal(await p1.evaluate(() => (window as any).__audio.debug().context), 'none', 'no audio context exists before the first interaction');
-  await p1.getByText('Sound is off until you click or press a key.').waitFor();
+  await p1.waitForFunction(() => ['locked', 'running'].includes((window as any).__audio.debug().state));
   await p1.waitForFunction((want) => JSON.stringify((window as any).__audio.debug().settings) === want, JSON.stringify(savedAudio));
-  // pressing the button is the interaction: audio unlocks on mouse-down and the prompt is gone before the button comes back up
-  await p1.getByRole('button', { name: 'Enable sound' }).hover();
-  await p1.mouse.down();
-  await p1.mouse.up();
+  if ((await p1.evaluate(() => (window as any).__audio.debug().state)) === 'locked') {
+    await p1.getByText('Sound is off until you click or press a key.').waitFor();
+    // pressing the button is the interaction: audio unlocks on mouse-down and the prompt is gone before the button comes back up
+    await p1.getByRole('button', { name: 'Enable sound' }).hover();
+    await p1.mouse.down();
+    await p1.mouse.up();
+  }
   await p1.waitForFunction(() => (window as any).__audio.debug().state === 'running');
   await p1.getByText('Sound is off until you click or press a key.').waitFor({ state: 'detached' });
   assert.equal(await p1.evaluate(() => (window as any).__audio.debug().music.want), BGM.MENU, 'the menu theme is selected on the character screen');

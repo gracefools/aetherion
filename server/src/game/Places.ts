@@ -2,7 +2,7 @@
 // All of it is validated here: where the player stands, what they own, what they have found.
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
 import { ITEM_LIST, ITEMS, pickRarity, rollItem, usableBy } from '../../../shared/src/items';
-import {
+import { GATHER_MS,
   allDiscoveries, INTERACT_RANGE, NODE_RESPAWN_MS, objById, objNear, RECIPES, START_DISCOVERIES, teleportCost, waypointId, WAYSTONE_RANGE, zoneObjects,
 } from '../../../shared/src/places';
 import { TICK_MS } from '../../../shared/src/protocol';
@@ -44,6 +44,23 @@ const CACHE_LORE: Record<string, string> = {
   astral: 'Inside: a Runewright\'s last notes. "The seal holds as long as someone remembers why."',
 };
 
+/**
+ * A gathering in progress: done when its time is up, called off if the player moves, fights or dies.
+ * Called every tick for players who are gathering.
+ */
+export function gatherTick(w: World, p: Player) {
+  const gt = p.gathering;
+  if (!gt) return;
+  const stop = (why: string) => { p.gathering = null; w.send(p, { t: 'chan', name: '', ms: 0 }); if (why) w.send(p, { t: 'sys', text: why }); };
+  if (p.dead || Math.hypot(p.x - gt.x, p.y - gt.y) > 6) return stop('Gathering was interrupted.');
+  if ((w.tick - p.lastCombat) * TICK_MS <= 200) return stop('Gathering was interrupted.');
+  if (w.tick < gt.until) return;
+  p.gathering = null;
+  w.send(p, { t: 'chan', name: '', ms: 0 });
+  const why = objOp(w, p, { op: 'gather', id: gt.id, done: true });
+  if (why) w.send(p, { t: 'no', a: 'obj', why });
+}
+
 /** Executes a world interaction. Returns '' or the reason it was refused. */
 export function objOp(w: World, p: Player, m: any): string {
   if (!m || typeof m !== 'object') return 'Unknown command';
@@ -55,6 +72,13 @@ export function objOp(w: World, p: Player, m: any): string {
       if (!o || o.kind !== 'node' || o.zone !== zone) return 'Nothing to gather';
       if (Math.hypot(o.x - p.x, o.y - p.y) > INTERACT_RANGE + 16) return 'Too far away';
       if ((p.room.nodeReady.get(o.id) ?? 0) > w.tick) return 'Nothing left to gather here yet';
+      // gathering takes time: it begins now and finishes in finishGather if the player stays put
+      if (!m.done) {
+        if ((w.tick - p.lastCombat) * TICK_MS <= COMBAT_TIMEOUT_MS) return 'Not while in combat';
+        p.gathering = { id: o.id, x: p.x, y: p.y, until: w.tick + Math.ceil(GATHER_MS / TICK_MS) };
+        w.send(p, { t: 'chan', name: o.name, ms: GATHER_MS });
+        return '';
+      }
       const qty = 1 + (w.rnd() < 0.35 ? 1 : 0);
       if (!give(p, { base: o.res!, rar: 0, ilvl: 1, aff: [], up: 0, qty })) return 'Inventory is full';
       p.room.nodeReady.set(o.id, w.tick + Math.ceil(NODE_RESPAWN_MS / TICK_MS));
@@ -87,6 +111,7 @@ export function objOp(w: World, p: Player, m: any): string {
       if (to === zone) return 'You are already here';
       if (!objNear(zone, p.x, p.y, 140, ['waykeeper'])) return 'You need to be at a waystone';
       if (!p.disc.has(waypointId(to))) return 'You have not attuned to that waystone yet';
+      if (w.opts.levelGates !== false && p.level < ZONES[to].level[0]) return `${ZONES[to].name} is for level ${ZONES[to].level[0]} and up`;
       if ((w.tick - p.lastCombat) * TICK_MS <= COMBAT_TIMEOUT_MS) return 'Cannot travel in combat';
       const cost = teleportCost(to);
       if (p.gold < cost) return 'Not enough gold';

@@ -155,7 +155,7 @@ function harness(opts: { rng?: () => number; capacity?: number; kit?: boolean; w
   // anything else the world stores (progress, guilds, PvP records) is accepted and ignored
   const repoAny = new Proxy(repo, { get: (t, k) => t[k] ?? (async () => {}) });
   // Monsters are placed by hand in combat tests; rng 0.5 = no miss, no crit, no damage variance.
-  const world = new World(repoAny, { events: false, roomCapacity: opts.capacity ?? 3, reconnectGraceMs: 0, autosaveMs: 1e9, monsters: false, rng: opts.rng ?? (() => 0.5), ...opts.world });
+  const world = new World(repoAny, { events: false, roomCapacity: opts.capacity ?? 3, reconnectGraceMs: 0, autosaveMs: 1e9, monsters: false, rng: opts.rng ?? (() => 0.5), mobHp: 1, levelGates: false, ...opts.world });
   let id = 0;
   const join = (dx = 0, dy = 0, job: Job = 'knight', level = 1, weapon = -1, zone = 'eldoria') => {
     const sp = ZONES[zone].spawn;
@@ -667,11 +667,14 @@ test('M3 statuses: poison ticks and stacks, slow changes the server step, stun b
   const run0 = a.p.runStep;
   applyStatus(a.p, STATUS_INDEX.poison, world.tick, 50, 0);
   step(21);
-  assert.deepEqual(dmOf(a.out).at(-1), [a.p.id, Math.round(50 * 0.12), Dmg.Dot, 0]);
+  // a player's defence turns poison aside as it does a blow
+  const poisoned = (raw: number) => Math.max(1, Math.round(mitigate(raw, a.p.stats.def * a.p.mods.def)));
+  assert.deepEqual(dmOf(a.out).at(-1), [a.p.id, poisoned(Math.round(50 * 0.12)), Dmg.Dot, 0]);
+  assert.ok(poisoned(Math.round(50 * 0.12)) < Math.round(50 * 0.12), 'less than the raw tick');
   for (let i = 0; i < 5; i++) applyStatus(a.p, STATUS_INDEX.poison, world.tick, 50, 0);
   assert.equal(a.p.st[0].stacks, 3, 'stack cap');
   step(20);
-  assert.equal(dmOf(a.out).at(-1)[1], Math.round(50 * 0.12 * 3));
+  assert.equal(dmOf(a.out).at(-1)[1], poisoned(Math.round(50 * 0.12 * 3)));
   assert.equal(lastMe(a.out).st[0][0], STATUS_INDEX.poison);
   step(110);
   assert.equal(a.p.mask, 0, 'expired after 5s');
@@ -2646,15 +2649,59 @@ test('M8 places: every town has a merchant, a waystone keeper and a lorekeeper; 
   for (const r of RECIPES) assert.ok(ITEMS[r.out[0]] && r.needs.every(([b]) => ITEMS[b].kind === 'material'));
 });
 
+test('new rules: monsters have doubled health; regions refuse players below their level; rune scrolls only in Eldoria; gathering spots', () => {
+  // doubled health for normal and elite monsters, bosses as listed
+  const h = harness({ capacity: 10, world: { mobHp: MOB_HP_MUL, levelGates: true } }), { world, join, step } = h;
+  const a = join(0, 0, 'knight', 1);
+  const mob = world.spawn(a.p.room, 'mossling', a.p.x + 40, a.p.y);
+  assert.equal(mob.maxHp, MONSTERS.mossling.hp * MOB_HP_MUL);
+  const boss = Object.values(MONSTERS).find((d) => d.boss && !d.boss.world)!;
+  assert.equal(world.spawn(a.p.room, boss.id, a.p.x + 400, a.p.y).maxHp, boss.hp, 'bosses keep their health');
+  world.removeMonster(mob);
+  // a level 1 character cannot walk into the next region
+  const portal = ZONES.eldoria.portals.find((p) => ZONES[p.to] && !ZONES[p.to].kind && ZONES[p.to].level[0] > 1)!;
+  a.p.x = tileCenter(portal.tx - 1); a.p.y = tileCenter(portal.ty); a.p.room.grid.update(a.p);
+  let seq = 0;
+  for (let i = 0; i < 10; i++) { world.input(a.p, ++seq, 1, 0, 1); step(); }
+  assert.equal(a.p.room.zoneId, 'eldoria', 'still in Eldoria');
+  assert.ok(a.out.some((m) => m.t === 'sys' && m.text === `${ZONES[portal.to].name} is for level ${ZONES[portal.to].level[0]} and up`));
+  // at the level, the way opens
+  a.p.level = ZONES[portal.to].level[0];
+  a.p.portalMsgAt = 0;
+  a.p.x = tileCenter(portal.tx - 1); a.p.y = tileCenter(portal.ty); a.p.room.grid.update(a.p);
+  for (let i = 0; i < 10 && a.p.room.zoneId === 'eldoria'; i++) { world.input(a.p, ++seq, 1, 0, 1); step(); }
+  assert.equal(a.p.room.zoneId, portal.to);
+  // rune scrolls: Eldoria's Rune Merchant only
+  const far = join(0, 0, 'mage', 30, -1, 'verdant'), rs = runesmith('verdant');
+  far.p.x = rs.x; far.p.y = rs.y + 30; far.p.gold = 1e6;
+  assert.equal(world.inventory(far.p, { op: 'buy', base: 'scroll_fire', qty: 1 }), 'Rune Scrolls are sold only by the Rune Merchant of Eldoria');
+  // gathering: two spots per region, four nodes each, close together
+  for (const z of REGIONS) {
+    const nodes = zoneObjects(z).filter((o) => o.kind === 'node'), kinds = [...new Set(nodes.map((o) => o.res))];
+    assert.equal(nodes.length, 8, z);
+    assert.equal(kinds.length, 2, `${z}: one spot per resource`);
+    for (const k of kinds) {
+      const g = nodes.filter((o) => o.res === k), cx = g.reduce((s, o) => s + o.x, 0) / g.length, cy = g.reduce((s, o) => s + o.y, 0) / g.length;
+      assert.equal(g.length, 4);
+      assert.ok(g.every((o) => Math.hypot(o.x - cx, o.y - cy) < 6 * TILE), `${z}: the ${k} nodes are one spot`);
+    }
+  }
+});
+
 test('M8 gathering: range and cooldown per node, shared by the channel, respawning; no energy or daily limit', () => {
   const node = objAt('eldoria', 'node'), [dx, dy] = offset('eldoria', node);
   const { world, join, step } = harness({ capacity: 10 });
   const a = join(dx + 5, dy, 'knight', 3), b = join(dx - 5, dy, 'mage', 3), far = join(0, 0, 'mage', 3);
+  // gathering takes GATHER_MS standing still: start it, then let the time pass
+  const gather = (p: any, id: string) => { const why = world.object(p, { op: 'gather', id }); if (!why) step(Math.ceil(GATHER_MS / TICK_MS) + 1); return why; };
   assert.equal(world.object(far.p, { op: 'gather', id: node.id }), 'Too far away');
   assert.equal(world.object(a.p, { op: 'gather', id: 'node:eldoria:99' }), 'Nothing to gather');
   assert.equal(world.object(a.p, { op: 'gather', id: objAt('verdant', 'node').id }), 'Nothing to gather', 'a node in another zone');
   assert.equal(world.object(a.p, { op: 'gather', id: objAt('eldoria', 'cache').id }), 'Nothing to gather');
   assert.equal(world.object(a.p, { op: 'gather', id: node.id }), '');
+  assert.equal(a.p.inv.length, 0, 'nothing yet: gathering takes time');
+  assert.ok(a.out.some((m) => m.t === 'chan' && m.name === node.name && m.ms === GATHER_MS), 'a progress bar is shown');
+  step(Math.ceil(GATHER_MS / TICK_MS) + 1);
   assert.deepEqual(a.p.inv.map((i) => [i.base, i.qty]), [[node.res, 1]]);
   assert.deepEqual(lootOf(a.out).at(-1).items, [{ base: node.res, rar: 0, qty: 1 }]);
   assert.deepEqual(b.out.filter((m) => m.t === 'nodes').at(-1).cd, [[node.id, NODE_RESPAWN_MS]], 'everyone in the channel sees the node is spent');
@@ -2662,15 +2709,22 @@ test('M8 gathering: range and cooldown per node, shared by the channel, respawni
   // a player who arrives later is told which nodes are spent
   const late = join(dx, dy + 5, 'ranger', 3);
   assert.equal(late.out.filter((m) => m.t === 'nodes').at(-1).cd[0][0], node.id);
-  step(NODE_RESPAWN_MS / TICK_MS - 1);
+  step(NODE_RESPAWN_MS / TICK_MS - 2);
   assert.equal(world.object(b.p, { op: 'gather', id: node.id }), 'Nothing left to gather here yet');
-  step(1);
+  step(2);
+  // walking away breaks it off
   assert.equal(world.object(b.p, { op: 'gather', id: node.id }), '');
+  b.p.x += 30;
+  step(2);
+  assert.equal(b.p.gathering, null, 'moving interrupts gathering');
+  assert.ok(b.out.some((m) => m.t === 'sys' && m.text === 'Gathering was interrupted.'));
+  b.p.x -= 30;
+  assert.equal(gather(b.p, node.id), '');
   // unlimited: other nodes can be gathered straight away, again and again
   const n2 = objAt('eldoria', 'node', 1);
   a.p.x = n2.x; a.p.y = n2.y;
   for (let i = 0; i < 5; i++) {
-    assert.equal(world.object(a.p, { op: 'gather', id: n2.id }), '');
+    assert.equal(gather(a.p, n2.id), '');
     step(NODE_RESPAWN_MS / TICK_MS);
   }
   assert.ok(a.p.inv.reduce((n, i) => n + i.qty, 0) >= 6);
@@ -3833,16 +3887,18 @@ test('inventory sorting: merges stacks and orders the bag on the server', () => 
   assert.equal(p.inv.reduce((n, i) => n + i.qty, 0), 3 + 1 + 9 + 1 + 1, 'sorting never creates or destroys anything');
 });
 
-test('bound items: worn or rewarded equipment stays with its owner; monster drops trade until worn', () => {
+test('bound items: worn gear and quest rewards stay with their owner; drops, events, dungeons and shops trade until worn', () => {
   const { world, join } = harness({ capacity: 10 });
   const A = join(0, 0, 'knight', 30), B = join(60, 0, 'mage', 30), a = A.p, b = B.p;
   a.inv.length = 0;
-  // a monster drop is tradable; a reward is bound
+  // a monster drop and any other reward (events, dungeons, raids, caches) are tradable; a quest reward is bound
   award(world, a, 0, [spec('longsword', { rar: 2, ilvl: 20 })], true);
-  award(world, a, 0, [spec('longsword', { rar: 2, ilvl: 20 }), spec('upgrade_stone', { qty: 2 })]);
-  const [drop, reward] = a.inv.filter((i) => i.base === 'longsword');
+  award(world, a, 0, [spec('longsword', { rar: 2, ilvl: 20 })]);
+  award(world, a, 0, [spec('longsword', { rar: 2, ilvl: 20 }), spec('upgrade_stone', { qty: 2 })], false, '', true);
+  const [drop, other, reward] = a.inv.filter((i) => i.base === 'longsword');
   assert.ok(!drop.bd, 'dropped by a monster: tradable');
-  assert.equal(reward.bd, 1, 'a reward is bound');
+  assert.ok(!other.bd, 'an event, dungeon or raid reward: tradable');
+  assert.equal(reward.bd, 1, 'a quest reward is bound');
   assert.ok(!a.inv.find((i) => i.base === 'upgrade_stone')!.bd, 'only equipment binds');
   // bound: no trade, no market; the free one trades
   assert.equal(world.trade(a, { op: 'invite', id: b.id }), '');
@@ -6889,6 +6945,8 @@ import { FURNITURE, GROW_MS, profExpToNext, SEASON_XP, seasonReward } from '../s
 import { gearTier } from '../shared/src/items';
 import { appearanceKey } from '../shared/src/appearance';
 import { boundWhy, cleanItem } from '../shared/src/items';
+import { GATHER_MS } from '../shared/src/places';
+import { MOB_HP_MUL } from '../shared/src/combat';
 
 test('pets evolve at 20, 40 and 60 with a stronger bonus; flying mounts pass over water and trees, never walls or the map edge', () => {
   assert.equal(PETMAX, 60);

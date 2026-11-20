@@ -21,7 +21,6 @@ import { INTERACT_RANGE } from '../../../shared/src/places';
 import { ITEMS } from '../../../shared/src/items';
 import { give, sendInv } from './Inventory';
 import { Matches } from './Matches';
-import { bindSpec } from '../../../shared/src/items';
 
 interface Duel {
   a: Player;
@@ -165,7 +164,7 @@ export class Pvp {
         const line = HONOR_SHOP.find(([b]) => b === m.base);
         if (!line) return 'Not sold here';
         if (!objNear(p.room.zoneId, p.x, p.y, INTERACT_RANGE * 2.2, ['arenamaster'])) return 'Visit the Arena Master';
-        const [base, cost] = line, spec = bindSpec({ base, rar: ITEMS[base].unique?.rar ?? 0, ilvl: ITEMS[base].kind === 'equip' ? p.level : 1, aff: [] as [any, number][], up: 0, qty: 1 });
+        const [base, cost] = line, spec = { base, rar: ITEMS[base].unique?.rar ?? 0, ilvl: ITEMS[base].kind === 'equip' ? p.level : 1, aff: [] as [any, number][], up: 0, qty: 1 };
         const trial = { inv: p.inv.map((i) => ({ ...i })) } as unknown as Player;
         if (!give(trial, spec)) return 'Inventory is full';
         void this.repo.pvpSpend(p.id, cost).then((left) => {

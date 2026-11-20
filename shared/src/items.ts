@@ -164,8 +164,7 @@ export interface Item {
   /** Sigils: the class skill they raise and by how many ranks (+1 to +3). */
   sk?: [skill: string, plus: number];
   /**
-   * Bound to its character (equipment only): it has been worn, or it came as a reward (quests,
-   * caches and chests, bosses, raids, events, shops for honour or reputation). A bound item cannot be
+   * Bound to its character (equipment only): it has been worn, or it came as a quest reward. A bound item cannot be
    * traded, mailed or listed on the auction house; it can still be sold to a merchant or banked.
    */
   bd?: 1;

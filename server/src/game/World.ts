@@ -7,7 +7,7 @@ import { inSanctuary, inTown, MONSTER_TOWN_CLEAR, nearTown } from '../../../shar
 import { BOUNTY_STREAK, DEPTH_MONSTER, SANCTUARY_LEAVE_SHIELD_MS, SANCTUARY_SHIELD_EVERY_MS, type DepthBossState } from '../../../shared/src/depths';
 import { applySigilSets, ARMAMENT_LEVEL, armamentDrops, armMultipliers, cleanGear, effectiveRanks, emptyGear, rollSigil, SIGIL_DROP, sigilTierForBoss, weaponAura, worldBossArmament, type Gear } from '../../../shared/src/gear';
 import { performance } from 'node:perf_hooks';
-import {
+import { MOB_HP_MUL, DOT_MAGIC,
   BASIC_COMBO, COMBAT_TIMEOUT_MS, DODGE, Dmg, expLevelFactor, expToNext, missChance, mitigate, RAGE_PER_HIT, RAGE_PER_HIT_TAKEN,
   RESPAWN_AUTO_MS, RESPAWN_MIN_MS, STATUS, STATUS_INDEX, weaponRule, type WeaponRule,
 } from '../../../shared/src/combat';
@@ -27,7 +27,7 @@ import { applyMastery, applyPath, cleanAscension, emptyAscension, MASTERY_STATS,
 import { chargeUlt } from './Abilities';
 import { AWAKEN_LEVEL, AWAKEN_POINTS, awakeKey } from '../../../shared/src/awakening';
 import { applyJournal, emptyJournal, type Journal } from '../../../shared/src/journal';
-import { cleanDiscoveries, discoverWaystones, objOp } from './Places';
+import { gatherTick, cleanDiscoveries, discoverWaystones, objOp } from './Places';
 import { computeStats, JOB_DEFS, MAX_LEVEL, type Stats } from '../../../shared/src/jobs';
 import { DEPTH_BOSSES, MONSTERS, SPAWNS, spawnRegions, WORLD_BOSSES } from '../../../shared/src/monsters';
 import { navOf, spawnFault } from '../../../shared/src/nav';
@@ -50,11 +50,11 @@ import {
   type SelfState, type ServerMsg, type SnapMsg, type VitalUpdate,
   type Cue,
 } from '../../../shared/src/protocol';
-import { blocked, DEPTH_ZONES, EXIT, getZoneMap, portalAt, stepMove, stepSize, tileCenter, ZONES, type ZoneMap } from '../../../shared/src/world';
+import { REGIONS, blocked, DEPTH_ZONES, EXIT, getZoneMap, portalAt, stepMove, stepSize, tileCenter, ZONES, type ZoneMap } from '../../../shared/src/world';
 import type { CharacterRow, Repo } from '../db/repo';
 import { attune, cancelCast, learn, noteDamage, respec, tickCast, updateFields, useAbility, type Casting, type Field } from './Abilities';
 import { applyStatus, clearStatuses, emit, NO_MODS, pushDmg, removeStatus, tickStatuses, type Ent } from './entity';
-import { Monster, type CombatCtx, type MonsterScale } from './Monster';
+import { MOB_TUNING, Monster, type CombatCtx, type MonsterScale } from './Monster';
 import { Parties, type Party } from './Party';
 import { SpatialGrid } from './SpatialGrid';
 import { Traits } from './Traits';
@@ -200,6 +200,8 @@ export class Player implements Ent {
   }
   gcd = 0;
   casting: Casting | null = null;
+  /** A gathering in progress (a resource node, where the player stood, the tick it is done). */
+  gathering: { id: string; x: number; y: number; until: number } | null = null;
   party: Party | null = null;
   inv: Item[] = [];
   eq: Equipment = {};
@@ -367,6 +369,10 @@ export interface Metrics {
 }
 
 export interface WorldOpts {
+  /** Health multiplier of normal and elite monsters (MOB_HP_MUL; 1 in older mechanics tests). */
+  mobHp?: number;
+  /** Regions refuse players below their level (off in older tests that walk a new character anywhere). */
+  levelGates?: boolean;
   /** Raiders needed to start a raid (lowered in tests). */
   raidMin?: number;
   /** World events and the night's monsters start by themselves (off in tests, which start them on purpose). */
@@ -405,6 +411,8 @@ export class World implements CombatCtx {
   private seen = new Set<number>();
   private transfers: Player[] = [];
   private dots: number[] = [];
+  /** The status id of each damage-over-time tick in `dots`. */
+  private dotKinds: string[] = [];
   private fMv: string[] = [];
   private fEv: string[] = [];
   private fDm: string[] = [];
@@ -461,6 +469,7 @@ export class World implements CombatCtx {
   }
 
   constructor(private repo: Repo, readonly opts: WorldOpts) {
+    MOB_TUNING.hp = opts.mobHp ?? MOB_HP_MUL;
     this.seasons = new Seasons(this, repo);
     this.rnd = opts.rng ?? Math.random;
     this.dropRate = opts.dropRate ?? 1;
@@ -1781,9 +1790,15 @@ export class World implements CombatCtx {
     for (const p of room.players.values()) {
       if (p.st.length) {
         this.dots.length = 0;
-        tickStatuses(p, tick, this.dots);
-        for (let i = 0; i < this.dots.length; i += 2) this.hurt(p, this.dots[i], Dmg.Dot, this.entById(room, this.dots[i + 1]));
+        this.dotKinds.length = 0;
+        tickStatuses(p, tick, this.dots, this.dotKinds);
+        for (let i = 0; i < this.dots.length; i += 2) {
+          // defence turns aside poison and bleeding (magic defence burns) as it does a blow
+          const kind = this.dotKinds[i / 2], def = DOT_MAGIC[kind] ? p.stats.mdef : p.stats.def;
+          this.hurt(p, Math.max(1, Math.round(mitigate(this.dots[i], def * p.mods.def))), Dmg.Dot, this.entById(room, this.dots[i + 1]));
+        }
       }
+      if (p.gathering) gatherTick(this, p);
       p.budget = Math.min(p.budget + 1, INPUT_BURST);
       const q = p.inQ;
       if (p.dead || p.mods.stun) {
@@ -1905,6 +1920,8 @@ export class World implements CombatCtx {
       this.send(p, { t: 'sys', text });
     };
     if (p.pvpTagUntil > now) return refuse('You cannot leave while you are fighting another player');
+    // a region is closed to anyone below its level
+    if (this.opts.levelGates !== false && !dest.kind && !dest.depth && REGIONS.includes(dest.id) && p.level < dest.level[0]) return refuse(`${dest.name} is for level ${dest.level[0]} and up`);
     if (dest.depth) {
       const need = ZONES[dest.depth.host].level[0];
       if (p.level < need) return refuse(`The Depths open at level ${need}`);

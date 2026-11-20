@@ -17,10 +17,10 @@ import { t, useT, type Key } from './i18n';
 import { Icon } from './ui/icons';
 import { traitOf } from '../../shared/src/traits';
 
-type Kind = 'you' | 'party' | 'town' | 'waystone' | 'dungeon' | 'hunt' | 'elite' | 'boss' | 'exit' | 'marker' | 'pvp';
+type Kind = 'you' | 'party' | 'town' | 'waystone' | 'dungeon' | 'hunt' | 'elite' | 'boss' | 'exit' | 'marker' | 'pvp' | 'gather';
 interface Pin { kind: Kind; x: number; y: number; label: string; id?: string; r?: number }
-const LAYERS: Kind[] = ['you', 'party', 'town', 'waystone', 'dungeon', 'hunt', 'elite', 'boss', 'exit', 'marker', 'pvp'];
-const GLYPH: Record<Kind, string> = { you: '◉', party: '●', town: '⌂', waystone: '◈', dungeon: '⛫', hunt: '✕', elite: '✦', boss: '☠', exit: '➜', marker: '⚑', pvp: '⚔' };
+const LAYERS: Kind[] = ['you', 'party', 'town', 'waystone', 'dungeon', 'gather', 'hunt', 'elite', 'boss', 'exit', 'marker', 'pvp'];
+const GLYPH: Record<Kind, string> = { you: '◉', party: '●', town: '⌂', waystone: '◈', dungeon: '⛫', hunt: '✕', elite: '✦', boss: '☠', exit: '➜', marker: '⚑', pvp: '⚔', gather: '⛏' };
 
 /** The region a zone belongs to: a dungeon belongs to the region whose gate leads into it; the arena to Eldoria. */
 export function regionOf(zone: string): string {
@@ -52,6 +52,10 @@ export function regionPins(hud: Hud, r: string, me: { zone: string; x: number; y
   const z = ZONES[r], pins: Pin[] = [];
   if (z.sanctuary) pins.push({ kind: 'town', x: z.sanctuary.tx * TILE, y: z.sanctuary.ty * TILE, label: t('map.sanctuaryPin') });
   if (z.town) pins.push({ kind: 'town', x: tileCenter(z.town.tx), y: tileCenter(z.town.ty), label: z.town.name });
+  // gathering spots: one pin at the middle of each group of nodes
+  const spots = new Map<string, { x: number; y: number; n: number; name: string }>();
+  for (const o of zoneObjects(r)) if (o.kind === 'node') { const s = spots.get(o.res!) ?? { x: 0, y: 0, n: 0, name: o.name }; s.x += o.x; s.y += o.y; s.n++; spots.set(o.res!, s); }
+  for (const s of spots.values()) pins.push({ kind: 'gather', x: s.x / s.n, y: s.y / s.n, label: t('map.gatherPin', { name: s.name, n: s.n }) });
   for (const o of zoneObjects(r)) if (o.kind === 'waykeeper') pins.push({ kind: 'waystone', x: o.x, y: o.y, label: t('map.waystoneOf', { name: z.town?.name ?? z.name }) });
   for (const g of z.gates ?? []) {
     const d = DUNGEONS[g.dungeon];
@@ -106,6 +110,10 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
   const [draft, setDraft] = useState(null as { x: number; y: number } | null);
   const [label, setLabel] = useState('');
   const [, tick] = useState(0);
+  const strip = useRef(null as HTMLOListElement | null);
+  useEffect(() => { // open on where the player is: the region strip scrolls to put it in the middle
+    strip.current?.querySelector('.region.here')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, []);
   useEffect(() => { // the player and party markers move: redraw twice a second
     const id = setInterval(() => tick((n: number) => n + 1), 500);
     return () => clearInterval(id);
@@ -132,7 +140,7 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
         <h2>{t('map.title')}</h2>
         <button className="link panelx" onClick={onClose} aria-label={t('map.close')}>{t('common.close')}</button>
       </div>
-      <ol className="regions" aria-label={t('map.regions')}>
+      <ol className="regions" ref={strip} aria-label={t('map.regions')}>
         {MAPS.map((r, i) => {
           const d = ZONES[r], ok = explored(hud, r), party = (hud.party?.members ?? []).filter((m) => m.id !== hud.self?.id && regionOf(m.zone) === r).length;
           return (

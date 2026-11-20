@@ -1,3 +1,4 @@
+import { cleanPvpMode, type PvpMode } from './pvp';
 // Game settings (M16): key bindings, language, interface scale, graphics, camera and movement,
 // tutorial progress and map markers. One document per account (the "game" section of
 // account_settings, next to M10's "audio"); the server validates it on every write and read.
@@ -158,6 +159,8 @@ export interface GameSettings {
   touch: TouchMode;
   /** Fullscreen and landscape on phones and tablets: ask once, then on (the first tap of a visit) or off. */
   fullscreen: FullscreenMode;
+  /** How to meet other players where fighting is open: peaceful, prepared (default) or predator. */
+  pvpMode: PvpMode;
   /** U6: accessibility. */
   access: {
     /** Colour correction for colour-blind players: shifts the colours they confuse into ones they tell apart. */
@@ -185,6 +188,7 @@ export const defaultGameSettings = (): GameSettings => ({
   tutorial: { done: [], skipped: false },
   markers: [],
   touch: 'auto',
+  pvpMode: 'prepared',
   fullscreen: 'ask',
   access: { colorblind: 'none', contrast: false, reduceMotion: false },
 });
@@ -227,6 +231,7 @@ export function cleanGameSettings(raw: unknown): GameSettings {
   out.camera = { zoom: zr === 1 || zr === 2 ? zr : 0 };
   out.touch = TOUCH_MODES.includes(r.touch as TouchMode) ? (r.touch as TouchMode) : 'auto';
   out.fullscreen = FULLSCREEN_MODES.includes(r.fullscreen as FullscreenMode) ? (r.fullscreen as FullscreenMode) : 'ask';
+  out.pvpMode = cleanPvpMode(r.pvpMode);
   const ac = obj(r.access);
   out.access = { colorblind: COLORBLIND.includes(ac.colorblind as Colorblind) ? (ac.colorblind as Colorblind) : 'none', contrast: bool(ac.contrast, false), reduceMotion: bool(ac.reduceMotion, false) };
   out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false), aimAtCursor: bool(obj(r.movement).aimAtCursor, true) , clickMove: bool(obj(r.movement).clickMove, true) };

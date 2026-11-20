@@ -66,6 +66,7 @@ import { Finder } from './Finder';
 import { LFG_CHAT_MS, WORLD_CHAT_MS } from '../../../shared/src/social';
 import { Seasons } from './Seasons';
 import { Moderation } from './Moderation';
+import type { PvpMode } from '../../../shared/src/pvp';
 
 export interface Conn {
   send(data: string): void;
@@ -163,6 +164,8 @@ export class Player implements Ent {
   pvpShieldUntil = 0;
   /** Struck another player: until then the sanctuary of the Depths gives no shelter and portals stay shut. */
   pvpTagUntil = 0;
+  /** How this player meets others in open PvP (peaceful, prepared, predator). */
+  pvpMode: PvpMode = 'prepared';
   /** The Depths: standing in the sanctuary last tick, and when leaving it last gave protection. */
   inSanct = false;
   sanctShieldAt = 0;

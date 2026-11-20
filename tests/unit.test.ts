@@ -4974,6 +4974,7 @@ function freeGround(zone: string): { x: number; y: number } {
 function pair(h: ReturnType<typeof harness>, zone: string, at: { x: number; y: number }, la = 30, lb = 30) {
   const sp = ZONES[zone].spawn, dx = at.x - tileCenter(sp.tx), dy = at.y - tileCenter(sp.ty);
   const A = h.join(dx, dy, 'knight', la, -1, zone), B = h.join(dx + 48, dy, 'mage', lb, -1, zone);
+  A.p.pvpMode = B.p.pvpMode = 'predator'; // these tests are about open fighting itself; the modes have their own test
   if (ZONES[zone].depth) {
     // everyone enters the Depths through the sanctuary: walk them out to the place
     h.world.relocate(A.p, A.p.room, at.x, at.y);
@@ -7227,4 +7228,43 @@ test('quests that take you there: every objective of every quest has somewhere t
     for (const pl of places) assert.ok(Z[pl.place.zone], `${q.id}: ${pl.place.zone}`);
   }
   assert.deepEqual(missing.slice(0, 10), [], `objectives with nowhere to go (${missing.length})`);
+});
+
+test('PvP modes: peaceful never fights, prepared only fights the hostile and hits back, predator fights anyone; striking marks hostile for 20 seconds', async () => {
+  const { modeBlock, cleanPvpMode } = await import('../shared/src/pvp');
+  const { STATUS: ST, STATUS_INDEX: SI } = await import('../shared/src/combat');
+  const { DEPTHS: DP } = await import('../shared/src/depths');
+  const { ZONES: Z, tileCenter: tc } = await import('../shared/src/world');
+  assert.equal(cleanPvpMode(undefined), 'prepared', 'prepared is the default');
+  assert.equal(cleanPvpMode('predator'), 'predator');
+  assert.equal(cleanPvpMode('berserk'), 'prepared');
+  assert.ok(modeBlock('peaceful', true), 'peaceful: not even the hostile');
+  assert.ok(modeBlock('prepared', false));
+  assert.equal(modeBlock('prepared', true), '');
+  assert.equal(modeBlock('predator', false), '');
+  assert.equal(ST[SI.hostile].ms, 20000, 'hostile lasts 20 seconds');
+
+  // in the Depths (open PvP), away from the sanctuary
+  const h = harness({ capacity: 10 }), { world } = h, a = h.join(0, 0, 'knight', 60).p, b = h.join(0, 0, 'knight', 60).p;
+  const depth = DP[0], dz = Z[depth.id], far = { x: tc(dz.sanctuary!.tx + dz.sanctuary!.r + 12), y: tc(dz.sanctuary!.ty) };
+  const room = world.roomIn(depth.id, a);
+  world.relocate(a, room, far.x, far.y);
+  world.relocate(b, room, far.x + 40, far.y);
+  a.pvpShieldUntil = b.pvpShieldUntil = 0;
+  assert.equal(a.pvpMode, 'prepared');
+  assert.match(world.pvp.block(a, b), /not hostile/, 'prepared: a player who is not hostile is left alone');
+  world.pvpOp(a, { op: 'pmode', mode: 'peaceful' });
+  assert.match(world.pvp.block(a, b), /peaceful/);
+  world.pvpOp(a, { op: 'pmode', mode: 'predator' });
+  assert.equal(world.pvp.block(a, b), '', 'predator: anyone');
+  // the predator strikes: marked hostile; the prepared victim may now hit back, and is not marked for it
+  world.pvp.onHit(a, b);
+  assert.ok(world.pvp.hostile(a), 'the striker is hostile');
+  assert.equal(world.pvp.block(b, a), '', 'prepared: hitting back at a hostile player is allowed');
+  world.pvp.onHit(b, a);
+  assert.ok(!world.pvp.hostile(b), 'hitting back does not make you hostile');
+  // 20 seconds later the mark is gone and the prepared player leaves them alone again
+  for (let i = 0; i < 20 * 21; i++) h.step();
+  assert.ok(!world.pvp.hostile(a), 'the mark wears off');
+  assert.match(world.pvp.block(b, a), /not hostile/);
 });

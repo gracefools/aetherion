@@ -187,6 +187,7 @@ const STATUS_ICON: Record<string, IconDef> = {
   rested: { bg: '#3a6a8a', layers: [['crescent', '#fff0b0', 0, 0, 0, 0.8], ['star', '#ffffff', 12, -12, 0, 0.3]] },
   null_phase: { bg: '#2a1240', layers: [['eye', '#c84aff'], ['star', '#f0d0ff', 0, 0, 0, 0.4]] },
   swift: { bg: '#2a6a5a', layers: [['bolt', '#d0fff0', 0, 0, 0, 0.8]] },
+  hostile: { bg: '#8a1a14', layers: [['blade', '#ffd0c8', -8, -6, -30, 0.75], ['blade', '#ff8a7a', 8, -6, 30, 0.75], ['dot', '#fff', 0, 16, 0, 0.3]] },
 };
 
 /** Basic attack, one per weapon kind. */

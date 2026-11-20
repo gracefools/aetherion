@@ -56,11 +56,13 @@ export const STATUS: StatusDef[] = [
   // --- G4 region traits ---
   { id: 'null_phase', name: 'Phased Out', debuff: false, ms: 1800, maxStacks: 1, invuln: true },
   { id: 'swift', name: 'Swiftness', debuff: false, ms: 4000, maxStacks: 1, moveMul: 1.3 },
+  // --- PvP: struck a player who was not hostile; the name shows red to everyone for 20 seconds ---
+  { id: 'hostile', name: 'Hostile', debuff: false, ms: 20000, maxStacks: 1 },
 ];
 export type StatusId =
   | 'poison' | 'slow' | 'stun' | 'weaken' | 'bleed' | 'enrage' | 'ward'
   | 'burn' | 'root' | 'mark' | 'guard' | 'rally' | 'blessing' | 'haste' | 'frenzy' | 'surge' | 'last_stand'
-  | 'aegis' | 'stealth' | 'mana_shield' | 'barrier' | 'retribution' | 'shock' | 'death_mark' | 'rested' | 'null_phase' | 'swift';
+  | 'aegis' | 'stealth' | 'mana_shield' | 'barrier' | 'retribution' | 'shock' | 'death_mark' | 'rested' | 'null_phase' | 'swift' | 'hostile';
 export const STATUS_INDEX = Object.fromEntries(STATUS.map((s, i) => [s.id, i])) as Record<StatusId, number>;
 
 export interface StatusInst {

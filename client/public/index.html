@@ -779,6 +779,12 @@
   .regionview { cursor: crosshair; } .regionview .pin.dest { position: absolute; translate: -50% -50%; color: #ffe08a; font-size: 20px; text-shadow: 0 0 4px #000, 0 0 8px #000; pointer-events: none; animation: destpulse 1s ease-in-out infinite; }
   @keyframes destpulse { 50% { scale: 1.35; } }
   .gohere { align-items: center; flex-wrap: wrap; }
+  /* PvP mode switch and the hostile mark */
+  .pvpmodes { display: inline-flex; gap: 3px; margin-left: 6px; pointer-events: auto; }
+  .pvpmodes button { padding: 1px 7px; font-size: 11px; opacity: .7; } .pvpmodes button.on { opacity: 1; font-weight: 700; }
+  .pvpmodes button.peaceful.on { background: #2f8a3a; color: #eaffea; border-color: #9fe39b; } .pvpmodes button.prepared.on { background: #a57f2e; color: #1a1408; border-color: #e5c877; }
+  .pvpmodes button.predator.on { background: #a32a22; color: #fff; border-color: #ff8a7a; }
+  .hostiletag { margin-left: 6px; color: #ff5a4a; }
 </style>
 </head>
 <body>

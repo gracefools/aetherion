@@ -105,3 +105,19 @@ export function ratingDelta(winner: number, loser: number): number {
   const expected = 1 / (1 + Math.pow(10, (loser - winner) / 400));
   return Math.max(1, Math.round(RATING_K * (1 - expected)));
 }
+
+/**
+ * How a player meets other players where fighting is open (the Depths, outside duels and arenas):
+ *  peaceful  never fights players: cannot hurt them, does not hit back
+ *  prepared  fights only hostile players (those who struck someone who was not), and hits back
+ *  predator  fights anyone, players before monsters
+ */
+export const PVP_MODES = ['peaceful', 'prepared', 'predator'] as const;
+export type PvpMode = (typeof PVP_MODES)[number];
+export const cleanPvpMode = (v: unknown): PvpMode => (PVP_MODES.includes(v as PvpMode) ? (v as PvpMode) : 'prepared');
+/** Why this mode forbids striking the other player ('' if it allows it). */
+export function modeBlock(mode: PvpMode, targetHostile: boolean): string {
+  if (mode === 'peaceful') return 'You are in peaceful mode';
+  if (mode === 'prepared' && !targetHostile) return 'That player is not hostile (you are in prepared mode)';
+  return '';
+}

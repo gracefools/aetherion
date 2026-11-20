@@ -76,6 +76,8 @@ export class AutoHunter {
   private told = new Set<string>();
   private returning: { x: number; y: number } | null = null;
   private dir: Step | null = null;
+  /** Open PvP: the player to fight first, by the player's mode (predator: anyone; prepared: the hostile). */
+  foe: (() => { id: number; x: number; y: number; name: string } | null) | null = null;
   /** Only these monster types are hunted (a quest's targets); null: as configured. */
   focus: Set<string> | null = null;
   /** Following a party leader: the hunting area moves with them and their target comes first. */
@@ -195,6 +197,22 @@ export class AutoHunter {
     }
     if (cfg.loot && cfg.onFull === 'stop' && h.bagFull()) return this.selfStop('your inventory is full');
 
+    // --- another player first, where the mode says so: close in and strike ---
+    const foe = this.foe?.() ?? null;
+    if (foe) {
+      if (h.targetId() !== foe.id) h.setTarget(foe.id);
+      this.targetName = foe.name;
+      const reachP = h.range(), dP = Math.hypot(foe.x - me.x, foe.y - me.y);
+      if (dP <= (reachP > 100 ? reachP * 0.85 : reachP + 8) && lineOfSight(map, me.x, me.y, foe.x, foe.y)) {
+        this.dir = null;
+        this.status = `Fighting ${foe.name}`;
+        if (cfg.attack && !h.attacking() && now - this.lastAttack > 400) { this.lastAttack = now; h.attack(); }
+      } else {
+        this.status = `Moving to ${foe.name}`;
+        this.dir = this.walk(foe.x, foe.y, now, 4000);
+      }
+      return;
+    }
     // --- target: keep a valid one, otherwise the one that is quickest to hit inside the hunting area ---
     const all = h.monsters(), mobs = this.focus ? all.filter((m) => this.focus!.has(m.type)) : all, reach = h.range(), reachEff = reach > 100 ? reach * 0.85 : reach - 2;
     // with a leader: hunt around them, wherever they go

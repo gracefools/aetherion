@@ -19,6 +19,7 @@ import { Icon as ItemIcon } from './inventory';
 import { PET_SKILLS, petSkillPower } from '../../shared/src/companions';
 import { BG, RANKED } from '../../shared/src/matches';
 import { toTop } from './rail';
+import { PVP_MODES } from '../../shared/src/pvp';
 
 const ZONE_LABEL: Record<Hud['pvpZone'], [Key, Key]> = {
   safe: ['pvp.zone.safe', 'pvp.zone.safeTip'],
@@ -41,6 +42,12 @@ export function PvpZoneBadge({ hud, game }: { hud: Hud; game: Game }) {
   return toRail(
     <div className={'hud pvpzone ' + hud.pvpZone} title={t(tip, { n: Math.round((DEPTH_MONSTER.exp - 1) * 100) })} role="status" aria-label={t('pvp.zone.label', { name: t(label) })}>
       {t(label)}
+      {hud.pvpZone === 'open' && !hud.arena && !hud.match && (
+        <span className="pvpmodes" role="radiogroup" aria-label={t('pvp.mode')}>
+          {PVP_MODES.map((m) => <button key={m} role="radio" aria-checked={hud.pvpMode === m} className={'small ' + m + (hud.pvpMode === m ? ' on' : '')} title={t(`pvp.mode.${m}.tip` as Key)} onClick={() => game.setPvpMode(m)}>{t(`pvp.mode.${m}` as Key)}</button>)}
+        </span>
+      )}
+      {hud.hostile && <b className="hostiletag">{t('pvp.hostile')}</b>}
       {hud.arena && !hud.match && <button className="small" onClick={() => game.pvpOp('leave')}>{t('pvp.leaveArena')}</button>}
       {hud.mq && <span className="mq">{t(hud.mq === 'ranked' ? 'mm.inLineRanked' : hud.mq === 'ranked2' ? 'mm.inLineRanked2' : 'mm.inLineBg')} <small className="sub">{t('mm.waiting', { n: hud.mqN || 1, t: `${Math.floor(waited / 60)}:${String(waited % 60).padStart(2, '0')}` })}</small> <button className="small" onClick={() => game.pvpOp('unqueue')}>{t('mm.leaveLine')}</button></span>}
     </div>

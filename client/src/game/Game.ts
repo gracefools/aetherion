@@ -69,6 +69,7 @@ import { AUTO_MOUNT_MS, MOUNT_FORBIDDEN_KINDS } from '../../../shared/src/compan
 import { clearLine, findPath, tileOf, tileXY } from '../../../shared/src/nav';
 import { tc } from '../i18n/content';
 import { planRoute, routeSummary, type Leg, type Place, type Route, type TravelCtx } from '../../../shared/src/travel';
+import { modeBlock, type PvpMode } from '../../../shared/src/pvp';
 
 export interface ChatLine {
   id: number;
@@ -156,6 +157,9 @@ export interface Hud {
   travel: { to: string; tp: number; gold: number; follow: boolean } | null;
   /** Following the party leader. */
   follow: boolean;
+  pvpMode: PvpMode;
+  /** Marked hostile yourself (your name is red to others). */
+  hostile: boolean;
   /** U4: the right-click menu, at screen coordinates, for what was under the cursor. */
   ctx: CtxMenu | null;
   /** Id of the NPC the player is talking to. */
@@ -329,6 +333,7 @@ const MOVES: Partial<Record<Action, [number, number]>> = { 'move.up': [0, -1], '
 export const keyOf = (a: Action) => keyLabel(settings.get().keys[a][0] ?? '');
 export const runeKey = (slot: number, i: number) => keyOf(`rune.${slot + 1}.${i + 1}` as Action);
 const STEALTH_BIT = 1 << STATUS_INDEX.stealth;
+const HOSTILE_BIT = 1 << STATUS_INDEX.hostile;
 const rangedCache = new Map<string, boolean>();
 /** Whether a monster type throws projectiles (in any boss phase). */
 function isRanged(mt: string) {
@@ -347,7 +352,7 @@ export class Game {
     status: 'connecting', reason: '', zone: '', channel: 1, ping: 0, fps: 0, nearby: 0, chat: [], self: null, stats: null,
     hp: 0, res: 0, exp: 0, next: 1, statuses: [], statusUntil: [], target: null, attacking: false, dead: 0, canRespawn: false, toast: '',
     build: null, points: 0, cds: {}, cast: null, ally: null, notice: '', party: null, invite: null,
-    inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, travel: null, follow: false, ctx: null, talk: null, disc: [], zoneId: '',
+    inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, travel: null, follow: false, pvpMode: settings.get().pvpMode, hostile: false, ctx: null, talk: null, disc: [], zoneId: '',
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
     guild: null, grank: 3, ginv: null, bank: emptyBank(), ah: null, ahhist: [], banklog: [],
@@ -1124,6 +1129,7 @@ export class Game {
     if (this.hud.status !== 'playing' || this.isDead || !this.map || this.hunter.on) return;
     const cfg = this.hud.auto.cfg;
     this.hunter.start(cfg, performance.now());
+    this.hunter.foe = () => this.pvpFoe();
     this.hunter.onStop = () => {
       // the hunter stopped by itself (bag full, out of potions): the server session ends too
       this.sendMsg({ t: 'auto', on: false });
@@ -1247,7 +1253,41 @@ export class Game {
       { id: me.id, level: me.level, x: this.cur.x, y: this.cur.y, party: party(me.id), shieldUntil: 0, duel, guild: me.gt ?? '' },
       { id: r.meta.id, level: r.meta.level, x: r.rx, y: r.ry, party: party(r.meta.id), shieldUntil: 0, duel: duel === r.meta.id ? me.id : 0, guild: r.meta.gt ?? '' },
       this.map.def.id, this.hud.arena, Date.now(),
-    ) === '';
+    ) === '' && (this.hud.arena || !!duel || modeBlock(this.hud.pvpMode, this.isHostile(r as { st?: number } as { st: number })) === '');
+  }
+  /** PvP mode (peaceful, prepared, predator): kept in the settings, enforced by the server. */
+  setPvpMode(mode: PvpMode) {
+    settings.set({ pvpMode: mode });
+    this.sendMsg({ t: 'pvp', op: 'pmode', mode });
+    this.setHud({ pvpMode: mode });
+    this.pushChat({ text: mode === 'peaceful' ? 'Peaceful: you do not fight other players.' : mode === 'predator' ? 'Predator: you fight any player you meet.' : 'Prepared: you fight hostile players and hit back.' });
+  }
+  /** Whether that player is marked hostile (red name). */
+  private isHostile(r: { st: number }) {
+    return (r.st & HOSTILE_BIT) !== 0;
+  }
+  /** In open PvP, the player this mode goes for by itself: any in reach (predator), a hostile one (prepared), nobody (peaceful). */
+  private pvpFoe(): { id: number; x: number; y: number; name: string } | null {
+    if (this.hud.pvpZone !== 'open' || this.hud.pvpMode === 'peaceful') return null;
+    let best: Remote | null = null, bd = 380;
+    for (const r of this.remotes.values()) {
+      if (r.mt || r.hp <= 0 || r.st & STEALTH_BIT || !this.canAttack(r)) continue;
+      const d = Math.hypot(r.rx - this.cur.x, r.ry - this.cur.y);
+      if (d < bd) { bd = d; best = r; }
+    }
+    return best ? { id: best.meta.id, x: best.rx, y: best.ry, name: best.meta.name } : null;
+  }
+  private hitBackAt = 0;
+  /** Struck by a player: unless peaceful, turn on them (a monster in hand is dropped for the attacker). */
+  private hitBack(srcId: number) {
+    const now = performance.now(), r = this.remotes.get(srcId);
+    if (!r || r.mt || this.hud.pvpMode === 'peaceful' || now < this.hitBackAt || this.isDead) return;
+    const cur = this.remotes.get(this.targetId);
+    if (cur && !cur.mt && cur.hp > 0) return; // already fighting a player
+    if (!this.canAttack(r)) return;
+    this.hitBackAt = now + 1500;
+    this.setTarget(srcId);
+    if (!this.hud.attacking) this.doAction();
   }
   /** Player-to-player trading; every step is decided by the server. */
   tradeOp(op: 'invite' | 'accept' | 'decline' | 'offer' | 'remove' | 'gold' | 'confirm' | 'unconfirm' | 'cancel', a: { id?: number; name?: string; uid?: string; qty?: number; gold?: number } = {}) {
@@ -1631,6 +1671,8 @@ export class Game {
   }
   private onWelcome(m: WelcomeMsg) {
     const zoneChanged = this.map?.def.id !== m.zone;
+    this.sendMsg({ t: 'pvp', op: 'pmode', mode: settings.get().pvpMode }); // the server is told on every arrival
+    if (this.hud.pvpMode !== settings.get().pvpMode) this.setHud({ pvpMode: settings.get().pvpMode });
     this.goal = null; // a walk does not carry over to another place; a journey picks up its next leg
     sound.zone(m.zone, zoneChanged, !!this.map);
     this.map = getZoneMap(m.zone);
@@ -1680,6 +1722,8 @@ export class Game {
   }
   private onSelf(me: SelfState, now: number) {
     this.statusUntil = me.st.map(([i, ms]) => [i, now + ms] as [number, number]);
+    const hostile = me.st.some(([i]) => i === STATUS_INDEX.hostile);
+    if (hostile !== this.hud.hostile) this.setHud({ hostile });
     this.recalcStatus(now);
     if (me.dead && !this.isDead) {
       this.diedAt = now;
@@ -1696,6 +1740,7 @@ export class Game {
   private recalcStatus(now: number) {
     let mul = 1, stun = false;
     this.statusUntil = this.statusUntil.filter(([, until]) => until > now);
+    if (this.hud.hostile && !this.statusUntil.some(([i]) => i === STATUS_INDEX.hostile)) this.setHud({ hostile: false });
     for (const [i] of this.statusUntil) {
       mul *= STATUS[i].moveMul ?? 1;
       if (STATUS[i].stun) stun = true;
@@ -1811,6 +1856,7 @@ export class Game {
         const pos = this.posOf(tid);
         if (!pos) continue;
         const mine = tid === myId, byMe = src === myId;
+        if (mine && src > 0 && src !== myId && amount > 0) this.hitBack(src);
         const r = this.remotes.get(tid);
         sound.damage(now, {
           mine, byMe, basic: byMe && !myFx, targetMt: mine ? '' : r?.mt ?? '', srcMt: this.remotes.get(src)?.mt ?? '', flags, amount,
@@ -2361,7 +2407,7 @@ export class Game {
         if (targeted) targetPos = r;
         // in a match: team-mates blue, opponents red (G8)
         const side = this.hud.match ? (this.hud.match.teams[this.hud.match.side].ids.includes(r.meta.id) ? 1 : this.hud.match.teams[1 - this.hud.match.side].ids.includes(r.meta.id) ? 2 : 0) : 0;
-        o.color = targeted ? '#ff9a8a' : side === 1 ? '#8fd0ff' : side === 2 ? '#ff6a5a' : this.hud.party?.members.some((m) => m.id === r.meta.id) ? '#8fd0ff' : this.hud.guild && r.meta.gt === this.hud.guild.tag ? '#a8f0b0' : '#ffffff';
+        o.color = this.isHostile(r) && !side ? '#ff3b2f' : targeted ? '#ff9a8a' : side === 1 ? '#8fd0ff' : side === 2 ? '#ff6a5a' : this.hud.party?.members.some((m) => m.id === r.meta.id) ? '#8fd0ff' : this.hud.guild && r.meta.gt === this.hud.guild.tag ? '#a8f0b0' : '#ffffff';
         o.pet = r.meta.pet && r.hp > 0 ? (hd ? hdPetSprite : petSprite)(r.meta.pet[0]) : null;
         o.petStage = r.meta.pet ? petStage(r.meta.pet[2]) : 0;
         o.flying = !!(r.meta.mnt && MOUNTS[r.meta.mnt]?.fly);
@@ -2390,7 +2436,7 @@ export class Game {
       o.label = `${this.hud.guild ? `[${this.hud.guild.tag}] ` : ''}${me.name}  Lv.${me.level}`;
       o.title = this.hud.journal.ti ? titleName(this.hud.journal.ti) : '';
       o.labelY = (hd ? HD_NAME : NAME_OY) + (me.ap.helmet === 5 || me.ap.helmet === 3 ? 8 : 0) + (comp.riding ? 6 : 0);
-      o.color = '#ffe08a';
+      o.color = this.hud.hostile ? '#ff3b2f' : '#ffe08a';
       o.pet = pet && !this.isDead ? (hd ? hdPetSprite : petSprite)(pet.kind) : null;
       o.petStage = pet ? petStage(pet.level) : 0;
       o.flying = isFlying(comp);

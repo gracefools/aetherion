@@ -1,6 +1,7 @@
 // U7: Indonesian for the game content (item, skill, monster, quest, place and lore text), keyed by the
 // English text. Generated from the content tables (.run/u7/extract.ts); unchanged names are left out.
 export const CONTENT_ID: Record<string, string> = {
+"Hostile": "Bermusuhan",
 "\"Let it not end.\" The same words Ysolde used. The Askers are asking her to lend them her request.": "\"Jangan biarkan ini berakhir.\" Kata-kata yang sama seperti yang diucapkan Ysolde. Para Penanya memintanya meminjamkan permohonannya kepada mereka.",
 "\"To bring them home.\" Ser Maldrec's oath. Whoever answered it was not the star. The Askers want whatever did answer.": "\"Untuk membawa mereka pulang.\" Sumpah Ser Maldrec. Siapa pun yang menjawabnya bukanlah sang bintang. Para Penanya menginginkan apa pun yang menjawab itu.",
 "\"You stand before the throne. Kneel.\"": "\"Kau berdiri di hadapan takhta. Berlututlah.\"",

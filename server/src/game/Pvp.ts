@@ -21,6 +21,8 @@ import { INTERACT_RANGE } from '../../../shared/src/places';
 import { ITEMS } from '../../../shared/src/items';
 import { give, sendInv } from './Inventory';
 import { Matches } from './Matches';
+import { cleanPvpMode, modeBlock } from '../../../shared/src/pvp';
+import { applyStatus } from './entity';
 
 interface Duel {
   a: Player;
@@ -60,7 +62,18 @@ export class Pvp {
     if (b.dead || a.dead) return 'Not a valid target';
     if (a.room !== b.room) return 'Not a valid target';
     const now = Date.now();
-    return pvpBlock(this.view(a, now), this.view(b, now), a.room.zoneId, this.arenaRules(a.room), now);
+    const why = pvpBlock(this.view(a, now), this.view(b, now), a.room.zoneId, this.arenaRules(a.room), now);
+    if (why || this.arenaRules(a.room) || this.dueling(a, b)) return why;
+    // in the open, the attacker's own mode decides: peaceful never, prepared only against the hostile
+    return modeBlock(a.pvpMode, this.hostile(b));
+  }
+  /** Marked hostile: struck a player who was not, within the last 20 seconds. */
+  hostile(p: Player): boolean {
+    return p.st.some((s) => s.i === STATUS_INDEX.hostile);
+  }
+  private dueling(a: Player, b: Player): boolean {
+    const d = this.duels.get(a.id);
+    return !!d && (d.a === b || d.b === b);
   }
 
   /** One weapon or spell hit from a player on a player. */
@@ -101,6 +114,12 @@ export class Pvp {
     if (d && (d.a === v || d.b === v)) return;
     a.pvpShieldUntil = 0;
     a.pvpTagUntil = Date.now() + PVP_TAG_MS;
+    // striking someone who is not hostile makes the striker hostile; hitting back at a hostile player does not
+    if (!this.hostile(v)) {
+      applyStatus(a, STATUS_INDEX.hostile, this.w.tick, 0, a.id);
+      a.sver++;
+      a.selfDirty = true;
+    }
   }
   /**
    * Called by World.hurt before damage from a player lands on a player. Returns the damage that
@@ -177,6 +196,9 @@ export class Pvp {
         }).catch((e) => console.error('honour purchase failed', e));
         return '';
       }
+      case 'pmode':
+        p.pvpMode = cleanPvpMode(m.mode);
+        return '';
       case 'duel': {
         const t = Number.isInteger(m.id) ? this.w.online.get(m.id) : undefined;
         if (!t || t === p || !t.conn || t.room !== p.room) return 'That player is not here';

@@ -1092,6 +1092,15 @@
    "height": 64
   },
   {
+   "id": "status/hostile",
+   "kind": "status",
+   "ref": "hostile",
+   "name": "Hostile",
+   "file": "icons/status/hostile.png",
+   "width": 64,
+   "height": 64
+  },
+  {
    "id": "attack/sword_shield",
    "kind": "attack",
    "ref": "sword_shield",

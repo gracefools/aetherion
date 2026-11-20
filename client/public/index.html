@@ -19,6 +19,8 @@
   h1, h2 { font-family: Georgia, "Times New Roman", serif; color: var(--gold); margin: 0 0 4px; letter-spacing: .04em; font-weight: 600; }
   h1 { font-size: 30px; text-align: center; } h2 { font-size: 20px; }
   .screen { height: 100%; display: grid; place-items: center; padding: 16px; overflow: auto; }
+  /* a panel taller than the screen starts at the top and scrolls, instead of being cut off above it */
+  .screen { align-items: start; } .screen > .panel { margin: auto 0; max-width: calc(100vw / var(--uiw, 1) - 32px); zoom: var(--uiw, 1); }
   .panel { background: var(--panel); border: 1px solid var(--line); box-shadow: 0 0 0 1px #0b0d14, inset 0 0 0 1px rgba(201,162,74,.18), 0 12px 40px rgba(0,0,0,.5); border-radius: 6px; padding: 20px; }
   .auth { width: min(360px, 100%); display: grid; gap: 12px; }
   .sub { color: var(--dim); margin: 0; font-size: 13px; } .auth .sub { text-align: center; }
@@ -215,7 +217,7 @@
   .socialbtns { right: 10px; bottom: 70px; display: flex; gap: 4px; pointer-events: auto; } .lootfeed { bottom: 104px !important; }
   .chatlog .guild { color: #a8f0b0; }
   /* M16: interface scale, settings, world map, tutorial */
-  .play .hud, .modal, .menusettings { zoom: var(--ui, 1); }
+  .play .hud { zoom: var(--ui, 1); } .modal, .menusettings { zoom: var(--uiw, 1); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .settings { max-height: calc(100% - 40px); overflow: auto; width: min(600px, calc(100% - 24px)) !important; }
   .settings [role=tabpanel] { margin-top: 10px; }
@@ -409,7 +411,7 @@
   .ico { display: block; flex: 0 0 auto; }
   /* windows: a title bar to drag, several open at once (windows.tsx) */
   .winlayer { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
-  .win { position: absolute; left: 0; top: 0; zoom: var(--ui, 1); pointer-events: auto; display: flex; flex-direction: column; max-height: calc(100vh / var(--ui, 1) - 16px);
+  .win { position: absolute; left: 0; top: 0; zoom: var(--uiw, 1); pointer-events: auto; display: flex; flex-direction: column; max-height: calc(100vh / var(--uiw, 1) - 16px);
     filter: drop-shadow(0 14px 30px rgba(0,0,0,.55)); animation: winin .16s ease-out; }
   .win.dragging { opacity: .92; } .win.dragging .winbar { cursor: grabbing; }
   @keyframes winin { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
@@ -692,6 +694,27 @@
   html.touch .ctxmenu button { padding: 10px 12px; }
   html.touch .coach { top: calc(100px / var(--ui, 1)); bottom: auto; left: 10px; max-width: calc(330px / var(--ui, 1)); }
   html.touch.portrait .coach { top: auto; bottom: calc(340px / var(--ui, 1)); }
+  /* ==== Responsive: any screen from a small phone to a large monitor ==== */
+  /* small screens: a window fills the screen (several stay stacked; the front one is on top) */
+  @media (max-width: 760px), (max-height: 520px) {
+    .win { left: 0 !important; top: 0 !important; translate: none !important; width: calc(100vw / var(--uiw, 1)) !important; height: calc(100vh / var(--uiw, 1)); max-height: none; filter: none; animation: none; }
+    @supports (height: 100dvh) { .win { height: calc(100dvh / var(--uiw, 1)); } }
+    .win > .hud.panel, .win > .modal { border-radius: 0; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+    .winbar { border-radius: 0; height: 44px; padding-top: env(safe-area-inset-top); cursor: default; } .winx { width: 40px; height: 40px; } .wingrip { display: none; }
+    .win .tabs { flex-wrap: wrap; align-items: center; } .win table { display: block; overflow-x: auto; }
+    .modal { width: calc(100vw / var(--uiw, 1) - 16px); }
+  }
+  /* the touch controls step aside while a window is open */
+  html.touch body:has(.win) .touchpad { display: none; }
+  /* upright screens: event and boss boxes sit under the character frame instead of over it */
+  html.portrait .topstack { top: calc(190px * var(--ui, 1)); width: calc(100% - 24px); min-width: 0; }
+  html.portrait .rotatehint { font-size: 12px; }
+  html.touch.portrait:not(.phone) .rotatehint { display: none; } /* tablets are fine upright */
+  html.touch.portrait.phone .rotatehint { top: auto; bottom: 214px; }
+  /* short screens: the sound prompt goes to the bottom, clear of the title and the sign-in form */
+  @media (max-height: 520px) { .audioprompt { top: auto; bottom: 8px; } }
+  /* never a sideways scroll on the page itself */
+  html, body { max-width: 100%; overflow-x: hidden; }
 </style>
 </head>
 <body>

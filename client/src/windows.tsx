@@ -132,7 +132,7 @@ export function Win({ id, title: titleKey, width = 760, onClose, children }: { i
     centre(ref.current!, 0);
   };
   const body = (
-    <div ref={ref} className={'win win-' + id} style={{ width: `min(${width}px, calc(100vw / var(--ui, 1) - 24px))` }} onPointerDownCapture={front}>
+    <div ref={ref} className={'win win-' + id} style={{ width: `min(${width}px, calc(100vw / var(--uiw, 1) - 24px))` }} onPointerDownCapture={front}>
       <div className="winbar" onPointerDown={drag} onDoubleClick={reset} title={t('win.moveHint')}>
         <Icon name="grip" size={14} className="wingrip" />
         <span className="wintitle">{title}</span>

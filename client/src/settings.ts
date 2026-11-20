@@ -74,12 +74,19 @@ class SettingsStore {
   private watching = false;
   private apply() {
     if (typeof document === 'undefined') return;
-    // U3: touch mode (on touch screens unless switched off) shrinks the interface on small screens
-    const touch = touchActive(this.s), short = Math.min(window.innerWidth, window.innerHeight);
-    const tz = touch ? (short < 500 ? 0.6 : short < 800 ? 0.8 : 1) : 1;
+    // Responsive interface: the HUD is laid out for 1280x720 (or 720x1100 upright) and shrinks to fit
+    // smaller screens; windows shrink less, so their text stays readable, and fill a small screen.
+    const touch = touchActive(this.s), W = window.innerWidth, H = window.innerHeight, upright = H > W;
+    const r05 = (v: number) => Math.round(v * 20) / 20;
+    // smaller than the design: shrink to fit (not below 0.62); larger: grow at half the rate, up to 1.4
+    const fit = upright ? Math.min(W / 720, H / 1100) : Math.min(W / 1280, H / 720);
+    const hud = fit >= 1 ? Math.min(1.4, r05(1 + (fit - 1) / 2)) : Math.max(0.62, r05(fit));
+    const short = Math.min(W, H), win = Math.max(hud, short < 420 || (!upright && H < 480) ? 0.85 : short < 700 ? 0.9 : 1);
     document.documentElement.classList.toggle('touch', touch);
-    document.documentElement.classList.toggle('portrait', window.innerHeight > window.innerWidth);
-    document.documentElement.style.setProperty('--ui', String(Math.round(this.s.uiScale * tz * 100) / 100));
+    document.documentElement.classList.toggle('portrait', upright);
+    document.documentElement.style.setProperty('--ui', String(Math.round(this.s.uiScale * hud * 100) / 100));
+    document.documentElement.style.setProperty('--uiw', String(Math.round(this.s.uiScale * win * 100) / 100));
+    document.documentElement.classList.toggle('phone', short < 540);
     if (!this.watching) {
       this.watching = true;
       window.addEventListener('resize', () => this.apply());

@@ -1,7 +1,7 @@
 // World interactions: gathering, hidden caches, waystone travel and merchant crafting.
 // All of it is validated here: where the player stands, what they own, what they have found.
 import { COMBAT_TIMEOUT_MS } from '../../../shared/src/combat';
-import { ITEM_LIST, ITEMS, pickRarity, rollItem, usableBy } from '../../../shared/src/items';
+import { INVENTORY_SIZE, ITEM_LIST, ITEMS, pickRarity, rollItem, usableBy } from '../../../shared/src/items';
 import { GATHER_MS,
   allDiscoveries, INTERACT_RANGE, NODE_RESPAWN_MS, objById, objNear, RECIPES, START_DISCOVERIES, teleportCost, waypointId, WAYSTONE_RANGE, zoneObjects,
 } from '../../../shared/src/places';
@@ -9,6 +9,7 @@ import { TICK_MS } from '../../../shared/src/protocol';
 import { REGIONS, ZONES } from '../../../shared/src/world';
 import { award, consume, count, give, nearShop, sendInv } from './Inventory';
 import type { Player, World } from './World';
+import { ENERGY_COST, MAT_TIER } from '../../../shared/src/life';
 
 /** Stored discoveries are filtered against what actually exists. */
 export function cleanDiscoveries(raw: unknown): Set<string> {
@@ -75,17 +76,23 @@ export function objOp(w: World, p: Player, m: any): string {
       // gathering takes time: it begins now and finishes in finishGather if the player stays put
       if (!m.done) {
         if ((w.tick - p.lastCombat) * TICK_MS <= COMBAT_TIMEOUT_MS) return 'Not while in combat';
+        // energy is checked before and spent after: an interrupted gathering costs nothing
+        const need = ENERGY_COST[MAT_TIER[o.res!] || 1];
+        if (w.life.energy(p) < need) return `Not enough energy: this takes ${need}, you have ${w.life.energy(p)} (it fills again tomorrow)`;
         p.gathering = { id: o.id, x: p.x, y: p.y, until: w.tick + Math.ceil(GATHER_MS / TICK_MS) };
         w.send(p, { t: 'chan', name: o.name, ms: GATHER_MS });
         return '';
       }
-      const qty = 1 + (w.rnd() < 0.35 ? 1 : 0);
-      if (!give(p, { base: o.res!, rar: 0, ilvl: 1, aff: [], up: 0, qty })) return 'Inventory is full';
+      const qty = w.life.haul(p, o.res!);
+      if (p.inv.length >= INVENTORY_SIZE && !p.inv.some((i) => i.base === o.res && i.qty + qty <= (ITEMS[o.res!].stack ?? 1))) return 'Inventory is full';
+      const why = w.life.payEnergy(p, o.res!);
+      if (why) return why;
+      give(p, { base: o.res!, rar: 0, ilvl: 1, aff: [], up: 0, qty });
       p.room.nodeReady.set(o.id, w.tick + Math.ceil(NODE_RESPAWN_MS / TICK_MS));
       for (const q of p.room.players.values()) w.send(q, { t: 'nodes', cd: [[o.id, NODE_RESPAWN_MS]] });
       // the profession: more from every node as it grows, and rare finds from level 20
-      const extra = w.life.onGather(p, o.res!).filter((s) => give(p, s));
-      w.send(p, { t: 'loot', gold: 0, items: [{ base: o.res!, rar: 0, qty }, ...extra.map((s) => ({ base: s.base, rar: 0, qty: s.qty }))] });
+      w.life.onGather(p, o.res!);
+      w.send(p, { t: 'loot', gold: 0, items: [{ base: o.res!, rar: 0, qty }] });
       sendInv(w, p);
       w.journals.onGather(p);
       return '';

@@ -138,6 +138,12 @@ export function invOp(w: World, p: Player, m: any): string {
         take(p, it, 1);
         break;
       }
+      if (kind === 'food') {
+        const why = w.life.eat(p, it.base);
+        if (why) return why;
+        take(p, it, 1);
+        break;
+      }
       if (kind !== 'potion') return 'Cannot be used';
       if (w.tick < p.potionReady) return 'Potions are on cooldown';
       const rage = JOB_DEFS[p.job].resource === 'rage';
@@ -214,11 +220,13 @@ export function invOp(w: World, p: Player, m: any): string {
       break;
     }
     case 'buy': {
-      const rune = typeof m.base === 'string' && RUNE_STOCK.includes(m.base);
+      const rune = false; // Rune Scrolls are no longer sold: they drop from monsters and bosses
+      void RUNE_STOCK;
       const b = typeof m.base === 'string' && (SHOP_STOCK.includes(m.base) || SHOP_COMPANIONS.includes(m.base) || rune) ? ITEMS[m.base] : undefined;
       if (!b) return 'Not for sale';
       if (rune ? !nearRunesmith(p) : !nearShop(p)) return rune ? 'You need to be at the Rune Merchant' : 'You need to be at a shop';
       if (rune && p.room.zoneId !== 'eldoria') return 'Rune Scrolls are sold only by the Rune Merchant of Eldoria';
+      if (SHOP_COMPANIONS.includes(b.id) && p.room.zoneId !== 'eldoria') return 'Pets and mounts are sold only in Eldoria';
       // some things are sold once to each character: one starter pet, the first mount, one of each scroll
       const once = SHOP_ONCE[b.id], n = once ? 1 : qty;
       if (once && p.journal.s.b.includes(once)) return 'You have already bought that; a shop sells it only once';

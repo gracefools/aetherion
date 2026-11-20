@@ -4,8 +4,7 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ITEMS } from '../../shared/src/items';
 import {
-  acceptBlock, factionOfRegion, giverId, QUEST_LIST, QUESTS, REP_LEVELS, repLevel, type QuestDef,
-} from '../../shared/src/quests';
+  acceptBlock, factionOfRegion, giverId, QUEST_LIST, QUESTS, REP_LEVELS, repLevel, questPays, type QuestDef } from '../../shared/src/quests';
 import { ZONES } from '../../shared/src/world';
 import { SERA, speakerName, STORY, type Line } from '../../shared/src/story';
 import { objById } from '../../shared/src/places';
@@ -28,8 +27,8 @@ function Reward({ hud, q }: { hud: Hud; q: QuestDef }) {
   const r = q.reward;
   return (
     <div className="reward">
-      {t('quest.reward', { exp: r.exp, gold: r.gold })}
-      {r.items.map(([b, n]) => <span key={b}> · {n > 1 ? `${n}× ` : ''}{ITEMS[b]?.name ?? b}</span>)}
+      {questPays(q) ? t('quest.reward', { exp: r.exp, gold: r.gold }) : t('quest.repOnly')}
+      {questPays(q) && r.items.map(([b, n]) => <span key={b}> · {n > 1 ? `${n}× ` : ''}{ITEMS[b]?.name ?? b}</span>)}
       {r.rep.map(([f, n]) => <span key={f}> · +{n} {factionName(hud, f)}</span>)}
     </div>
   );
@@ -168,13 +167,14 @@ export function FactionShop({ hud, game, zone }: { hud: Hud; game: Game; zone: s
     <>
       <h3>{t('faction.shop', { name: f.name })}</h3>
       <p className="sub">{t('faction.standing')} <b>{repName(lv)}</b> ({pts.toLocaleString()}{lv + 1 < REP_LEVELS.length ? ` / ${t('faction.next', { n: REP_LEVELS[lv + 1].at, name: repName(lv + 1) })}` : ''})</p>
-      {f.shop.map(([base, price, need]) => {
-        const locked = lv < need;
+      <p className="sub">{t('faction.once')}</p>
+      {f.shop.map(([base, price, need, qty]) => {
+        const locked = lv < need, bought = hud.quests.fs?.includes(`${f.id}:${base}`);
         return (
           <div key={base} className="shoprow">
             <Icon base={base} size={24} />
-            <span>{ITEMS[base]?.name ?? base}<small> {locked ? t('faction.requires', { name: repName(need) }) : ITEMS[base]?.desc}</small></span>
-            <button className="small" disabled={locked || hud.gold < price} onClick={() => game.questOp('shop', { faction: f.id, base })} aria-label={t('faction.buy', { item: ITEMS[base]?.name ?? base, name: f.name, g: price })}>{price}g</button>
+            <span>{(qty ?? 1) > 1 ? `${qty}× ` : ''}{ITEMS[base]?.name ?? base}<small> {bought ? t('faction.bought') : locked ? t('faction.requires', { name: repName(need) }) : ITEMS[base]?.desc}</small></span>
+            <button className="small" disabled={bought || locked || hud.gold < price} onClick={() => game.questOp('shop', { faction: f.id, base })} aria-label={t('faction.buy', { item: ITEMS[base]?.name ?? base, name: f.name, g: price })}>{price}g</button>
           </div>
         );
       })}

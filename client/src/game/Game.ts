@@ -71,6 +71,7 @@ import { tc } from '../i18n/content';
 import { planRoute, routeSummary, type Leg, type Place, type Route, type TravelCtx } from '../../../shared/src/travel';
 import { modeBlock, type PvpMode } from '../../../shared/src/pvp';
 import { decorSprite } from './decor';
+import { MAT_TIER, PROF_OF_RES } from '../../../shared/src/life';
 
 export interface ChatLine {
   id: number;
@@ -2357,7 +2358,7 @@ export class Game {
       const b = r.buf;
       const move = r.m || (b.length >= 6 && rt < b[b.length - 3] ? Move.Run : Move.Idle);
       const o = pool.pop() ?? ({} as Drawable);
-      o.mark = ''; o.sqx = o.sqy = 1;
+      o.mark = ''; o.sqx = o.sqy = 1; o.sh = undefined; // a scenery height left on a reused object cut monsters and players in half
       o.x = r.rx; o.y = r.ry; o.sheet = r.sheet; o.id = r.meta.id;
       const frac = r.mhp ? r.hp / r.mhp : 0;
       if (r.mt) {
@@ -2426,6 +2427,7 @@ export class Game {
     }
     {
       const me = this.me, o = pool.pop() ?? ({} as Drawable), mhp = this.hud.stats?.maxHp ?? 1;
+      o.sh = undefined;
       o.sqx = o.sqy = 1;
       o.mark = '';
       o.x = px; o.y = py; o.sheet = this.sheet!; o.id = me.id;
@@ -2476,7 +2478,7 @@ export class Game {
         const opened = ob.kind === 'cache' && this.hud.disc.includes(ob.id), spent = ob.kind === 'node' && (this.nodeCd.get(ob.id) ?? 0) > now;
         if (ob.kind === 'node' && !spent) {
           // ready to gather: a ring of light that breathes on the ground, a soft halo, and sparkles rising
-          const col = ob.res === 'iron_ore' ? '255,200,120' : ob.res === 'star_shard' ? '200,170,255' : '150,255,170', k = 0.5 + 0.5 * Math.sin(now / 420 + ob.x);
+          const ore = PROF_OF_RES[ob.res!] === 'mining', col = ore ? (MAT_TIER[ob.res!] >= 3 ? '200,170,255' : '255,200,120') : '150,255,170', k = 0.5 + 0.5 * Math.sin(now / 420 + ob.x);
           g.save();
           g.globalAlpha = 0.35 + 0.25 * k;
           g.drawImage(glowSprite(col, 24), ob.x - 26, ob.y - 14, 52, 30);
@@ -2487,7 +2489,7 @@ export class Game {
           g.restore();
           if (settings.get().graphics.quality !== 'low' && Math.random() < 0.08) ambient.puff(ob.x + (Math.random() - 0.5) * 18, ob.y - 4 - Math.random() * 10, `rgb(${col})`, now, 2, 900);
         }
-        o.sheet = propSprite(ob.kind === 'cache' ? (opened ? 'cache_open' : 'cache') : ob.res!);
+        o.sheet = propSprite(ob.kind === 'cache' ? (opened ? 'cache_open' : 'cache') : PROF_OF_RES[ob.res!] === 'mining' ? (MAT_TIER[ob.res!] >= 3 ? 'star_shard' : 'iron_ore') : 'moonleaf');
         o.sx = 0; o.sy = 0; o.sw = 32; o.ox = 16; o.oy = 24; o.alpha = spent ? 0.3 : 1;
         o.label = ''; o.labelY = 30; o.color = '#ffffff'; o.title = '';
       }

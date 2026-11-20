@@ -3,6 +3,8 @@
 // colours). Pure rules shared by server (authority) and client (display).
 import { AFFIX, GEAR_STATS, ITEMS, RARITY_SUB_RANGE, type GearStat } from './items';
 import type { Job } from './protocol';
+import type { Stats } from './jobs';
+import { ZONES } from './world';
 
 // ---------------------------------------------------------------------------------------------
 // Professions
@@ -11,27 +13,114 @@ export const PROFESSIONS = ['mining', 'herbalism', 'fishing', 'smithing'] as con
 export type Profession = (typeof PROFESSIONS)[number];
 export const PROF_MAX = 50;
 export const profExpToNext = (lv: number) => Math.round(40 * Math.pow(lv, 1.5));
+/**
+ * Gathering materials have four tiers, by the level of the region: tier 1 below level 30, then a
+ * tier every 30 levels, tier 4 from level 90.
+ */
+export const TIER_MATS: Record<'mining' | 'herbalism' | 'fishing', [string, string, string, string]> = {
+  mining: ['iron_ore', 'mithril_ore', 'star_shard', 'aether_ore'],
+  herbalism: ['moonleaf', 'sunpetal', 'frostbloom', 'starlily'],
+  fishing: ['river_fish', 'moon_carp', 'star_koi', 'void_eel'],
+};
+/** The tier of a gathering material (0 for anything else). */
+export const MAT_TIER: Record<string, number> = Object.fromEntries(Object.values(TIER_MATS).flatMap((l) => l.map((id, i) => [id, i + 1])));
 /** Which profession a gathered material trains. */
-export const PROF_OF_RES: Record<string, Profession> = { iron_ore: 'mining', star_shard: 'mining', moonleaf: 'herbalism' };
-/** Rare finds by profession level: from 20 a rare material, more often with every level. */
-export const RARE_OF: Record<Profession, string> = { mining: 'mithril_ore', herbalism: 'sunpetal', fishing: 'star_koi', smithing: 'mithril_ore' };
-export const rareChance = (lv: number) => (lv < 20 ? 0 : 0.05 + (lv - 20) * 0.006);
-/** Extra yield from a gathered node: one more every 15 levels. */
-export const extraYield = (lv: number) => Math.floor(lv / 15);
-/** Fishing: stand next to water. Catches by level. */
-export const FISH = ['river_fish', 'river_fish', 'river_fish', 'moon_carp'];
-export const FISH_COOLDOWN_MS = 4000;
-/** Crafted gear: item level from the smith's level and the character's, rarity from the smith's level. */
-export const forgeIlvl = (prof: number, level: number) => Math.max(1, Math.min(level + 2, 10 + prof * 4));
-export const forgeRarity = (prof: number) => (prof >= 45 ? 5 : prof >= 35 ? 4 : prof >= 20 ? 3 : prof >= 8 ? 2 : 1);
-/** Sub-stats a crafted item gets: one per rarity tier above common (the smith chooses which). */
-export const forgeSlots = (rar: number) => Math.max(1, rar);
-export function forgeCost(ilvl: number, rar: number): { gold: number; mats: [string, number][] } {
-  const mats: [string, number][] = [['iron_ore', 4 + Math.floor(ilvl / 10)], ['upgrade_stone', 1 + rar]];
-  if (rar >= 3) mats.push(['mithril_ore', rar - 2]);
-  if (rar >= 4) mats.push(['star_shard', 3 * (rar - 3)]);
-  return { gold: Math.round(200 * ilvl * (1 + rar * 0.5)), mats };
+export const PROF_OF_RES: Record<string, Profession> = Object.fromEntries(Object.entries(TIER_MATS).flatMap(([p, l]) => l.map((id) => [id, p as Profession])));
+export const tierOfLevel = (level: number) => Math.min(4, 1 + Math.floor(Math.max(0, level) / 30));
+/** The tier of what is gathered and caught in a region (the Depths count as their own level). */
+export const zoneTier = (zone: string) => tierOfLevel(ZONES[zone]?.level[0] ?? 1);
+export const matOf = (prof: 'mining' | 'herbalism' | 'fishing', zone: string) => TIER_MATS[prof][zoneTier(zone) - 1];
+
+/** Gathering energy: 200, filled again every day (UTC). Each gathering or catch costs by its tier. */
+export const ENERGY_MAX = 200;
+export const ENERGY_COST = [0, 5, 10, 15, 20];
+export const dayOf = (ms: number) => Math.floor(ms / 86_400_000);
+/** Energy now (a new day fills it). */
+export const energyNow = (l: Life, now: number) => (l.energy.day === dayOf(now) ? l.energy.n : ENERGY_MAX);
+/** Spends energy; false (nothing spent) when there is not enough. */
+export function spendEnergy(l: Life, n: number, now: number): boolean {
+  const have = energyNow(l, now);
+  if (have < n) return false;
+  l.energy = { n: have - n, day: dayOf(now) };
+  return true;
 }
+
+/**
+ * Herbalism and fishing: every two levels give +2% for a double haul, +1.5% for a triple and
+ * +0.5% for a quadruple (at level 50: 50% / 37.5% / 12.5%, never a single one).
+ */
+export function haulChances(lv: number): { x2: number; x3: number; x4: number } {
+  const k = Math.floor(lv / 2);
+  return { x2: k * 0.02, x3: k * 0.015, x4: k * 0.005 };
+}
+export function haulRoll(lv: number, r: number): number {
+  const c = haulChances(lv);
+  return r < c.x4 ? 4 : r < c.x4 + c.x3 ? 3 : r < c.x4 + c.x3 + c.x2 ? 2 : 1;
+}
+/** Mining: one more every 15 levels. */
+export const extraYield = (lv: number) => Math.floor(lv / 15);
+export const FISH_COOLDOWN_MS = 4000;
+
+// ---------------------------------------------------------------------------------------------
+// Food: cooked from five herbs and five fish of a tier; eaten for half an hour. Each dish gives its
+// own bonus; eating a dish again (any tier) replaces the one before.
+// ---------------------------------------------------------------------------------------------
+export const FOODS = ['steak', 'soup', 'pie', 'juice', 'drink'] as const;
+export type FoodKind = (typeof FOODS)[number];
+export const FOOD_MS = 30 * 60_000;
+export const FOOD_STAT: Record<FoodKind, { stat: 'atk' | 'matk' | 'maxHp' | 'def' | 'moveMul'; v: [number, number, number, number] }> = {
+  steak: { stat: 'atk', v: [30, 90, 180, 360] },
+  soup: { stat: 'matk', v: [30, 90, 180, 360] },
+  pie: { stat: 'maxHp', v: [300, 900, 1800, 3600] },
+  juice: { stat: 'def', v: [20, 60, 120, 240] },
+  drink: { stat: 'moveMul', v: [5, 10, 15, 20] }, // percent
+};
+export const COOK_COST = 5;
+export const foodId = (k: FoodKind, tier: number) => `food_${k}_${tier}`;
+export const foodOf = (base: string): { kind: FoodKind; tier: number } | null => {
+  const m = /^food_([a-z]+)_([1-4])$/.exec(base);
+  return m && (FOODS as readonly string[]).includes(m[1]) ? { kind: m[1] as FoodKind, tier: Number(m[2]) } : null;
+};
+/** What cooking a dish of a tier takes: five of that tier's herb and five of its fish. */
+export const cookCost = (tier: number): [string, number][] => [[TIER_MATS.herbalism[tier - 1], COOK_COST], [TIER_MATS.fishing[tier - 1], COOK_COST]];
+/** The food bonuses still running, added to the stats. */
+export function applyFood(s: Stats, food: Life['food'], now: number) {
+  for (const k of FOODS) {
+    const f = food[k];
+    if (!f || f.until <= now) continue;
+    const d = FOOD_STAT[k], v = d.v[f.t - 1];
+    if (d.stat === 'moveMul') s.moveMul *= 1 + v / 100;
+    else s[d.stat] += v;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Forging: gear of level 30, 60, 90 or 120 from that tier's ore; the rarity is rolled, better odds
+// with smithing. The smith chooses the sub-stats in order; the item takes as many as its rarity has.
+// ---------------------------------------------------------------------------------------------
+export const FORGE_LEVELS: { ilvl: number; tier: number; ore: number }[] = [
+  { ilvl: 30, tier: 1, ore: 40 }, { ilvl: 60, tier: 2, ore: 50 }, { ilvl: 90, tier: 3, ore: 70 }, { ilvl: 120, tier: 4, ore: 100 },
+];
+/** Rarities a forge can give: normal, rare, epic, legendary, mythic (indexes into RARITIES). */
+export const FORGE_RARITIES = [0, 2, 3, 4, 5];
+const FORGE_BASE = [35, 25, 20, 15, 5], FORGE_STEP = [-1, -1, -1, 2, 1];
+/** The chance (percent, adding up to 100) of each forge rarity at a smithing level: every two levels gained shift the odds up. */
+export function forgeRates(smith: number): number[] {
+  const k = Math.floor((Math.max(1, smith) - 1) / 2), raw = FORGE_BASE.map((b, i) => Math.max(0, b + FORGE_STEP[i] * k)), sum = raw.reduce((a, b) => a + b, 0);
+  return raw.map((v) => Math.round((v / sum) * 1000) / 10);
+}
+export function rollForge(smith: number, r: number): number {
+  const rates = forgeRates(smith);
+  let acc = 0;
+  for (let i = 0; i < rates.length; i++) if (r * 100 < (acc += rates[i])) return FORGE_RARITIES[i];
+  return FORGE_RARITIES[rates.length - 1];
+}
+export function forgeCost(ilvl: number): { gold: number; mats: [string, number][] } {
+  const f = FORGE_LEVELS.find((x) => x.ilvl === ilvl) ?? FORGE_LEVELS[0];
+  return { gold: 150 * f.ilvl, mats: [[TIER_MATS.mining[f.tier - 1], f.ore]] };
+}
+/** Sub-stats a forged item gets: one per rarity tier above common (the smith chooses which, in order). */
+export const forgeSlots = (rar: number) => Math.max(1, rar);
 /** A crafted sub-stat: the smith's chosen stat, in the top half of its tier's range. */
 export function forgedAffix(k: GearStat, ilvl: number, rar: number, rng: () => number): [GearStat, number] {
   const [lo, hi] = RARITY_SUB_RANGE[rar], v = (AFFIX[k][0] + AFFIX[k][1] * ilvl) * (lo + (hi - lo) * (0.5 + 0.5 * rng()));
@@ -85,7 +174,7 @@ export type SeasonReward = { gold?: number; item?: [string, number]; aura?: stri
 export function seasonReward(level: number): SeasonReward {
   if (level === 30) return { title: 'Season Champion', aura: 'aurora' };
   if (level % 10 === 0) return { aura: level === 10 ? 'violet' : 'emerald' };
-  if (level % 5 === 0) return { item: [level >= 15 ? 'awakening_essence' : 'arm_core', 1] };
+  if (level % 5 === 0) return { item: [level >= 15 ? 'arm_relic' : 'arm_core', 1] };
   if (level % 3 === 0) return { item: ['arm_shard', 2] };
   return { gold: 1000 * level };
 }
@@ -120,11 +209,15 @@ export interface Life {
   auras: string[];
   aura: string;
   titles: string[];
+  /** Gathering energy, and the day it was last spent on. */
+  energy: { n: number; day: number };
+  /** Food eaten: tier and when it wears off, per dish. */
+  food: Partial<Record<FoodKind, { t: number; until: number }>>;
 }
 export const emptyLife = (): Life => ({
   prof: { mining: { lv: 1, xp: 0 }, herbalism: { lv: 1, xp: 0 }, fishing: { lv: 1, xp: 0 }, smithing: { lv: 1, xp: 0 } },
   home: { furn: [], garden: Array.from({ length: GARDEN_PLOTS }, () => null), restAt: 0 },
-  season: { id: 0, xp: 0, claimed: [] }, looks: [], tmog: {}, auras: [], aura: '', titles: [],
+  season: { id: 0, xp: 0, claimed: [] }, looks: [], tmog: {}, auras: [], aura: '', titles: [], energy: { n: ENERGY_MAX, day: 0 }, food: {},
 });
 const int = (v: unknown, lo: number, hi: number, d: number) => (Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi ? (v as number) : d);
 export function cleanLife(raw: unknown): Life {
@@ -140,6 +233,8 @@ export function cleanLife(raw: unknown): Life {
   l.auras = Array.isArray(r.auras) ? [...new Set<string>(r.auras.filter((x: unknown): x is string => typeof x === 'string' && !!AURA_SKINS[x]))] : [];
   l.aura = typeof r.aura === 'string' && l.auras.includes(r.aura) ? r.aura : '';
   l.titles = Array.isArray(r.titles) ? [...new Set<string>(r.titles.filter((x: unknown): x is string => typeof x === 'string' && x.length <= 30))] : [];
+  l.energy = { n: int(r.energy?.n, 0, ENERGY_MAX, ENERGY_MAX), day: int(r.energy?.day, 0, 1e7, 0) };
+  for (const k of FOODS) { const f = r.food?.[k]; if (f && Number.isInteger(f.t) && f.t >= 1 && f.t <= 4 && Number.isFinite(f.until)) l.food[k] = { t: f.t, until: f.until }; }
   return l;
 }
 export const seasonLevel = (xp: number) => Math.min(SEASON_LEVELS, Math.floor(xp / SEASON_XP));

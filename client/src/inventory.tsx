@@ -1,5 +1,6 @@
 // Inventory, equipment and shop panel, potion quick slots and loot notifications.
 // Everything here only displays state and sends requests: the server decides every outcome.
+import { MAT_TIER } from '../../shared/src/life';
 import { dayOf } from '../../shared/src/journal';
 import React, { useState } from 'react';
 import {
@@ -30,7 +31,7 @@ type BagFilter = 'all' | 'equip' | 'use' | 'comp' | 'scroll' | 'mat';
 const BAG_FILTERS: [BagFilter, Key, (i: Item) => boolean][] = [
   ['all', 'bag.f.all', () => true],
   ['equip', 'bag.f.equip', (i) => ITEMS[i.base].kind === 'equip'],
-  ['use', 'bag.f.use', (i) => ITEMS[i.base].kind === 'potion'],
+  ['use', 'bag.f.use', (i) => ITEMS[i.base].kind === 'potion' || ITEMS[i.base].kind === 'food'],
   ['comp', 'bag.f.comp', (i) => ITEMS[i.base].kind === 'pet' || ITEMS[i.base].kind === 'mount'],
   ['scroll', 'bag.f.scroll', (i) => ITEMS[i.base].kind === 'scroll'],
   ['mat', 'bag.f.mat', (i) => ITEMS[i.base].kind === 'material' || ITEMS[i.base].kind === 'sigil'],
@@ -63,7 +64,7 @@ function Cell({ item, sel, onClick, onUse, mark = false, hud, slot }: { item?: I
   );
 }
 
-const KIND_LINE: Record<string, Key> = { potion: 'item.kind.potion', scroll: 'item.kind.scroll', pet: 'item.kind.pet', mount: 'item.kind.mount', material: 'item.kind.material', sigil: 'item.kind.sigil' };
+const KIND_LINE: Record<string, Key> = { food: 'item.kind.food', potion: 'item.kind.potion', scroll: 'item.kind.scroll', pet: 'item.kind.pet', mount: 'item.kind.mount', material: 'item.kind.material', sigil: 'item.kind.sigil' };
 /**
  * The hover card for an item (or an item base, as sold in a shop): name in its rarity's colour, what
  * it is, bound or tradable, its stats and how they compare with what is worn, set and passive, its
@@ -77,7 +78,7 @@ export function ItemTip({ item, base, hud, price }: { item?: Item; base?: string
   const cur = b.slot && !worn ? hud.eq[b.slot] : undefined, st = itemStats(it), curSt = cur ? itemStats(cur) : {};
   const keys = [...new Set([...Object.keys(st), ...Object.keys(curSt)])] as GearStat[];
   const block = b.kind === 'equip' && me ? equipBlock(it, me.job, me.level) : '';
-  const use = b.kind === 'equip' ? (worn ? 'tip.dblUnequip' : 'tip.dblEquip') : b.kind === 'potion' ? 'tip.dblDrink' : b.kind === 'pet' || b.kind === 'mount' ? 'tip.dblAdd' : b.kind === 'scroll' ? 'tip.dblRead' : it.base.startsWith('furn_') ? 'tip.dblPlace' : '';
+  const use = b.kind === 'equip' ? (worn ? 'tip.dblUnequip' : 'tip.dblEquip') : b.kind === 'potion' ? 'tip.dblDrink' : b.kind === 'food' ? 'tip.dblEat' : b.kind === 'pet' || b.kind === 'mount' ? 'tip.dblAdd' : b.kind === 'scroll' ? 'tip.dblRead' : it.base.startsWith('furn_') ? 'tip.dblPlace' : '';
   return (
     <div className="tipcard" style={{ ['--rar' as any]: b.kind === 'equip' ? RARITY_COLOR[it.rar] : '#c9a24a' }}>
       <div className="tiphead">
@@ -154,7 +155,7 @@ function Details({ item, worn, hud, game, askRead = false }: { item: Item; worn:
       <div className="actions">
         {worn && <button onClick={() => game.invOp('unequip', { slot: worn })}>{t('item.unequip')}</button>}
         {!worn && b.kind === 'equip' && <button className="primary" disabled={!!block} onClick={() => game.invOp('equip', { uid: item.uid })}>{t('item.equip')}</button>}
-        {!worn && (b.kind === 'potion' || b.kind === 'pet' || b.kind === 'mount') && <button className="primary" onClick={() => game.invOp('use', { uid: item.uid })}>{t('item.use')}</button>}
+        {!worn && (b.kind === 'potion' || b.kind === 'food' || b.kind === 'pet' || b.kind === 'mount') && <button className="primary" onClick={() => game.invOp('use', { uid: item.uid })}>{t('item.use')}</button>}
         {!worn && b.kind === 'scroll' && <ReadButton key={item.uid + item.qty + (askRead ? ':ask' : '')} name={b.name} armedAtFirst={askRead} onConfirm={() => game.invOp('scroll', { uid: item.uid })} />}
         {b.kind === 'equip' && item.up < MAX_UPGRADE && (
           <button
@@ -210,7 +211,7 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
   const quick = (it: Item) => {
     const k = ITEMS[it.base].kind;
     if (k === 'equip') game.invOp('equip', { uid: it.uid });
-    else if (k === 'potion' || k === 'pet' || k === 'mount') game.invOp('use', { uid: it.uid });
+    else if (k === 'potion' || k === 'food' || k === 'pet' || k === 'mount') game.invOp('use', { uid: it.uid });
     else if (k === 'sigil') game.invOp('sigil', { uid: it.uid });
     else if (k === 'scroll') {
       // reading uses the scroll up: a double click opens the question instead of reading at once
@@ -297,9 +298,8 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
                 <div className="bulk" role="group" aria-label={t('bulk.label')}>
                   <p className="sub">{t('bulk.help')}</p>
                   <div className="actions">
-                    <button className="small" onClick={() => markAll((i) => ITEMS[i.base].kind === 'equip' && i.rar === 0)}>{t('bulk.common')}</button>
-                    <button className="small" onClick={() => markAll((i) => ITEMS[i.base].kind === 'equip' && i.rar <= 1)}>{t('bulk.uncommon')}</button>
-                    <button className="small" onClick={() => markAll((i) => ITEMS[i.base].kind === 'material')}>{t('bulk.materials')}</button>
+                    {([2, 3, 4] as const).map((r) => <button key={'g' + r} className="small" onClick={() => markAll((i) => ITEMS[i.base].kind === 'equip' && i.rar < r && !i.bd)}>{t('bulk.gearBelow', { r: RARITIES[r] })}</button>)}
+                    {([2, 3, 4] as const).map((n) => <button key={'m' + n} className="small" onClick={() => markAll((i) => (MAT_TIER[i.base] ?? 0) > 0 && MAT_TIER[i.base] < n)}>{t('bulk.matBelow', { n })}</button>)}
                     <button className="small" onClick={() => setMarks(new Set())}>{t('bulk.clear')}</button>
                   </div>
                   <p role="status" className="bulktotal"><b>{marked.length}</b> {t(marked.length === 1 ? 'bulk.marked1' : 'bulk.markedN')} · <b className="gold">{t('common.gold', { n: total })}</b></p>
@@ -317,8 +317,8 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
                   </div>
                   {SHOP_STOCK.map((id) => <BuyRow key={id} id={id} hud={hud} game={game} />)}
                   <h4 className="statsh">{t('shop.companions')}</h4>
-                  <p className="sub">{t('shop.companionsHelp')}</p>
-                  {SHOP_COMPANIONS.map((id) => {
+                  <p className="sub">{t(hud.zoneId === 'eldoria' ? 'shop.companionsHelp' : 'shop.companionsEldoria')}</p>
+                  {hud.zoneId === 'eldoria' && SHOP_COMPANIONS.map((id) => {
                     const done = hud.journal.s.b.includes(SHOP_ONCE[id]), poor = hud.gold < ITEMS[id].price;
                     return (
                       <div key={id} className={'ware' + (done ? ' sold' : '')}>

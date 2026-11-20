@@ -37,7 +37,7 @@ const roundStat = (k: GearStat, v: number) => (FRACTIONAL.includes(k) ? Math.rou
 export interface ItemBase {
   id: string;
   name: string;
-  kind: 'equip' | 'potion' | 'material' | 'scroll' | 'pet' | 'mount' | 'sigil';
+  kind: 'equip' | 'potion' | 'material' | 'scroll' | 'pet' | 'mount' | 'sigil' | 'food';
   /** Sigils: the slot shape and the symbol (index into SIGIL_SHAPES / SIGIL_SYMBOLS in gear.ts). */
   sigil?: { shape: number; sym: number };
   /** Pet and mount whistles: which pet or mount the item adds to the collection. */
@@ -101,11 +101,16 @@ export const ITEM_LIST: ItemBase[] = [
   { id: 'mount_sky_griffin', name: 'Sky Griffin Reins', kind: 'mount', ref: 'sky_griffin', stack: 1, price: 250000, desc: 'A flying mount (level 120): it carries you over water and forests. Dropped rarely by world bosses of level 120 and higher, and by Aetherion\'s Shadow.' },
   { id: 'mount_star_drake', name: 'Star Drake Reins', kind: 'mount', ref: 'star_drake', stack: 1, price: 600000, desc: 'The fastest flying mount (level 160). Dropped very rarely by Aetherion\'s Shadow and world bosses of level 160 and higher.' },
   // gathering, fishing and the garden
-  { id: 'mithril_ore', name: 'Mithril Ore', kind: 'material', stack: 99, price: 400, desc: 'A rare find of skilled miners (Mining 20+). Used to forge rare gear.' },
-  { id: 'sunpetal', name: 'Sunpetal', kind: 'material', stack: 99, price: 300, desc: 'A rare herb found by skilled herbalists (Herbalism 20+), or grown in a home garden.' },
-  { id: 'river_fish', name: 'River Fish', kind: 'material', stack: 99, price: 25, desc: 'Caught by fishing at any water. Cooked into a feast at a merchant.' },
-  { id: 'moon_carp', name: 'Moon Carp', kind: 'material', stack: 99, price: 120, desc: 'A silvery fish that bites at dusk.' },
-  { id: 'star_koi', name: 'Star Koi', kind: 'material', stack: 99, price: 1500, desc: 'A legendary catch of master anglers (Fishing 20+). Collectors pay well for it.' },
+  // gathering materials come in four tiers, by the level of the region they are gathered in (life.ts)
+  { id: 'mithril_ore', name: 'Mithril Ore', kind: 'material', stack: 99, price: 60, desc: 'Mining, tier 2: mined in regions of level 30 to 59. Forges gear of level 60.' },
+  { id: 'aether_ore', name: 'Aetherite', kind: 'material', stack: 99, price: 500, desc: 'Mining, tier 4: mined in regions of level 90 and up. Forges gear of level 120.' },
+  { id: 'sunpetal', name: 'Sunpetal', kind: 'material', stack: 99, price: 60, desc: 'Herbalism, tier 2: gathered in regions of level 30 to 59, or grown in a home garden. Cooks tier 2 food.' },
+  { id: 'frostbloom', name: 'Frostbloom', kind: 'material', stack: 99, price: 180, desc: 'Herbalism, tier 3: gathered in regions of level 60 to 89. Cooks tier 3 food.' },
+  { id: 'starlily', name: 'Starlily', kind: 'material', stack: 99, price: 500, desc: 'Herbalism, tier 4: gathered in regions of level 90 and up. Cooks tier 4 food.' },
+  { id: 'river_fish', name: 'River Fish', kind: 'material', stack: 99, price: 16, desc: 'Fishing, tier 1: caught in regions below level 30. Cooks tier 1 food.' },
+  { id: 'moon_carp', name: 'Moon Carp', kind: 'material', stack: 99, price: 60, desc: 'Fishing, tier 2: caught in regions of level 30 to 59. Cooks tier 2 food.' },
+  { id: 'star_koi', name: 'Star Koi', kind: 'material', stack: 99, price: 180, desc: 'Fishing, tier 3: caught in regions of level 60 to 89. Cooks tier 3 food.' },
+  { id: 'void_eel', name: 'Void Eel', kind: 'material', stack: 99, price: 500, desc: 'Fishing, tier 4: caught in regions of level 90 and up. Cooks tier 4 food.' },
   { id: 'furn_bed', name: 'Feather Bed', kind: 'material', stack: 5, price: 3000, desc: 'Furniture for your home. Sleep in it once a day to wake up rested (+5% attack and defence for half an hour).' },
   { id: 'furn_table', name: 'Oak Table', kind: 'material', stack: 5, price: 800, desc: 'Furniture for your home.' },
   { id: 'furn_chair', name: 'Carved Chair', kind: 'material', stack: 5, price: 400, desc: 'Furniture for your home.' },
@@ -130,10 +135,31 @@ export const ITEM_LIST: ItemBase[] = [
   { id: 'scroll_random', name: 'Random Rune Scroll', kind: 'scroll', stack: 20, price: 150, desc: 'Read it to unlock one of the five runes, chosen at random. A rune you already own gains experience instead.' },
   { id: 'scroll_advanced', name: 'Advanced Rune Scroll', kind: 'scroll', stack: 20, price: 600, desc: 'A random rune that arrives with experience; much more experience if you already own it. Dropped by bosses.' },
   { id: 'scroll_rare', name: 'Rare Rune Scroll', kind: 'scroll', stack: 20, price: 1500, desc: 'Always unlocks a rune you do not own yet, with experience. If you own all five, a large amount of experience. Dropped by the greatest bosses.' },
+  // food (life.ts): cooked from herbs and fish of a tier; eaten for a half-hour bonus
+  { id: 'food_steak_1', name: 'Steak', kind: 'food', stack: 99, price: 40, desc: '+30 attack for 30 minutes.' },
+  { id: 'food_steak_2', name: 'Hearty Steak', kind: 'food', stack: 99, price: 160, desc: '+90 attack for 30 minutes.' },
+  { id: 'food_steak_3', name: 'Royal Steak', kind: 'food', stack: 99, price: 480, desc: '+180 attack for 30 minutes.' },
+  { id: 'food_steak_4', name: 'Celestial Steak', kind: 'food', stack: 99, price: 1400, desc: '+360 attack for 30 minutes.' },
+  { id: 'food_soup_1', name: 'Herb Soup', kind: 'food', stack: 99, price: 40, desc: '+30 magic for 30 minutes.' },
+  { id: 'food_soup_2', name: 'Hearty Soup', kind: 'food', stack: 99, price: 160, desc: '+90 magic for 30 minutes.' },
+  { id: 'food_soup_3', name: 'Royal Soup', kind: 'food', stack: 99, price: 480, desc: '+180 magic for 30 minutes.' },
+  { id: 'food_soup_4', name: 'Celestial Soup', kind: 'food', stack: 99, price: 1400, desc: '+360 magic for 30 minutes.' },
+  { id: 'food_pie_1', name: 'Fish Pie', kind: 'food', stack: 99, price: 40, desc: '+300 maximum HP for 30 minutes.' },
+  { id: 'food_pie_2', name: 'Hearty Pie', kind: 'food', stack: 99, price: 160, desc: '+900 maximum HP for 30 minutes.' },
+  { id: 'food_pie_3', name: 'Royal Pie', kind: 'food', stack: 99, price: 480, desc: '+1800 maximum HP for 30 minutes.' },
+  { id: 'food_pie_4', name: 'Celestial Pie', kind: 'food', stack: 99, price: 1400, desc: '+3600 maximum HP for 30 minutes.' },
+  { id: 'food_juice_1', name: 'Berry Juice', kind: 'food', stack: 99, price: 40, desc: '+20 defence for 30 minutes.' },
+  { id: 'food_juice_2', name: 'Hearty Juice', kind: 'food', stack: 99, price: 160, desc: '+60 defence for 30 minutes.' },
+  { id: 'food_juice_3', name: 'Royal Juice', kind: 'food', stack: 99, price: 480, desc: '+120 defence for 30 minutes.' },
+  { id: 'food_juice_4', name: 'Celestial Juice', kind: 'food', stack: 99, price: 1400, desc: '+240 defence for 30 minutes.' },
+  { id: 'food_drink_1', name: 'Energy Drink', kind: 'food', stack: 99, price: 40, desc: '+5% movement speed for 30 minutes.' },
+  { id: 'food_drink_2', name: 'Strong Energy Drink', kind: 'food', stack: 99, price: 160, desc: '+10% movement speed for 30 minutes.' },
+  { id: 'food_drink_3', name: 'Royal Energy Drink', kind: 'food', stack: 99, price: 480, desc: '+15% movement speed for 30 minutes.' },
+  { id: 'food_drink_4', name: 'Celestial Energy Drink', kind: 'food', stack: 99, price: 1400, desc: '+20% movement speed for 30 minutes.' },
   // M8: gathered from resource nodes; merchants turn them into stones and potions
-  { id: 'iron_ore', name: 'Iron Ore', kind: 'material', stack: 50, price: 16, desc: 'Four of these make an Upgrade Stone at any merchant.' },
-  { id: 'moonleaf', name: 'Moonleaf', kind: 'material', stack: 50, price: 12, desc: 'A healing herb. Merchants brew potions from it.' },
-  { id: 'star_shard', name: 'Star Shard', kind: 'material', stack: 50, price: 40, desc: 'A splinter of the fallen star, warm and faintly humming.' },
+  { id: 'iron_ore', name: 'Iron Ore', kind: 'material', stack: 99, price: 16, desc: 'Mining, tier 1: mined in regions below level 30. Forges gear of level 30; four make an Upgrade Stone at a merchant.' },
+  { id: 'moonleaf', name: 'Moonleaf', kind: 'material', stack: 99, price: 16, desc: 'Herbalism, tier 1: gathered in regions below level 30. Cooks tier 1 food; merchants brew potions from it.' },
+  { id: 'star_shard', name: 'Star Shard', kind: 'material', stack: 99, price: 180, desc: 'Mining, tier 3: mined in regions of level 60 to 89. Forges gear of level 90.' },
 ];
 export const ITEMS: Record<string, ItemBase> = Object.fromEntries(ITEM_LIST.map((b) => [b.id, b]));
 /** Late registration of fixed-identity items (M7 boss loot) so `ITEMS` stays the single lookup. */
@@ -196,6 +222,7 @@ export const SHOP_ONCE: Record<string, string> = {
   scroll_random: 'scroll_random', scroll_fire: 'scroll_fire', scroll_water: 'scroll_water', scroll_wind: 'scroll_wind', scroll_earth: 'scroll_earth', scroll_lightning: 'scroll_lightning',
 };
 /** Companions the merchant sells, once each: the starter pet (Eldoria's own) and the lowest mount. */
+/** The first pet and mount: sold only by the shop in Eldoria (other shops sell none). */
 export const SHOP_COMPANIONS = ['pet_moss_sprout', 'mount_plains_strider'];
 /** The merchant's daily gift. */
 export const DAILY_STONES = 3;
@@ -204,7 +231,10 @@ export const MONSTER_GOLD = 0.1;
 /** Chance that a kill drops a Random Rune Scroll. */
 export const SCROLL_DROP = { normal: 0.012, elite: 0.15 };
 export const PET_DROP_ELITE = 0.03;
-export const PET_WHISTLES = ['pet_ember_kit', 'pet_moss_sprout', 'pet_frost_owlet', 'pet_bog_toad', 'pet_iron_pup'];
+export const PET_WHISTLES = ['pet_ember_kit', 'pet_moss_sprout', 'pet_frost_owlet', 'pet_bog_toad', 'pet_iron_pup', 'pet_star_mote'];
+/** Reins of the ground mounts: dropped by dungeon bosses, now that no shop sells them. */
+export const GROUND_MOUNTS = ['mount_plains_strider', 'mount_ashen_charger', 'mount_frost_elk', 'mount_void_skiff'];
+export const GROUND_MOUNT_DROP = 0.04;
 
 export const reqLevel = (it: Item) => Math.max(1, it.ilvl - 2);
 export const itemName = (it: Item) => `${it.up ? `+${it.up} ` : ''}${ITEMS[it.base]?.name ?? it.base}`;
@@ -332,9 +362,11 @@ export const bindSpec = <T extends { base: string; bd?: 1 }>(s: T): T => (ITEMS[
 /** Why an item cannot leave its owner ('' if it can). */
 export const boundWhy = (it: { bd?: 1 }, what: 'trade' | 'market' | 'mail'): string =>
   !it.bd ? '' : what === 'trade' ? 'Bound items cannot be traded' : what === 'market' ? 'Bound items cannot be sold on the market' : 'Bound items cannot be sent by mail';
+/** Items that no longer exist, and what a stored one becomes. */
+export const LEGACY_ITEMS: Record<string, string> = { awakening_essence: 'arm_core' };
 export function cleanItem(raw: any, seen: Set<string>): Item | null {
   if (!raw || typeof raw !== 'object' || typeof raw.uid !== 'string' || raw.uid.length > 40 || seen.has(raw.uid)) return null;
-  const b = ITEMS[raw.base];
+  const b = ITEMS[LEGACY_ITEMS[raw.base] ?? raw.base];
   if (!b) return null;
   const int = (v: unknown, lo: number, hi: number, d: number) => (Number.isInteger(v) ? Math.max(lo, Math.min(hi, v as number)) : d);
   const it: Item = { uid: raw.uid, base: b.id, rar: 0, ilvl: 1, aff: [], up: 0, qty: int(raw.qty, 1, b.stack ?? 1, 1) };

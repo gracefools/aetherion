@@ -969,16 +969,16 @@ try {
     await bag.getByLabel('Sort inventory').selectOption('rarity');
     await p1.waitForFunction(() => (window as any).__game.debug().hud.inv[0].base === 'greatsword');
     assert.deepEqual(pl.inv.map((i) => i.rar), [2, 1, 0, 0, 0, 0], 'the server sorted the bag by rarity');
-    const common = pl.inv.filter((i) => ITEMS[i.base].kind === 'equip' && i.rar === 0), worth = common.reduce((n, i) => n + (pl.gold - pl.gold) + 0, 0);
+    const common = pl.inv.filter((i) => ITEMS[i.base].kind === 'equip' && i.rar < 2), worth = common.reduce((n, i) => n + (pl.gold - pl.gold) + 0, 0);
     const gold0 = pl.gold;
     await bag.getByRole('button', { name: 'Bulk sell…' }).click();
-    await bag.getByRole('button', { name: 'Common gear', exact: true }).click();
+    await bag.getByRole('button', { name: 'Gear below Rare', exact: true }).click();
     await bag.getByText(`${common.length}`, { exact: true }).first().waitFor();
     await bag.getByRole('button', { name: 'Sell marked items' }).click();
-    await bag.getByRole('button', { name: /^Confirm: sell 3 for/ }).click();
-    await p1.waitForFunction(() => (window as any).__game.debug().hud.inv.length === 3);
+    await bag.getByRole('button', { name: /^Confirm: sell 4 for/ }).click();
+    await p1.waitForFunction(() => (window as any).__game.debug().hud.inv.length === 2);
     assert.ok(pl.gold > gold0 + worth, 'gold was paid');
-    assert.deepEqual(pl.inv.map((i) => i.base).sort(), ['cloth_hood', 'greatsword', 'upgrade_stone'], 'only the marked items were sold');
+    assert.deepEqual(pl.inv.map((i) => i.base).sort(), ['greatsword', 'upgrade_stone'], 'only the marked items (gear below Rare) were sold');
     await p1.keyboard.press('Escape');
 
     // --- trade: Lyra gives a sword, Bram gives gold ---
@@ -1066,8 +1066,10 @@ try {
     await p1.locator('.toast').getByText('New rune: Wind Rune').waitFor();
     assert.deepEqual(pl.build.runes.slots.includes('wind'), false, 'owning a rune does not equip it');
     await p1.screenshot({ path: '.run/m12-runeshop.png' });
-    // a scroll: bought here, kept in the bag, read with a confirmation, consumed by the server
-    await dlg.getByRole('button', { name: `Buy Random Rune Scroll for ${ITEMS.scroll_random.price} gold` }).click();
+    // a scroll: no longer sold (it drops); one found is kept in the bag, read with a confirmation, consumed by the server
+    assert.equal(await dlg.getByRole('button', { name: /Buy Random Rune Scroll/ }).count(), 0, 'the Rune Merchant sells no scrolls');
+    give(pl, { base: 'scroll_random', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
+    sendInv(app.world, pl);
     await p1.waitForFunction(() => (window as any).__game.debug().hud.inv.some((i: any) => i.base === 'scroll_random'));
     await p1.keyboard.press('Escape');
     await p1.keyboard.press('KeyI');
@@ -1579,7 +1581,8 @@ try {
       await wa.getByRole('button', { name: `Enhance the Weapon armament to +${i}` }).click();
       await p1.waitForFunction((n) => (window as any).__game.debug().hud.gear.arm.weapon === n, i, { timeout: 8000 }).catch(async (e) => {
         const d = await p1.evaluate(() => { const h = (window as any).__game.debug().hud; return { arm: h.gear?.arm, chat: h.chat.slice(-5).map((c: any) => c.text), toast: h.toast, gold: h.gold, focus: document.activeElement?.outerHTML.slice(0, 120) }; });
-        throw new Error(`armament +${i}: ${JSON.stringify(d)} server ${JSON.stringify(L.gear.arm)}; ${e}`);
+        const notice = await p1.evaluate(() => (window as any).__game.debug().hud.notice);
+        throw new Error(`armament +${i}: ${JSON.stringify(d)} notice ${JSON.stringify(notice)} server ${JSON.stringify(L.gear.arm)} lvl ${L.level} combatAgo ${((w.tick - L.lastCombat) * 50) / 1000}s room ${L.room.zoneId} at ${Math.round(L.x)},${Math.round(L.y)} serverSays "${w.inventory(L, { op: 'arm', slot: 'weapon' })}"; ${e}`);
       });
     }
     assert.equal(L.gear.arm.weapon, 6, 'the server holds +6');

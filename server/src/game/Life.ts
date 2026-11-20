@@ -2,11 +2,13 @@
 // sub-stats), the home (furniture, garden, a bed to rest in), the season pass, and the wardrobe.
 import { applyStatus } from './entity';
 import { STATUS_INDEX } from '../../../shared/src/combat';
-import { INVENTORY_SIZE, ITEMS, rollItem, type GearStat, type ItemSpec } from '../../../shared/src/items';
+import { INVENTORY_SIZE, ITEMS, RARITIES, rollItem, type GearStat } from '../../../shared/src/items';
+/** How far up the forge's scale a rarity is (normal 0 ... mythic 4): more smithing experience for better results. */
+const FORGE_RARITY_RANK: Record<number, number> = { 0: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
 import {
-  AURA_SKINS, cleanLife, extraYield, FISH, FISH_COOLDOWN_MS, forgeCost, forgedAffix, forgeIlvl, forgeRarity, forgeSlots, FURNITURE, FURNITURE_MAX, GARDEN_PLOTS,
-  GEAR_STATS, GROW_MS, HOME_SLOTS, HOME_ZONE, PROF_MAX, PROF_OF_RES, profExpToNext, rareChance, RARE_OF, REST_EVERY_MS, REST_MS, SEASON_GAIN, SEASON_LEVELS, SEASON_XP,
-  seasonLevel, seasonOf, seasonReward, SEEDS, type Life, type Profession,
+  AURA_SKINS, cleanLife, COOK_COST, cookCost, ENERGY_COST, energyNow, extraYield, FISH_COOLDOWN_MS, FOOD_MS, FOODS, foodId, foodOf, FORGE_LEVELS, forgeCost, forgedAffix, forgeSlots,
+  FURNITURE, FURNITURE_MAX, GARDEN_PLOTS, GEAR_STATS, GROW_MS, haulRoll, HOME_SLOTS, HOME_ZONE, MAT_TIER, matOf, PROF_MAX, PROF_OF_RES, profExpToNext, REST_EVERY_MS, REST_MS, rollForge,
+  SEASON_GAIN, SEASON_LEVELS, SEASON_XP, seasonLevel, seasonOf, seasonReward, SEEDS, spendEnergy, zoneTier, type FoodKind, type Life, type Profession,
 } from '../../../shared/src/life';
 import { objNear } from '../../../shared/src/places';
 import { inTown } from '../../../shared/src/pvp';
@@ -51,21 +53,56 @@ export class Lives {
     if (s.lv >= PROF_MAX) s.xp = 0;
     p.progDirty = true;
   }
-  /** A resource node was gathered: the profession trains, and gives more (and rare finds) as it grows. */
-  onGather(p: Player, res: string): ItemSpec[] {
+  /** Energy left today. */
+  energy(p: Player, now = Date.now()) {
+    return energyNow(p.life, now);
+  }
+  /** Spends the energy a gathering of this material's tier costs; the reason it cannot, or ''. */
+  payEnergy(p: Player, res: string, now = Date.now()): string {
+    const cost = ENERGY_COST[MAT_TIER[res] || 1];
+    if (!spendEnergy(p.life, cost, now)) return `Not enough energy: this takes ${cost}, you have ${energyNow(p.life, now)} (it fills again tomorrow)`;
+    p.progDirty = true;
+    return '';
+  }
+  /** How many a gathering yields: herbalism doubles, triples or quadruples with its level; mining adds one every 15 levels. */
+  haul(p: Player, res: string): number {
     const prof = PROF_OF_RES[res];
-    if (!prof) return [];
-    const lv = p.life.prof[prof].lv, out: ItemSpec[] = [];
-    if (extraYield(lv)) out.push({ base: res, rar: 0, ilvl: 1, aff: [], up: 0, qty: extraYield(lv) });
-    if (this.w.rnd() < rareChance(lv)) out.push({ base: RARE_OF[prof], rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
-    this.train(p, prof, 12);
+    if (!prof) return 1;
+    const lv = p.life.prof[prof].lv;
+    return prof === 'herbalism' ? haulRoll(lv, this.w.rnd()) : 1 + (this.w.rnd() < 0.35 ? 1 : 0) + extraYield(lv);
+  }
+  /** A resource node was gathered: the profession trains (by the material's tier). */
+  onGather(p: Player, res: string) {
+    const prof = PROF_OF_RES[res];
+    if (!prof) return;
+    this.train(p, prof, 8 + 6 * (MAT_TIER[res] || 1));
     this.send(p);
-    return out;
   }
   private nearWater(p: Player): boolean {
     const m = p.room.map, tx = Math.floor(p.x / TILE), ty = Math.floor(p.y / TILE);
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (tileAt(m, tx + dx, ty + dy) === T.Water) return true;
     return false;
+  }
+
+  // ---------- food ----------
+  /** Eats a dish: its bonus for half an hour, replacing the same dish eaten before. */
+  eat(p: Player, base: string): string {
+    const f = foodOf(base);
+    if (!f) return 'Cannot be eaten';
+    p.life.food[f.kind] = { t: f.tier, until: Date.now() + FOOD_MS };
+    p.progDirty = true;
+    this.w.companionsChanged(p); // stats, HP kept in proportion, sent
+    this.send(p);
+    return '';
+  }
+  /** Once a second: a dish whose half hour is over stops counting. */
+  foodTick(p: Player, now: number) {
+    let gone = false;
+    for (const k of FOODS) { const f = p.life.food[k]; if (f && f.until <= now) { delete p.life.food[k]; gone = true; } }
+    if (!gone) return;
+    p.progDirty = true;
+    this.w.companionsChanged(p);
+    this.send(p);
   }
 
   // ---------- the season ----------
@@ -137,34 +174,54 @@ export class Lives {
         if (ZONES[p.room.zoneId]?.kind === 'dungeon') return 'There is no fishing here';
         if (!this.nearWater(p)) return 'Stand at the water to fish';
         if (now < (this.fishAt.get(p.id) ?? 0)) return 'The fish are not biting yet';
+        const base = matOf('fishing', p.room.zoneId), qty = haulRoll(p.life.prof.fishing.lv, this.w.rnd());
+        if (p.inv.length >= INVENTORY_SIZE && !p.inv.some((i) => i.base === base && i.qty + qty <= (ITEMS[base].stack ?? 1))) return 'Inventory is full';
+        const why = this.payEnergy(p, base, now);
+        if (why) return why;
         this.fishAt.set(p.id, now + FISH_COOLDOWN_MS);
-        const lv = p.life.prof.fishing.lv, rare = this.w.rnd() < rareChance(lv);
-        const base = rare ? 'star_koi' : FISH[Math.min(FISH.length - 1, Math.floor(this.w.rnd() * (2 + lv / 10)))];
-        if (!give(p, { base, rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 })) return 'Inventory is full';
-        this.w.send(p, { t: 'loot', gold: 0, items: [{ base, rar: 0, qty: 1 }] });
-        this.train(p, 'fishing', rare ? 40 : 10);
+        give(p, { base, rar: 0, ilvl: 1, aff: [], up: 0, qty });
+        this.w.send(p, { t: 'loot', gold: 0, items: [{ base, rar: 0, qty }] });
+        this.train(p, 'fishing', 8 + 6 * zoneTier(p.room.zoneId));
         sendInv(this.w, p);
         this.send(p);
+        return '';
+      }
+      case 'cook': {
+        // five herbs and five fish of a tier make one dish of that tier, at a merchant
+        if (!objNear(p.room.zoneId, p.x, p.y, 200, ['merchant'])) return 'You need to be at a merchant';
+        const kind = FOODS.find((k) => k === m.food) as FoodKind | undefined, tier = Number(m.tier);
+        if (!kind || !Number.isInteger(tier) || tier < 1 || tier > 4) return 'Unknown dish';
+        const cost = cookCost(tier);
+        for (const [mat, n] of cost) if (count(p, mat) < n) return `Requires ${n} ${ITEMS[mat].name}`;
+        if (!give(p, { base: foodId(kind, tier), rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 })) return 'Inventory is full';
+        for (const [mat, n] of cost) consume(p, mat, n);
+        this.w.send(p, { t: 'sys', text: `You cooked ${ITEMS[foodId(kind, tier)].name}.`, cue: 'loot' });
+        sendInv(this.w, p);
         return '';
       }
       case 'forge': {
         if (!objNear(p.room.zoneId, p.x, p.y, 200, ['merchant'])) return 'You need to be at a merchant';
         const b = typeof m.base === 'string' ? ITEMS[m.base] : undefined;
         if (!b || b.kind !== 'equip' || b.unique) return 'That cannot be forged';
-        const lv = p.life.prof.smithing.lv, rar = forgeRarity(lv), ilvl = forgeIlvl(lv, p.level), slots = forgeSlots(rar);
-        const stats: GearStat[] = Array.isArray(m.stats) ? [...new Set<GearStat>(m.stats.filter((k: unknown): k is GearStat => GEAR_STATS.includes(k as GearStat)))].slice(0, slots) : [];
+        const lvl = FORGE_LEVELS.find((f) => f.ilvl === m.ilvl);
+        if (!lvl) return 'Choose the level of the gear: 30, 60, 90 or 120';
+        // the sub-stats in the smith's order of preference; the item takes as many as its rarity has
+        const stats: GearStat[] = Array.isArray(m.stats) ? [...new Set<GearStat>(m.stats.filter((k: unknown): k is GearStat => GEAR_STATS.includes(k as GearStat)))].slice(0, 5) : [];
         if (!stats.length) return 'Choose the sub-stats to forge';
-        const cost = forgeCost(ilvl, rar);
+        const cost = forgeCost(lvl.ilvl);
         if (p.gold < cost.gold) return `Forging costs ${cost.gold} gold`;
         for (const [mat, n] of cost.mats) if (count(p, mat) < n) return `Requires ${n} ${ITEMS[mat].name}`;
         if (p.inv.length >= INVENTORY_SIZE) return 'Inventory is full';
-        const it = rollItem(this.w.rnd, b.id, ilvl, rar);
-        it.aff = stats.map((k) => forgedAffix(k, ilvl, rar, this.w.rnd));
+        const smith = p.life.prof.smithing.lv, rar = rollForge(smith, this.w.rnd()), slots = forgeSlots(rar);
+        const it = rollItem(this.w.rnd, b.id, lvl.ilvl, rar);
+        const picked = stats.slice(0, slots), rest = GEAR_STATS.filter((k) => !picked.includes(k));
+        while (picked.length < slots && rest.length) picked.push(rest.splice(Math.floor(this.w.rnd() * rest.length), 1)[0]);
+        it.aff = picked.map((k) => forgedAffix(k, lvl.ilvl, rar, this.w.rnd));
         p.gold -= cost.gold;
         for (const [mat, n] of cost.mats) consume(p, mat, n);
         give(p, it);
-        this.train(p, 'smithing', 25 + 15 * rar);
-        this.w.send(p, { t: 'sys', text: `You forged ${ITEMS[b.id].name}.`, cue: 'upgrade_ok' });
+        this.train(p, 'smithing', 25 + 15 * lvl.tier + 10 * FORGE_RARITY_RANK[rar]);
+        this.w.send(p, { t: 'sys', text: `You forged a ${RARITIES[rar]} ${ITEMS[b.id].name}.`, cue: rar >= 4 ? 'questdone' : 'upgrade_ok' });
         sendInv(this.w, p);
         this.send(p);
         return '';

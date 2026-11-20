@@ -2684,7 +2684,7 @@ test('new rules: monsters have doubled health; regions refuse players below thei
   // rune scrolls: Eldoria's Rune Merchant only
   const far = join(0, 0, 'mage', 30, -1, 'verdant'), rs = runesmith('verdant');
   far.p.x = rs.x; far.p.y = rs.y + 30; far.p.gold = 1e6;
-  assert.equal(world.inventory(far.p, { op: 'buy', base: 'scroll_fire', qty: 1 }), 'Rune Scrolls are sold only by the Rune Merchant of Eldoria');
+  assert.equal(world.inventory(far.p, { op: 'buy', base: 'scroll_fire', qty: 1 }), 'Not for sale', 'rune scrolls are not sold anywhere any more');
   // gathering: two spots per region, four nodes each, close together
   for (const z of REGIONS) {
     const nodes = zoneObjects(z).filter((o) => o.kind === 'node'), kinds = [...new Set(nodes.map((o) => o.res))];
@@ -2871,7 +2871,7 @@ test('M8 merchants: trade and crafting work at every town merchant and nowhere e
   assert.equal(world.object(p, { op: 'craft', recipe: 'stone' }), 'Requires 4 Iron Ore');
   assert.deepEqual([p.gold, p.inv.find((i) => i.base === 'iron_ore')!.qty, p.inv.find((i) => i.base === 'upgrade_stone')!.qty], [40, 1, 2]);
   assert.equal(world.object(p, { op: 'craft', recipe: 'hp' }), '');
-  assert.equal(world.object(p, { op: 'craft', recipe: 'mana' }), 'Requires 1 Star Shard');
+  assert.equal(world.object(p, { op: 'craft', recipe: 'mana' }), 'Requires 1 River Fish');
   assert.equal(world.object(p, { op: 'craft', recipe: 'philosophers_stone' }), 'Unknown recipe');
   assert.equal(p.inv.find((i) => i.base === 'moonleaf')!.qty, 2);
   p.x += SHOP_RANGE + 80;
@@ -3040,7 +3040,7 @@ test('M9 replication: on-screen entities update every tick; off-screen ones at a
 });
 
 // ================= Definition of Done: no energy system =================
-test('there is no energy, stamina, fatigue or entry-limit mechanic anywhere in the rules, the protocol or the code', () => {
+test('there is no energy, stamina, fatigue or entry-limit mechanic anywhere but gathering energy (professions)', () => {
   // 1. No such field in anything a player has or is sent.
   const banned = /energy|stamina|fatigue|lockout|dailylimit|entriesleft|attemptsleft|keys?$/i;
   const { world, join } = harness({ kit: true });
@@ -3053,7 +3053,8 @@ test('there is no energy, stamina, fatigue or entry-limit mechanic anywhere in t
       walk(x);
     }
   };
-  for (const m of out) walk(m);
+  // the one exception: gathering energy, part of the professions (the life state), never a gate on fighting content
+  for (const m of out) if (m.t !== 'life') walk(m);
   walk(p.stats);
   walk(JOB_DEFS);
   walk(DUNGEONS);
@@ -3082,7 +3083,8 @@ test('there is no energy, stamina, fatigue or entry-limit mechanic anywhere in t
   assert.ok(files.length > 30);
   for (const f of files) {
     const code = fs.readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.replace(/\/\/.*$/, '').replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""')).join('\n');
-    const hit = /\b\w*(stamina|energy|fatigue)\w*\b/i.exec(code);
+    const gathering = /(^|[\\/])(life\.ts|Life\.ts|Places\.ts|lifeUi\.tsx)$/.test(f);
+    const hit = (gathering ? /\b\w*(stamina|fatigue)\w*\b/i : /\b\w*(stamina|energy|fatigue)\w*\b/i).exec(code);
     assert.equal(hit, null, `${f}: identifier "${hit?.[0]}"`);
   }
 });
@@ -4237,16 +4239,16 @@ test('M12 Rune Merchant: in every town, sells runes and scrolls for gold, checks
   assert.equal(world.inventory(p, { op: 'buyrune', el: 'fire' }), '');
   assert.equal(p.gold, 200);
   assert.equal(world.attune(p, 0, 'fire'), '');
-  // scrolls are sold here, not at the general merchant
-  assert.equal(world.inventory(p, { op: 'buy', base: 'scroll_random', qty: 1 }), '');
-  assert.deepEqual([p.gold, p.inv.filter((i) => i.base === 'scroll_random').length], [200 - ITEMS.scroll_random.price, 1]);
+  // scrolls are no longer sold (they drop)
+  assert.equal(world.inventory(p, { op: 'buy', base: 'scroll_random', qty: 1 }), 'Not for sale');
+  assert.deepEqual([p.gold, p.inv.filter((i) => i.base === 'scroll_random').length], [200, 0]);
   assert.equal(world.inventory(p, { op: 'buy', base: 'scroll_rare', qty: 1 }), 'Not for sale', 'boss scrolls are not sold');
   // away from the Rune Merchant nothing can be bought, even standing at the general merchant
   const shop = zoneObjects('eldoria').find((o) => o.kind === 'merchant')!;
   world.relocate(p, p.room, shop.x - RUNE_SHOP_RANGE - 40, shop.y);
   p.gold = 5000;
   assert.equal(world.inventory(p, { op: 'buyrune', el: 'wind' }), 'You need to be at the Rune Merchant');
-  assert.equal(world.inventory(p, { op: 'buy', base: 'scroll_random', qty: 1 }), 'You need to be at the Rune Merchant');
+  assert.equal(world.inventory(p, { op: 'buy', base: 'scroll_random', qty: 1 }), 'Not for sale');
   assert.equal(world.inventory(p, { op: 'buy', base: 'hp_potion', qty: 1 }), '', 'the general merchant still sells potions');
   assert.equal(p.gold, 5000 - ITEMS.hp_potion.price);
 });
@@ -4434,7 +4436,7 @@ test('M12 asset pipeline: icons, NPC sheets, tilesets and effects are validated;
 // M13: quests and faction reputation
 // ---------------------------------------------------------------------------------------------
 import {
-  acceptBlock, cleanQuests, cleanRep, DEFAULT_FACTIONS, emptyQuests, giverId, MAX_ACTIVE_QUESTS, QUEST_LIST, QUEST_TYPES, QUESTS, REP_GIFT, REP_LEVELS, repLevel, utcDay,
+  acceptBlock, cleanQuests, cleanRep, DEFAULT_FACTIONS, factionStock, emptyQuests, giverId, MAX_ACTIVE_QUESTS, QUEST_LIST, QUEST_TYPES, QUESTS, REP_GIFT, REP_LEVELS, repLevel, utcDay,
 } from '../shared/src/quests';
 import { DUNGEONS as DUNGEON_DEFS } from '../shared/src/dungeons';
 import { count, sendInv } from '../server/src/game/Inventory';
@@ -4795,7 +4797,7 @@ test('M13 accepting: level, prerequisites, reputation, once, daily reset at midn
   assert.match(acceptBlock(QUESTS.collect_astral, s, 60, {}, now), /at most 15 quests/);
   // stored state is sanitised
   const c = cleanQuests({ active: { main_eldoria: { p: [5, -3, 99], at: 1 }, nope: { p: [] } }, done: { side_eldoria: { n: 2, day: 9 }, ghost: { n: 1 } }, hist: [{ id: 'main_eldoria', at: 5 }, { id: 'ghost', at: 1 }, 'x'] });
-  assert.deepEqual(c, { active: { main_eldoria: { p: [1, 0], at: 1 } }, done: { side_eldoria: { n: 2, day: 9 } }, hist: [{ id: 'main_eldoria', at: 5 }] }, 'progress clamped to the objective, unknown quests dropped');
+  assert.deepEqual(c, { active: { main_eldoria: { p: [1, 0], at: 1 } }, done: { side_eldoria: { n: 2, day: 9 } }, hist: [{ id: 'main_eldoria', at: 5 }], fs: [] }, 'progress clamped to the objective, unknown quests dropped');
   assert.deepEqual(cleanRep({ crown: 700, wardens: -5, ghosts: 100, forge: 1e9, hearth: 1.5 }), { crown: 700, forge: 12000 });
 });
 
@@ -4914,17 +4916,14 @@ test('M13 reputation: levels announced and rewarded once, faction quests and the
   world.quests.addRep(p, 'nobody', 100);
   assert.equal(p.rep.nobody, undefined);
   // the faction shop: at the faction's seat only, by standing, for gold
-  const f = DEFAULT_FACTIONS.find((x) => x.id === 'forge')!, [cheap, price] = f.shop[0], [mount, , needM] = f.shop.find(([b]) => b.startsWith('mount_'))!;
+  const f = DEFAULT_FACTIONS.find((x) => x.id === 'forge')!, [cheap, price] = f.shop[0];
   const fresh = atGiver(h, 'ashen', 'knight', 20).p;
   fresh.gold = 1e6;
-  assert.equal(world.quest(fresh, { op: 'shop', faction: 'forge', base: mount }), `Requires ${REP_LEVELS[needM].name} reputation with The Cinder Compact`);
   assert.equal(world.quest(fresh, { op: 'shop', faction: 'forge', base: cheap }), '');
   assert.equal(fresh.gold, 1e6 - price);
   assert.equal(world.quest(fresh, { op: 'shop', faction: 'forge', base: 'hp_potion' }), 'Not sold by this faction');
-  assert.equal(world.quest(fresh, { op: 'shop', faction: 'crown', base: 'hp_potion' }), 'Visit The Starfall Crown at Eldoria', 'only at the faction seat');
-  p.gold = 1e6;
-  assert.equal(world.quest(p, { op: 'shop', faction: 'forge', base: mount }), '', 'Revered may buy the mount');
-  assert.equal(count(p, mount), 1);
+  assert.equal(world.quest(fresh, { op: 'shop', faction: 'crown', base: 'upgrade_stone' }), 'Visit The Starfall Crown at Eldoria', 'only at the faction seat');
+  assert.equal(world.quest(fresh, { op: 'shop', faction: 'forge', base: cheap }), 'You have already bought that; the faction sells it to you only once');
   // faction quests are offered from Friendly
   assert.equal(world.quest(fresh, { op: 'accept', id: 'faction_ashen' }), 'Requires Friendly reputation with The Cinder Compact');
   assert.equal(world.quest(p, { op: 'accept', id: 'faction_ashen' }), '');
@@ -4939,13 +4938,14 @@ test('M13 factions are configuration and database records: rows are validated, n
     { id: 'nowhere', name: 'Lost', seat: '-', region: 'd_ruins', creed: '-', about: '-', shop: [] },
   ]);
   assert.deepEqual(q.factions.map((f) => f.id), [...DEFAULT_FACTIONS.map((f) => f.id), 'tidecallers'], 'a faction in a region with no lorekeeper is skipped');
-  assert.deepEqual(q.faction('tidecallers')!.shop, [['mana_potion', 30, 0]], 'invalid shop lines are dropped');
+  assert.deepEqual(q.faction('tidecallers')!.shop, factionStock('verdant'), "the stock follows the seat region's level, whatever the row lists");
   const a = atGiver(h, 'verdant', 'mage', 10);
   assert.ok(a.out.find((m) => m.t === 'welcome').factions.some((f: any) => f.id === 'tidecallers'), 'clients receive the factions in force');
   q.addRep(a.p, 'tidecallers', 600);
   assert.equal(a.p.rep.tidecallers, 600, 'reputation works for it');
-  a.p.gold = 100;
-  assert.equal(h.world.quest(a.p, { op: 'shop', faction: 'tidecallers', base: 'mana_potion' }), '');
+  a.p.gold = 1000;
+  assert.equal(h.world.quest(a.p, { op: 'shop', faction: 'tidecallers', base: 'upgrade_stone' }), '');
+  assert.equal(h.world.quest(a.p, { op: 'shop', faction: 'tidecallers', base: 'mana_potion' }), 'Not sold by this faction');
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -6935,7 +6935,7 @@ test('raids: a group at the Raid Herald, two waves of elites, Aetherion\'s Shado
     for (const m of [...run.alive]) world.hurt(m, 1e9, 0, raiders[0]);
   }
   assert.equal(run.state, 'won');
-  for (const p of raiders) assert.ok(p.inv.filter((i) => i.rar >= 3).length >= 2 && p.inv.some((i) => i.base === 'awakening_essence'), `${p.name}: two raid items and an essence`);
+  for (const p of raiders) assert.ok(p.inv.filter((i) => i.rar >= 3).length >= 2 && p.inv.some((i) => i.base === 'arm_relic'), `${p.name}: two raid items and an armament relic`);
   assert.equal(world.raidOp(raiders[1], { op: 'leave' }), '');
   assert.equal(raiders[1].room.zoneId, 'eldoria');
 });
@@ -7007,36 +7007,118 @@ test('pets evolve at 20, 40 and 60 with a stronger bonus; flying mounts pass ove
   assert.equal(blocked(map, tileCenter(0), tileCenter(10), true), true, 'never off the map');
 });
 
-test('professions: gathering trains and pays more as it grows; fishing at the water; forging gear with chosen sub-stats', () => {
+test('professions: tiers by region level, energy 200 a day, hauls by level, food that lasts half an hour, forging at 30/60/90/120 with rolled rarity', async () => {
+  const L = await import('../shared/src/life');
+  const { REGION_RES: RR } = await import('../shared/src/places');
+  // tiers: below 30, then every 30 levels, at most 4
+  assert.deepEqual([1, 29, 30, 59, 60, 89, 90, 200].map(L.tierOfLevel), [1, 1, 2, 2, 3, 3, 4, 4]);
+  assert.deepEqual(RR.eldoria, ['moonleaf', 'iron_ore']);
+  const t3 = REGIONS.find((z) => ZONES[z].level[0] >= 60 && ZONES[z].level[0] < 90)!;
+  assert.deepEqual(RR[t3], ['frostbloom', 'star_shard'], 'a level 60-89 region: tier 3 herb and ore');
+  assert.equal(L.matOf('fishing', REGIONS.at(-1)!), 'void_eel');
+  // energy: 200, refilled on a new day; tiers cost 5/10/15/20
+  const life = L.emptyLife(), day = 20000 * 86_400_000;
+  assert.equal(L.energyNow(life, day), 200);
+  assert.ok(L.spendEnergy(life, 195, day));
+  assert.ok(!L.spendEnergy(life, 10, day), 'not enough left');
+  assert.equal(L.energyNow(life, day + 86_400_000), 200, 'full again the next day');
+  assert.deepEqual(L.ENERGY_COST.slice(1), [5, 10, 15, 20]);
+  // hauls: every two levels +2% double, +1.5% triple, +0.5% quadruple
+  assert.deepEqual(L.haulChances(10), { x2: 0.1, x3: 0.075, x4: 0.025 });
+  assert.deepEqual([L.haulRoll(50, 0.01), L.haulRoll(50, 0.3), L.haulRoll(50, 0.9), L.haulRoll(1, 0.5)], [4, 3, 2, 1]);
+  // forging odds: 35/25/20/15/5, every two smithing levels -1/-1/-1/+2/+1
+  assert.deepEqual(L.forgeRates(1), [35, 25, 20, 15, 5]);
+  assert.deepEqual(L.forgeRates(11), [30, 20, 15, 25, 10]);
+  assert.ok(Math.abs(L.forgeRates(50).reduce((x, y) => x + y, 0) - 100) < 0.5 && L.forgeRates(50)[2] === 0, 'never below zero, adding up to 100');
+  assert.deepEqual(L.FORGE_LEVELS.map((f) => [f.ilvl, L.forgeCost(f.ilvl).mats[0]]), [[30, ['iron_ore', 40]], [60, ['mithril_ore', 50]], [90, ['star_shard', 70]], [120, ['aether_ore', 100]]]);
+
   const { world, join } = harness({ capacity: 10 });
   const p = join(0, 0, 'knight', 40, -1, 'verdant').p;
-  p.life.prof.mining.lv = 30;
-  const extra = world.life.onGather(p, 'iron_ore');
-  assert.ok(extra.some((s) => s.base === 'iron_ore' && s.qty === 2), 'two more ore at level 30');
-  assert.ok(p.life.prof.mining.xp > 0);
-  // fishing needs water
+  // gathering: energy checked before and spent after, by the node's tier
+  const node = zoneObjects('verdant').find((o) => o.kind === 'node' && o.res === 'iron_ore')!;
+  world.relocate(p, p.room, node.x, node.y);
+  p.lastCombat = -1e6;
+  p.life.energy = { n: 3, day: L.dayOf(Date.now()) };
+  assert.match(world.object(p, { op: 'gather', id: node.id }), /Not enough energy: this takes 5, you have 3/);
+  p.life.energy = { n: 200, day: L.dayOf(Date.now()) };
+  assert.equal(world.object(p, { op: 'gather', id: node.id, done: true }), '');
+  assert.equal(L.energyNow(p.life, Date.now()), 195);
+  assert.ok(count(p, 'iron_ore') >= 1 && p.life.prof.mining.xp > 0);
+  // fishing needs water, costs energy, gives the region's fish
   assert.equal(world.lifeOp(p, { op: 'fish' }), 'Stand at the water to fish');
   const map = getZoneMap('verdant');
   let spot: [number, number] | null = null;
   for (let y = 5; y < map.h - 5 && !spot; y++) for (let x = 5; x < map.w - 5; x++) if (tileAt(map, x, y) === T.Water && !blocked(map, tileCenter(x - 2), tileCenter(y))) { spot = [x - 2, y]; break; }
   world.relocate(p, p.room, tileCenter(spot![0]), tileCenter(spot![1]));
   assert.equal(world.lifeOp(p, { op: 'fish' }), '');
-  assert.ok(p.inv.some((i) => ['river_fish', 'moon_carp', 'star_koi'].includes(i.base)));
+  assert.ok(count(p, 'river_fish') >= 1);
+  assert.equal(L.energyNow(p.life, Date.now()), 190);
   assert.equal(world.lifeOp(p, { op: 'fish' }), 'The fish are not biting yet');
-  // forging at a merchant: the chosen sub-stats, nothing else
+  // cooking at a merchant: five herbs and five fish of a tier
   const mer = objById2('merchant:verdant')!;
   world.relocate(p, p.room, mer.x + 30, mer.y);
-  p.life.prof.smithing.lv = 20;
+  give(p, { base: 'moonleaf', rar: 0, ilvl: 1, aff: [], up: 0, qty: 10 });
+  give(p, { base: 'river_fish', rar: 0, ilvl: 1, aff: [], up: 0, qty: 10 });
+  assert.equal(world.lifeOp(p, { op: 'cook', food: 'steak', tier: 2 }), 'Requires 5 Sunpetal');
+  assert.equal(world.lifeOp(p, { op: 'cook', food: 'steak', tier: 1 }), '');
+  assert.equal(world.lifeOp(p, { op: 'cook', food: 'pie', tier: 1 }), '');
+  // eating: +30 attack for half an hour; the same dish of another tier replaces it; it ends by itself
+  const atk0 = p.stats.atk, hp0 = p.maxHp;
+  assert.equal(world.inventory(p, { op: 'use', uid: p.inv.find((i) => i.base === 'food_steak_1')!.uid }), '');
+  assert.equal(p.stats.atk, atk0 + 30);
+  assert.equal(world.inventory(p, { op: 'use', uid: p.inv.find((i) => i.base === 'food_pie_1')!.uid }), '');
+  assert.equal(p.maxHp, hp0 + 300, 'different dishes add up');
+  give(p, { base: 'food_steak_3', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
+  assert.equal(world.inventory(p, { op: 'use', uid: p.inv.find((i) => i.base === 'food_steak_3')!.uid }), '');
+  assert.equal(p.stats.atk, atk0 + 180, 'tier 3 steak replaced tier 1');
+  p.life.food.steak!.until = Date.now() - 1;
+  world.life.foodTick(p, Date.now());
+  assert.equal(p.stats.atk, atk0, 'the bonus ends with the half hour');
+  // forging: the level's ore and gold; the rarity is rolled from the odds; the chosen sub-stats in order
+  p.life.prof.smithing.lv = 50;
   p.gold = 1e6;
-  give(p, { base: 'iron_ore', rar: 0, ilvl: 1, aff: [], up: 0, qty: 30 });
-  give(p, { base: 'upgrade_stone', rar: 0, ilvl: 1, aff: [], up: 0, qty: 10 });
-  give(p, { base: 'mithril_ore', rar: 0, ilvl: 1, aff: [], up: 0, qty: 5 });
-  assert.equal(world.lifeOp(p, { op: 'forge', base: 'plate_cuirass', stats: [] }), 'Choose the sub-stats to forge');
-  assert.equal(world.lifeOp(p, { op: 'forge', base: 'plate_cuirass', stats: ['crit', 'maxHp', 'def', 'atk'] }), '');
+  assert.equal(world.lifeOp(p, { op: 'forge', base: 'plate_cuirass', ilvl: 45, stats: ['crit'] }), 'Choose the level of the gear: 30, 60, 90 or 120');
+  assert.equal(world.lifeOp(p, { op: 'forge', base: 'plate_cuirass', ilvl: 30, stats: [] }), 'Choose the sub-stats to forge');
+  assert.equal(world.lifeOp(p, { op: 'forge', base: 'plate_cuirass', ilvl: 30, stats: ['crit'] }), 'Requires 40 Iron Ore');
+  give(p, { base: 'iron_ore', rar: 0, ilvl: 1, aff: [], up: 0, qty: 40 });
+  const rnd = world.rnd;
+  world.rnd = () => 0.99; // the top of the odds: Mythic
+  assert.equal(world.lifeOp(p, { op: 'forge', base: 'plate_cuirass', ilvl: 30, stats: ['crit', 'maxHp', 'def', 'atk', 'dodge'] }), '');
+  world.rnd = rnd;
   const it = p.inv.find((i) => i.base === 'plate_cuirass')!;
-  assert.equal(it.rar, 3, 'Epic at smithing 20');
-  assert.deepEqual(it.aff.map((a) => a[0]), ['crit', 'maxHp', 'def'], 'the first three chosen (Epic has three)');
+  assert.deepEqual([it.ilvl, it.rar], [30, 5]);
+  assert.deepEqual(it.aff.map((x) => x[0]), ['crit', 'maxHp', 'def', 'atk', 'dodge'], 'Mythic takes all five, in order');
+  assert.equal(count(p, 'iron_ore') < 40, true, 'the ore was used');
   assert.ok(profExpToNext(1) > 0);
+});
+
+test('shops and quests: Eldoria alone sells the first pet and mount; no shop sells scrolls; faction bundles once; repeatable quests give reputation only', async () => {
+  const { factionStock, questPays, QUESTS: QS, DEFAULT_FACTIONS: DF } = await import('../shared/src/quests');
+  const { HONOR_SHOP } = await import('../shared/src/pvp');
+  const { world, join } = harness({ capacity: 10 });
+  const shopIn = (z: string) => zoneObjects(z).find((o) => o.kind === 'merchant')!;
+  const a = join(0, 0, 'knight', 10).p, b = join(0, 0, 'knight', 10, -1, 'verdant').p;
+  a.gold = b.gold = 1e6;
+  atShop(world, a);
+  world.relocate(b, b.room, shopIn('verdant').x, shopIn('verdant').y + 40);
+  assert.equal(world.inventory(a, { op: 'buy', base: 'pet_moss_sprout', qty: 1 }), '', 'Eldoria sells the first pet');
+  assert.equal(world.inventory(b, { op: 'buy', base: 'pet_moss_sprout', qty: 1 }), 'Pets and mounts are sold only in Eldoria');
+  assert.equal(world.inventory(a, { op: 'buy', base: 'scroll_random', qty: 1 }), 'Not for sale');
+  for (const [base] of HONOR_SHOP) assert.ok(!/^(scroll_|pet_|mount_)/.test(base), `the honour shop sells no ${base}`);
+  // faction shops: upgrade stones everywhere, armament material from level 30, the seat's tier of materials
+  assert.deepEqual(factionStock('eldoria').map(([x, , , q]) => [x, q]), [['upgrade_stone', 5], ['iron_ore', 10], ['moonleaf', 10], ['river_fish', 10]]);
+  assert.ok(factionStock('astral').some(([x]) => x === 'arm_shard') && factionStock('astral').some(([x]) => x === 'mithril_ore'));
+  for (const f of DF) for (const [x] of f.shop) assert.ok(!/^(scroll_|pet_|mount_)/.test(x), `${f.id} sells no ${x}`);
+  // each bundle once
+  const crown = DF.find((f) => f.id === 'crown')!, lk = zoneObjects('eldoria').find((o) => o.kind === 'lorekeeper')!;
+  world.relocate(a, a.room, lk.x, lk.y + 30);
+  assert.equal(world.quest(a, { op: 'shop', faction: 'crown', base: 'upgrade_stone' }), '');
+  assert.equal(count(a, 'upgrade_stone'), 5);
+  assert.equal(world.quest(a, { op: 'shop', faction: 'crown', base: 'upgrade_stone' }), 'You have already bought that; the faction sells it to you only once');
+  assert.ok(crown.shop.length >= 4);
+  // repeatable quests: reputation, no experience, gold or items
+  const rep = Object.values(QS).find((q) => q.repeat === 'always')!, daily = Object.values(QS).find((q) => q.repeat === 'day')!, main = Object.values(QS).find((q) => q.id.startsWith('main_'))!;
+  assert.deepEqual([questPays(rep), questPays(daily), questPays(main)], [false, true, true]);
 });
 
 test('home: furniture placed and picked up, a garden that grows, a bed to rest in; visits by name', () => {

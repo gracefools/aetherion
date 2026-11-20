@@ -6,6 +6,8 @@ import { defaultAppearance, type Appearance } from './appearance';
 import { TILE, type Job } from './protocol';
 import { EXPANSION } from './expansion';
 import { CITY, getZoneMap, REGIONS, T, tileAt, tileCenter, ZONES } from './world';
+import { matOf, TIER_MATS } from './life';
+import { ITEMS } from './items';
 
 export type ObjKind = 'merchant' | 'waykeeper' | 'lorekeeper' | 'runesmith' | 'banker' | 'arenamaster' | 'riftwarden' | 'raidherald' | 'steward' | 'node' | 'cache';
 export interface WorldObj {
@@ -42,20 +44,17 @@ export const RUNESMITH_NAMES: Record<string, string> = {
   eldoria: 'Runewright Maelis', verdant: 'Runecarver Sorrel', ashen: 'Runeforger Tavi', frostveil: 'Runesinger Yrsa', dreadmoor: 'Runebinder Corvin', astral: 'Rune Scholar Ilyan',
 };
 
-/** Which material each region's nodes yield (index 0 common, index 1 the region's speciality). */
-export const REGION_RES: Record<string, [string, string]> = {
-  eldoria: ['moonleaf', 'iron_ore'], verdant: ['moonleaf', 'iron_ore'], ashen: ['iron_ore', 'star_shard'],
-  frostveil: ['iron_ore', 'moonleaf'], dreadmoor: ['moonleaf', 'star_shard'], astral: ['star_shard', 'iron_ore'],
-};
-const RES_BY_THEME: Record<string, [string, string]> = {
-  kingdom: ['moonleaf', 'iron_ore'], forest: ['moonleaf', 'iron_ore'], ashen: ['iron_ore', 'star_shard'], frost: ['iron_ore', 'moonleaf'], moor: ['moonleaf', 'star_shard'], astral: ['star_shard', 'iron_ore'],
-};
+/**
+ * What each region's two gathering spots yield: its herb and its ore, of the region's tier
+ * (life.ts: tier 1 below level 30, then a tier every 30 levels).
+ */
+export const REGION_RES: Record<string, [string, string]> = {};
 for (const e of EXPANSION) {
-  REGION_RES[e.id] = RES_BY_THEME[e.theme] ?? ['moonleaf', 'iron_ore'];
   BANKER_NAMES[e.id] = e.npcs[3];
   RUNESMITH_NAMES[e.id] = e.npcs[4];
 }
-export const NODE_NAMES: Record<string, string> = { moonleaf: 'Moonleaf Patch', iron_ore: 'Iron Vein', star_shard: 'Star Shard Cluster' };
+for (const z of REGIONS) REGION_RES[z] = [matOf('herbalism', z), matOf('mining', z)];
+export const NODE_NAMES: Record<string, string> = Object.fromEntries([...TIER_MATS.herbalism.map((id) => [id, `${ITEMS[id].name} Patch`]), ...TIER_MATS.mining.map((id) => [id, `${ITEMS[id].name} Vein`])]);
 
 /** Things a merchant makes from gathered materials. */
 export interface Recipe {
@@ -66,10 +65,9 @@ export interface Recipe {
 }
 export const RECIPES: Recipe[] = [
   { id: 'stone', out: ['upgrade_stone', 1], needs: [['iron_ore', 4]], gold: 30 },
+  { id: 'stone2', out: ['upgrade_stone', 2], needs: [['mithril_ore', 3]], gold: 50 },
   { id: 'hp', out: ['hp_potion', 1], needs: [['moonleaf', 3]], gold: 0 },
-  { id: 'mana', out: ['mana_potion', 2], needs: [['moonleaf', 2], ['star_shard', 1]], gold: 0 },
-  { id: 'stone2', out: ['upgrade_stone', 2], needs: [['star_shard', 3]], gold: 50 },
-  { id: 'feast', out: ['hp_potion', 3], needs: [['river_fish', 3]], gold: 0 },
+  { id: 'mana', out: ['mana_potion', 2], needs: [['moonleaf', 2], ['river_fish', 1]], gold: 0 },
 ];
 
 /** Waystone travel: the fee to arrive in a region. No other cost or limit. */
@@ -162,7 +160,7 @@ export function zoneObjects(zoneId: string): WorldObj[] {
   // Resource nodes: two gathering spots per region, always in the same places, four nodes each:
   // one for the region's first resource and one for its second (a mine, a meadow...), so a player
   // learns where to go rather than searching the whole map.
-  const res = REGION_RES[zoneId] ?? ['iron_ore', 'moonleaf'];
+  const res = REGION_RES[zoneId] ?? [matOf('herbalism', zoneId), matOf('mining', zoneId)];
   let n = 0;
   for (let spot = 0; spot < 2; spot++) {
     const r = res[spot];

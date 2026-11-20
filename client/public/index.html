@@ -812,6 +812,10 @@
   .featurecard .fcicon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(201,162,74,.18); border: 1px solid var(--gold); color: var(--gold); flex: 0 0 auto; }
   .featurecard p { margin: 10px 0 12px; line-height: 1.5; } .featurecard .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   html.touch .featurecard { top: calc(70px / var(--ui, 1)); }
+  /* professions: energy, forge odds, food buffs */
+  .energyrow { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; margin: 4px 0; } .bar.energy i { background: linear-gradient(90deg, #ffd24a, #5fd35a); }
+  .forgeodds { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; font-size: 12px; }
+  .statusbar .stat.food img { image-rendering: pixelated; }
 </style>
 </head>
 <body>

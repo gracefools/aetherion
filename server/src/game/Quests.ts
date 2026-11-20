@@ -1,10 +1,7 @@
 // Quests and faction reputation on the server (M13). Progress comes only from events the server
 // resolved itself; accepting, turning in and the faction shop need the right NPC close by.
 import { INTERACT_RANGE, objById, objNear, zoneObjects } from '../../../shared/src/places';
-import {
-  acceptBlock, cleanQuests, cleanRep, DEFAULT_FACTIONS, giverId, HISTORY_SIZE, isComplete, progressOf, QUESTS, REP_GIFT, REP_LEVELS, REP_MAX, repLevel, utcDay,
-  type FactionDef, type QuestCtx, type QuestState,
-} from '../../../shared/src/quests';
+import { acceptBlock, cleanQuests, cleanRep, DEFAULT_FACTIONS, giverId, HISTORY_SIZE, isComplete, progressOf, QUESTS, REP_GIFT, REP_LEVELS, REP_MAX, repLevel, utcDay, type FactionDef, type QuestCtx, type QuestState, factionStock, questPays } from '../../../shared/src/quests';
 import { ITEMS, type ItemSpec } from '../../../shared/src/items';
 import { award, consume, count, give, sendInv } from './Inventory';
 import type { Monster } from './Monster';
@@ -26,7 +23,7 @@ export class Quests {
         console.warn(`faction ${r.id}: region "${r.region}" has no lorekeeper; skipped`);
         continue;
       }
-      const shop = Array.isArray(r.shop) ? (r.shop as unknown[]).filter((x): x is [string, number, number] => Array.isArray(x) && !!ITEMS[x[0] as string] && Number.isInteger(x[1]) && (x[1] as number) > 0 && Number.isInteger(x[2]) && (x[2] as number) >= 0 && (x[2] as number) < REP_LEVELS.length) : [];
+      const shop = factionStock(r.region); // stock follows the seat region's level (quests.ts), whatever the row says
       out.push({ id: r.id, name: r.name, seat: r.seat, region: r.region, creed: r.creed, about: r.about, shop });
     }
     if (out.length) this.factions = out;
@@ -95,10 +92,13 @@ export class Quests {
         s.done[q.id] = { n: d.n + 1, day: utcDay(now) };
         s.hist.unshift({ id: q.id, at: now });
         if (s.hist.length > HISTORY_SIZE) s.hist.length = HISTORY_SIZE;
-        this.w.grantExp(p, Math.round(q.reward.exp));
-        award(this.w, p, Math.round(q.reward.gold * this.w.goldRate), q.reward.items.map(([b, n]) => spec(b, n)), false, '', true);
+        const pays = questPays(q);
+        if (pays) {
+          this.w.grantExp(p, Math.round(q.reward.exp));
+          award(this.w, p, Math.round(q.reward.gold * this.w.goldRate), q.reward.items.map(([b, n]) => spec(b, n)), false, '', true);
+        }
         for (const [f, n] of q.reward.rep) this.addRep(p, f, n);
-        this.w.send(p, { t: 'sys', text: `Quest complete: ${q.name}. ${q.reward.exp} EXP, ${Math.round(q.reward.gold * this.w.goldRate)} gold.`, cue: 'questdone' });
+        this.w.send(p, { t: 'sys', text: pays ? `Quest complete: ${q.name}. ${q.reward.exp} EXP, ${Math.round(q.reward.gold * this.w.goldRate)} gold.` : `Quest complete: ${q.name}.`, cue: 'questdone' });
         this.w.journals.onQuest(p);
         this.w.guilds.goal(p, 'quests');
         this.changed(p);
@@ -123,11 +123,14 @@ export class Quests {
         const line = f.shop.find((x) => x[0] === m.base);
         if (!line) return 'Not sold by this faction';
         if (!objNear(p.room.zoneId, p.x, p.y, TALK_RANGE, ['lorekeeper']) || p.room.zoneId !== f.region) return `Visit ${f.name} at ${f.seat}`;
-        const [base, price, need] = line, have = repLevel(p.rep[f.id] ?? 0);
+        const [base, price, need, qty] = line, have = repLevel(p.rep[f.id] ?? 0), key = `${f.id}:${base}`;
+        if (p.quests.fs.includes(key)) return 'You have already bought that; the faction sells it to you only once';
         if (have < need) return `Requires ${REP_LEVELS[need].name} reputation with ${f.name}`;
         if (p.gold < price) return 'Not enough gold';
-        if (!give(p, spec(base, 1))) return 'Inventory is full';
+        if (!give(p, spec(base, qty ?? 1))) return 'Inventory is full';
         p.gold -= price;
+        p.quests.fs.push(key);
+        this.changed(p);
         p.invDirty = true;
         sendInv(this.w, p);
         return '';

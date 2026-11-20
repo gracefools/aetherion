@@ -58,6 +58,15 @@ export const MESSAGES: Record<string, Msg> = {
   pmSetPeace: m('Peaceful: you do not fight other players.', 'Damai: kamu tidak melawan pemain lain.'), pmSetPred: m('Predator: you fight any player you meet.', 'Pemangsa: kamu melawan pemain mana pun yang kamu temui.'),
   pmSetPrep: m('Prepared: you fight hostile players and hit back.', 'Siaga: kamu melawan pemain bermusuhan dan membalas serangan.'),
 
+  // ---- professions, shops ----
+  petsEldoria: m('Pets and mounts are sold only in Eldoria', 'Peliharaan dan tunggangan hanya dijual di Eldoria'),
+  fsOnce: m('You have already bought that; the faction sells it to you only once', 'Kamu sudah membelinya; faksi hanya menjualnya sekali kepadamu'),
+  questDoneBare: m('Quest complete: {a}.', 'Misi selesai: {a}.'),
+
+  gatherLow: m('Not enough energy: this takes {a}, you have {b} (it fills again tomorrow)', 'Energi tidak cukup: butuh {a}, kamu punya {b} (terisi lagi besok)'),
+  cooked: m('You cooked {a}.', 'Kamu memasak {a}.'), forgedR: m('You forged a {a} {b}.', 'Kamu menempa {b} {a}.'), unknownDish: m('Unknown dish', 'Hidangan tidak dikenal'),
+  notEaten: m('Cannot be eaten', 'Tidak bisa dimakan'), forgeLevel: m('Choose the level of the gear: 30, 60, 90 or 120', 'Pilih level perlengkapan: 30, 60, 90, atau 120'),
+
   // ---- skills, runes ----
   skillNot: m('Skill not learned', 'Skill belum dipelajari'), skillNotK: m('Skill not learned (press K)', 'Skill belum dipelajari (tekan K)'), noPoints: m('No skill points', 'Tidak ada poin skill'),
   maxRank: m('Already at maximum rank', 'Sudah di peringkat tertinggi'), learnFirst: m('Learn {a} first', 'Pelajari {a} terlebih dahulu'), notJob: m('Not a skill of this job', 'Bukan skill kelas ini'), unknownSkill: m('Unknown skill', 'Skill tidak dikenal'),

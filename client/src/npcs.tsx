@@ -11,7 +11,7 @@ import { FACTIONS, LORE } from '../../shared/src/lore';
 import { allDiscoveries, objById, RECIPES, teleportCost, waypointId, zoneObjects } from '../../shared/src/places';
 import { REGIONS, ZONES } from '../../shared/src/world';
 import { ELEMENT_NAMES, ELEMENTS, runeSpells, type Element } from '../../shared/src/abilities';
-import { ownedRunes, ownsRune, RUNE_SHOP, RUNE_STOCK, runePrice } from '../../shared/src/runes';
+import { ownedRunes, ownsRune, RUNE_SHOP, runePrice } from '../../shared/src/runes';
 import { runeIcon, skillIcon } from './game/skillicons';
 import { QuestGiver, FactionShop, NpcQuests } from './quests';
 import { QUESTS } from '../../shared/src/quests';
@@ -133,14 +133,7 @@ function RuneMerchant({ hud, game }: { hud: Hud; game: Game }) {
         </div>
       </div>
       <h3>{t('npc.rune.scrolls')}</h3>
-      <p className="sub">{t('npc.rune.scrollsHelp', { n: ownedRunes(b).length })}</p>
-      {hud.zoneId !== 'eldoria' && <p className="sub">{t('npc.rune.onlyEldoria')}</p>}
-      {hud.zoneId === 'eldoria' && RUNE_STOCK.map((id) => (
-        <div key={id} className="shoprow">
-          <Icon base={id} size={24} /><span>{ITEMS[id].name}<small> {ITEMS[id].desc}</small></span>
-          <button className="small" disabled={hud.journal.s.b.includes(id) || hud.gold < ITEMS[id].price} title={t('shop.once')} onClick={() => game.invOp('buy', { base: id, qty: 1 })} aria-label={t('shop.buy', { name: ITEMS[id].name, g: ITEMS[id].price })}>{hud.journal.s.b.includes(id) ? t('shop.bought') : `${ITEMS[id].price}g`}</button>
-        </div>
-      ))}
+      <p className="sub">{t('npc.rune.scrollsFound')}</p>
     </>
   );
 }

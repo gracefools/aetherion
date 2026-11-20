@@ -67,6 +67,8 @@ import { LFG_CHAT_MS, WORLD_CHAT_MS } from '../../../shared/src/social';
 import { Seasons } from './Seasons';
 import { Moderation } from './Moderation';
 import type { PvpMode } from '../../../shared/src/pvp';
+import { GROUND_MOUNT_DROP, GROUND_MOUNTS } from '../../../shared/src/items';
+import { applyFood } from '../../../shared/src/life';
 
 export interface Conn {
   send(data: string): void;
@@ -306,6 +308,7 @@ export class Player implements Ent {
     applyPath(this.stats, this.asc.path, this.level);
     applyMastery(this.stats, this.asc.mastery);
     applyGuild(this.stats, this.guildB);
+    applyFood(this.stats, this.life.food, Date.now());
     this.rule = weaponRule(this.job, JOB_DEFS[this.job].weapons[wslot].kind, wslot);
     this.maxHp = this.stats.maxHp;
     this.onStatusChange();
@@ -1474,7 +1477,9 @@ export class World implements CombatCtx {
         items.push(...armamentDrops(this.rnd, run.diff, run.def.level));
         // the sigil's tier follows the boss's designed level: tier 3 only from bosses of level 110 or more
         const tier = sigilTierForBoss(MONSTERS[run.def.boss].level);
-        if (run.diff === 'armageddon' && this.rnd() < 0.3) items.push({ base: 'awakening_essence', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
+        if (run.diff === 'armageddon' && this.rnd() < 0.3) items.push({ base: 'arm_core', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
+        // ground mounts are found now, not bought: a dungeon boss sometimes carries reins
+        if (this.rnd() < GROUND_MOUNT_DROP * this.dropRate) items.push({ base: GROUND_MOUNTS[Math.floor(this.rnd() * GROUND_MOUNTS.length)], rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 });
         if (run.diff === 'armageddon' && tier && this.rnd() < SIGIL_DROP) {
           const sg = rollSigil(this.rnd, tier);
           items.push(sg);
@@ -2123,6 +2128,7 @@ export class World implements CombatCtx {
     this.lastHousekeep = now;
     // T7: loot, gold and trades are stored within a second of happening, not at the next autosave
     for (const p of this.online.values()) if (p.invDirty) this.saveInv(p);
+    for (const p of this.online.values()) this.life.foodTick(p, now);
     for (const p of this.online.values()) {
       if (p.chatTokens < 5) p.chatTokens += 0.5; // 5 burst, 1 message / 2s sustained
       if (!p.conn && p.disconnectedAt && now - p.disconnectedAt >= this.opts.reconnectGraceMs) this.despawn(p);

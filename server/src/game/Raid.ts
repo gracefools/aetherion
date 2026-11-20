@@ -182,7 +182,7 @@ export class Raids {
     run.overAt = Date.now();
     for (const p of run.room.players.values()) {
       const items: ItemSpec[] = [rollBossItem(this.w.rnd, run.boss, run.level, p.job, 'raid'), rollBossItem(this.w.rnd, run.boss, run.level, p.job, 'raid'),
-        { base: 'awakening_essence', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 }, { base: 'arm_core', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 }];
+        { base: 'arm_relic', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 }, { base: 'arm_core', rar: 0, ilvl: 1, aff: [], up: 0, qty: 1 }];
       const tier = sigilTierForBoss(run.level);
       if (tier && this.w.rnd() < 0.5) items.push(rollSigil(this.w.rnd, tier));
       award(this.w, p, Math.round(400 * run.level * this.w.goldRate), items);

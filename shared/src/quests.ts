@@ -2,6 +2,7 @@
 // The server keeps each character's quest state and reputation, counts progress from events it
 // resolved itself (kills, dungeon clears, discoveries, inventory), and hands out every reward.
 import { expToNext } from './combat';
+import { ITEMS } from './items';
 import { DUNGEONS } from './dungeons';
 import { FACTIONS, type Faction } from './lore';
 import { MONSTERS, SPAWNS, WORLD_BOSSES } from './monsters';
@@ -9,6 +10,7 @@ import { REGION_RES, zoneObjects } from './places';
 import { EXPANSION } from './expansion';
 import { REGIONS, ZONES } from './world';
 import { STORY_REGIONS, storyParts, type Line } from './story';
+import { TIER_MATS, tierOfLevel } from './life';
 
 // ---------------------------------------------------------------------------------------------
 // Factions and reputation
@@ -17,8 +19,8 @@ import { STORY_REGIONS, storyParts, type Line } from './story';
 export interface FactionDef extends Faction {
   /** The region whose town is the faction's seat (its lorekeeper runs the faction shop). */
   region: string;
-  /** Faction shop: item, gold price, reputation level required (index into REP_LEVELS). */
-  shop: [base: string, price: number, level: number][];
+  /** Faction shop: item, gold price, reputation level required (index into REP_LEVELS), how many in the bundle. Each line once per character. */
+  shop: [base: string, price: number, level: number, qty: number][];
 }
 export const REP_LEVELS = [
   { name: 'Neutral', at: 0 },
@@ -36,15 +38,19 @@ export const repLevel = (points: number) => {
 /** Reached for the first time at each level: a one-time gift from the faction. */
 export const REP_GIFT: Record<number, [string, number][]> = { 1: [['hp_potion', 5]], 2: [['scroll_random', 1]], 3: [['scroll_advanced', 1]], 4: [['scroll_rare', 1]] };
 const SEAT: Record<string, string> = { crown: 'eldoria', wardens: 'verdant', forge: 'ashen', hearth: 'frostveil', lantern: 'dreadmoor', runewrights: 'astral' };
-const SHOP: Record<string, [string, number, number][]> = {
-  crown: [['hp_potion', 16, 0], ['scroll_fire', 220, 1], ['pet_iron_pup', 1800, 2], ['mount_plains_strider', 3000, 3]],
-  wardens: [['mana_potion', 20, 0], ['scroll_wind', 220, 1], ['pet_moss_sprout', 1800, 2], ['mount_plains_strider', 2800, 3]],
-  forge: [['upgrade_stone', 130, 0], ['scroll_earth', 220, 1], ['pet_ember_kit', 1800, 2], ['mount_ashen_charger', 6000, 3]],
-  hearth: [['hp_potion', 16, 0], ['scroll_water', 220, 1], ['pet_frost_owlet', 1800, 2], ['mount_frost_elk', 6000, 3]],
-  lantern: [['mana_potion', 20, 0], ['scroll_lightning', 220, 1], ['pet_bog_toad', 1800, 2], ['mount_frost_elk', 6000, 3]],
-  runewrights: [['scroll_random', 120, 0], ['scroll_advanced', 500, 2], ['pet_star_mote', 2400, 3], ['mount_void_skiff', 12000, 4]],
-};
-export const DEFAULT_FACTIONS: FactionDef[] = FACTIONS.map((f) => ({ ...f, region: SEAT[f.id], shop: SHOP[f.id] ?? [] }));
+/**
+ * A faction shop sells by the level of its seat region: a few Upgrade Stones everywhere, armament
+ * materials from level 30, and the region's tier of mining, herbalism and fishing materials. Each
+ * line is a bundle a character can buy once.
+ */
+export function factionStock(region: string): [base: string, price: number, level: number, qty: number][] {
+  const lv = ZONES[region]?.level[0] ?? 1, tier = tierOfLevel(lv), out: [string, number, number, number][] = [['upgrade_stone', 500, 0, 5]];
+  if (lv >= 30) out.push(['arm_shard', 2400, 1, 3]);
+  const price = [0, 120, 450, 1300, 3600][tier];
+  for (const p of ['mining', 'herbalism', 'fishing'] as const) out.push([TIER_MATS[p][tier - 1], price, 0, 10]);
+  return out;
+}
+export const DEFAULT_FACTIONS: FactionDef[] = FACTIONS.map((f) => ({ ...f, region: SEAT[f.id], shop: factionStock(SEAT[f.id]) }));
 /** The faction whose seat is in a region. */
 export const factionOfRegion = (factions: FactionDef[], zone: string) => factions.find((f) => f.region === zone);
 
@@ -134,7 +140,7 @@ function regionQuests(zone: string, i: number): QuestDef[] {
 const SEAT_OF: Record<string, string> = Object.fromEntries(Object.entries(SEAT).map(([fid, z]) => [z, fid]));
 for (const e of EXPANSION) SEAT_OF[e.id] = e.faction;
 const FACTION_NAME: Record<string, string> = Object.fromEntries(FACTIONS.map((x) => [x.id, x.name]));
-const RES_NAME: Record<string, string> = { iron_ore: 'Iron Ore', moonleaf: 'Moonleaf', star_shard: 'Star Shards' };
+const RES_NAME = new Proxy({} as Record<string, string>, { get: (_, id: string) => ITEMS[id]?.name ?? id });
 const MAIN_NAMES: Record<string, string> = {
   eldoria: 'The Crater Watch', verdant: 'What the Forest Counts', ashen: 'Under the Breathing Mountain', frostveil: 'The Winter That Stayed', dreadmoor: 'Names in the Mud', astral: 'The Falling City',
 };
@@ -195,8 +201,10 @@ export interface QuestState {
   done: Record<string, { n: number; day: number }>;
   /** Most recent completions, newest first. */
   hist: { id: string; at: number }[];
+  /** Faction shop bundles bought (`faction:item`): each is sold once to a character. */
+  fs: string[];
 }
-export const emptyQuests = (): QuestState => ({ active: {}, done: {}, hist: [] });
+export const emptyQuests = (): QuestState => ({ active: {}, done: {}, hist: [], fs: [] });
 export const utcDay = (ms: number) => Math.floor(ms / 86_400_000);
 
 /** Sanitises stored quest state: unknown quests are dropped, numbers clamped. */
@@ -210,6 +218,7 @@ export function cleanQuests(raw: unknown): QuestState {
   }
   for (const [id, d] of Object.entries(r.done ?? {})) if (QUESTS[id] && d && typeof d === 'object') out.done[id] = { n: int((d as any).n) , day: int((d as any).day) };
   if (Array.isArray(r.hist)) out.hist = r.hist.filter((h: any) => h && QUESTS[h.id] && Number.isFinite(h.at)).slice(0, HISTORY_SIZE).map((h: any) => ({ id: h.id, at: h.at }));
+  if (Array.isArray(r.fs)) out.fs = [...new Set<string>(r.fs.filter((x: unknown): x is string => typeof x === 'string' && x.length <= 60))].slice(0, 500);
   return out;
 }
 export function cleanRep(raw: unknown, factions: FactionDef[] = DEFAULT_FACTIONS): Record<string, number> {
@@ -244,3 +253,5 @@ export function acceptBlock(q: QuestDef, s: QuestState, level: number, rep: Reco
 /** Quests a giver offers to this character right now. */
 export const offeredAt = (zone: string, s: QuestState, level: number, rep: Record<string, number>, now: number) =>
   QUEST_LIST.filter((q) => q.zone === zone && !acceptBlock(q, s, level, rep, now));
+/** Only main (story) quests, other one-time quests and daily quests pay out; quests that can be repeated at will give reputation only. */
+export const questPays = (q: QuestDef) => q.repeat !== 'always';

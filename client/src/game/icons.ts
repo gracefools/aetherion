@@ -102,6 +102,8 @@ const SET_PALS = ['emerald', 'ruby', 'sapphire', 'amethyst', 'topaz', 'obsidian'
 const hashOf = (s: string) => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
 Object.assign(RECIPE, {
   // gathering and the garden
+  aether_ore: ['ore', 'amethyst'], frostbloom: ['herb', 'frost'], starlily: ['herb', 'holy'], void_eel: ['fish', 'dark'],
+  ...Object.fromEntries([1, 2, 3, 4].flatMap((t) => { const pal = ['', 'red', 'ember', 'gold', 'holy'][t]; return [[`food_steak_${t}`, ['heart', pal]], [`food_soup_${t}`, ['orb', pal]], [`food_pie_${t}`, ['chest', pal]], [`food_juice_${t}`, ['potion', pal === 'red' ? 'rose' : pal]], [`food_drink_${t}`, ['potion', ['', 'emerald', 'frost', 'blue', 'crystal'][t]]]]; })) as Record<string, [string, string]>,
   iron_ore: ['ore', 'steel'], mithril_ore: ['ore', 'silver'], ore_spore: ['seed', 'venom'], sunpetal: ['herb', 'topaz'], moonleaf: ['herb', 'frost'],
   moonleaf_seed: ['seed', 'frost'], sunpetal_seed: ['seed', 'topaz'], river_fish: ['fish', 'blue'], moon_carp: ['fish', 'frost'], star_koi: ['fish', 'gold'], star_shard: ['star', 'holy'],
   // furniture

@@ -123,7 +123,6 @@ SIGIL_SYMBOLS.forEach((sym, si) => SIGIL_SHAPES.forEach((shape, sh) => sigilBase
 registerItems([
   { id: 'arm_shard', name: 'Armament Shard', kind: 'material', stack: 99, price: 600, desc: 'Enhances an armament up to +6. Dropped by dungeon bosses on Nightmare and Armageddon, and by world bosses of level 30 or higher.' },
   { id: 'arm_core', name: 'Armament Core', kind: 'material', stack: 99, price: 2500, desc: 'Enhances an armament from +6 to +12. Dropped rarely by the harder dungeon bosses on Nightmare and Armageddon, and by world bosses of level 60 or higher.' },
-  { id: 'awakening_essence', name: 'Awakening Essence', kind: 'material', stack: 99, price: 12000, desc: 'Awakens a fully trained skill (level 80). Dropped by Armageddon dungeon bosses and Rift guardians from floor 30.' },
   { id: 'arm_relic', name: 'Armament Relic', kind: 'material', stack: 99, price: 9000, desc: 'Enhances an armament from +12 to +20. Dropped very rarely by the hardest dungeon bosses on Nightmare and Armageddon, and by world bosses of level 100 or higher.' },
   ...sigilBases,
 ]);

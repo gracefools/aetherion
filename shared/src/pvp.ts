@@ -26,8 +26,7 @@ export function pvpRuleAt(zone: string, x: number, y: number): PvpRule {
 export const PVP_RESPAWN_SHIELD_MS = 60_000;
 /** G8: what the Arena Master sells for honour (base id, honour). Gear comes at the buyer's level. */
 export const HONOR_SHOP: [string, number][] = [
-  ['upgrade_stone', 30], ['scroll_advanced', 60], ['scroll_rare', 150],
-  ['gl_helm', 400], ['gl_amulet', 400], ['gl_ring', 400], ['conquerors_medal', 1500], ['mount_sky_griffin', 3000],
+  ['upgrade_stone', 30], ['gl_helm', 400], ['gl_amulet', 400], ['gl_ring', 400], ['conquerors_medal', 1500],
 ];
 /** Killing the same player again within this time gives no honour or rating. */
 export const PVP_REPEAT_MS = 10 * 60_000;

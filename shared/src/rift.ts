@@ -37,7 +37,7 @@ export function riftFloorTypes(floor: number, level: number): string[] {
 /** Reward for every climber on clearing a floor. */
 export function riftReward(floor: number, level: number): { gold: number; exp: number; items: [string, number][] } {
   const boss = isBossFloor(floor);
-  const items: [string, number][] = boss ? [['upgrade_stone', 2 + Math.floor(floor / 10)], ...(floor >= 30 ? [['awakening_essence', 1] as [string, number]] : []), ...(level >= 30 ? [['arm_shard', 1 + Math.floor(floor / 15)] as [string, number]] : []), ...(floor >= 20 && level >= 60 ? [['arm_core', 1] as [string, number]] : [])] : [];
+  const items: [string, number][] = boss ? [['upgrade_stone', 2 + Math.floor(floor / 10)], ...(floor >= 30 ? [['arm_relic', 1] as [string, number]] : []), ...(level >= 30 ? [['arm_shard', 1 + Math.floor(floor / 15)] as [string, number]] : []), ...(floor >= 20 && level >= 60 ? [['arm_core', 1] as [string, number]] : [])] : [];
   return { gold: Math.round(12 * level * (1 + floor * 0.1) * (boss ? 4 : 1)), exp: Math.round(6 * level ** 1.45 * (1 + floor * 0.06) * (boss ? 4 : 1)), items };
 }
 export interface RiftScore {

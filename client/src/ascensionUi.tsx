@@ -11,6 +11,7 @@ import { AWAKEN_LEVEL, AWAKEN_POINTS, awakenKind } from '../../shared/src/awaken
 import type { Game, Hud } from './game/Game';
 import { t, useT } from './i18n';
 import { skillIcon } from './game/skillicons';
+import { SkillFacts } from './skillInfo';
 
 const STAT_KEY: Record<string, string> = { atk: 'stat.atk', matk: 'stat.matk', maxHp: 'stat.hp', def: 'stat.def', mdef: 'stat.mdef', crit: 'stat.crit', critDmg: 'stat.critDmg', healPower: 'stat.heal', maxRes: 'stat.mana', moveMul: 'stat.speed', atkIntervalMs: 'stat.atkTime', range: 'stat.range', dodge: 'stat.dodge', lifesteal: 'stat.lifesteal', runeCost: 'stat.runeCost' };
 /** A path's bonus per milestone, in words. */
@@ -78,6 +79,7 @@ export function AscensionPanel({ game, onClose }: { game: Game; onClose: () => v
                   </div>
                   <div className="chips"><span className="chip">{t('asc.bonusPer')}: {pathBonusText(d)}</span>{on && n > 0 && <span className="chip better">{t('asc.bonusNow', { n })}: {pathBonusText(d, n)}</span>}</div>
                   <p className="ultline"><b>{t('asc.ultimate')}: {u.name}</b> <small className="sub">{u.desc}</small></p>
+                  <SkillFacts def={u} hud={hud} cost={u.cost} />
                   <button className={on ? '' : 'primary'} disabled={on || me.level < ASCENSION_LEVEL} onClick={() => game.ascOp('path', { id: d.id })}>
                     {on ? t('asc.chosen') : a.path ? t('asc.change') : t('asc.choose')}
                   </button>

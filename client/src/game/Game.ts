@@ -765,7 +765,7 @@ export class Game {
     if (this.floaters.length > 120) this.floaters.splice(0, this.floaters.length - 120);
   }
   /** Ranks the equipped sigils add to this character's skills and sub-skills. */
-  private sigilExtra(): Record<string, number> {
+  sigilExtra(): Record<string, number> {
     const me = this.hud.self, b = this.hud.build;
     return me && b ? sigilRanks(me.job, me.level, this.hud.gear, b.skills) : {};
   }
@@ -936,7 +936,7 @@ export class Game {
     if (!cur || cur.id !== r.meta.id || cur.hp !== r.hp || cur.mhp !== r.mhp) this.setHud({ ally: { id: r.meta.id, name: r.meta.name, hp: r.hp, mhp: r.mhp } });
   }
   private setBuild(build: Build) {
-    if (this.me) this.setAuto({ cfg: withSkills(this.hud.auto.cfg, this.me.job, build) });
+    if (this.me) this.setAuto({ cfg: withSkills(this.hud.auto.cfg, this.me.job, build, this.me.level) });
     this.setHud({ build, points: this.me ? freePoints(this.me.level, build) : 0 });
   }
   private onFx(e: number[], now: number) {
@@ -1161,7 +1161,7 @@ export class Game {
       case 'auto': {
         // the server's view of the session: its figures, and its decision when it ends one
         if (!m.on && this.hunter.on) this.hunter.stop(m.why ? `Stopped: ${m.why}` : 'Stopped');
-        const cfg = this.me && this.hud.build ? withSkills(m.cfg, this.me.job, this.hud.build) : m.cfg;
+        const cfg = this.me && this.hud.build ? withSkills(m.cfg, this.me.job, this.hud.build, this.me.level) : m.cfg;
         this.setAuto({ on: this.hunter.on, stats: m.stats, status: this.hunter.status, ...(this.hunter.on ? {} : { cfg }) });
         if (m.why) this.pushChat({ text: `Auto hunting stopped: ${m.why}.` });
         return;
@@ -1319,7 +1319,7 @@ export class Game {
     }
     this.setHud({ status: 'playing', zone: ZONES[m.zone].name, channel: m.channel, self: m.self, stats: m.stats, hp: m.hp, res: m.res, exp: m.exp, next: m.next, target: null, attacking: false, build: m.build, points: freePoints(m.self.level, m.build), cast: null, ally: null, inv: m.inv, eq: m.eq, gold: m.gold, boss: null, gate: null, level: ZONES[m.zone].level, near: null, talk: null, disc: m.disc, zoneId: m.zone, trade: null, tradeInvite: null, factions: m.factions?.length ? m.factions : DEFAULT_FACTIONS,
       comp: m.comp ?? emptyCompanions(), bank: m.bank ?? emptyBank(), gear: m.gear ?? emptyGear(), arena: !!m.arena, duel: null, dinv: null,
-      auto: { on: false, status: this.hunter.on ? 'Stopped: you left the hunting area' : this.hud.auto.status, target: '', cfg: withSkills(m.auto, m.self.job, m.build), stats: this.hud.auto.stats } });
+      auto: { on: false, status: this.hunter.on ? 'Stopped: you left the hunting area' : this.hud.auto.status, target: '', cfg: withSkills(m.auto, m.self.job, m.build, m.self.level), stats: this.hud.auto.stats } });
     if (this.hunter.busy) {
       this.hunter.stop('Stopped: you left the hunting area');
       this.hunter.cancelReturn();

@@ -233,7 +233,7 @@ export class AutoHunter {
     const inPlace = sight && dist <= reachEff;
 
     // --- the ultimate first, as soon as it is charged and the target is in sight ---
-    const ult = cfg.skills ? h.ultReady() : null;
+    const ult = cfg.skills && cfg.ult !== false ? h.ultReady() : null;
     if (ult && sight && dist <= 220 && now - this.lastSkill > 300) {
       this.lastSkill = now;
       h.useAbility(ult);

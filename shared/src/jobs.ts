@@ -331,7 +331,8 @@ export function computeStats(job: Job, level: number, weapon: number, ranks: Rec
     runeCost: 1,
     runeLevel: 0,
   };
-  for (const n of d.skills) if (n.type === 'passive' && ranks[n.id] > 0) PASSIVE_NODES[n.id]?.(s, Math.min(n.maxRank, ranks[n.id]));
+  // sigils may lift a passive above its maximum rank, and each extra rank counts like a learned one
+  for (const n of d.skills) if (n.type === 'passive' && ranks[n.id] > 0) PASSIVE_NODES[n.id]?.(s, ranks[n.id]);
   for (const p of parts.cls === false ? [] : unlockedPassives(job, level)) {
     if (p.mul) for (const k in p.mul) s[k as StatKey] *= p.mul[k as StatKey]!;
     if (p.add) for (const k in p.add) s[k as StatKey] += p.add[k as StatKey]!;

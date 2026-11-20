@@ -26,7 +26,7 @@ import { RiftTracker } from './riftUi';
 import { RaidTracker, SiegeTracker } from './conquestUi';
 import { AscensionSummary, AscensionPanel } from './ascensionUi';
 import { LifePanel } from './lifeUi';
-import { FUSION_LEVEL, FUSION_RUNE_LEVEL, fusionsFor } from '../../shared/src/awakening';
+import { FUSIONS, FUSION_LEVEL, FUSION_RUNE_LEVEL, fusionsFor } from '../../shared/src/awakening';
 import { ASCENSION_LEVEL, COMBO_LEVEL, COMBO_WINDOW_MS, comboOf, PATH_INDEX, ULT_MAX } from '../../shared/src/ascension';
 import { Dock, MENU_OF_ACTION, menuLock } from './dock';
 import { Sprite } from './sprite';
@@ -69,6 +69,7 @@ import { tip as tipOn } from './tooltip';
 import { hdMountSprite, hdPetSprite } from './game/hdcomp';
 import { toDockTop } from './rail';
 import { TitleBackdrop } from './titleArt';
+import { abilityFacts, SkillFacts } from './skillInfo';
 
 interface Character {
   id: number;
@@ -570,6 +571,7 @@ function Slot({ def: base, hotkey, hud, game, locked, combo, gauge }: { def: Abi
         {def.range ? <span>{t('skill.range', { n: def.range })}</span> : null}
       </div>
       <p className="tipdesc">{def.desc}</p>
+      <ul className="tipfacts">{abilityFacts(def, hud, game.sigilExtra()).map((f, i) => <li key={i}>{f}</li>)}</ul>
       {locked && <p className="err">{locked}</p>}
     </div>
   );
@@ -637,14 +639,15 @@ function SkillBook({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () =
             <div key={tier} className="tier">
               <h3>{t('book.tier', { n: tier })}</h3>
               {d.skills.filter((n) => n.tier === tier).map((n, i) => {
-                const rank = b.skills[n.id] ?? 0, why = learnBlock(me.job, me.level, b, n.id), base = ABILITIES[n.id], def = base && game.ability(n.id);
+                const rank = b.skills[n.id] ?? 0, why = learnBlock(me.job, me.level, b, n.id), base = ABILITIES[n.id], def = base && game.ability(n.id), sig = game.sigilExtra(), extra = sig[n.id] ?? 0;
                 return (
                   <React.Fragment key={n.id}>
                   <div className={'node row2' + (rank ? ' on' : '')}>
                     <img className="nodeicon" src={skillIcon(n.id)} alt="" />
                     <div className="grow">
-                      <b>{n.name}</b> <small>{n.type === 'passive' ? t('skill.passive') : t('book.key', { k: keyOf(`skill.${jobActives(me.job).indexOf(base) + 1}` as Action) })} · {t('common.lv', { n: n.level })} · {t('book.rank', { r: rank, m: n.maxRank })}</small>
-                      <div>{n.desc}{def ? ` ${def.costAll ? t('skill.allRage') : def.cost ? t(d.resource === 'rage' ? 'skill.costRage' : 'skill.costMana', { n: def.cost }) : t('skill.free')}, ${t('skill.cd', { s: def.cdMs / 1000 })}.` : ''}</div>
+                      <b>{n.name}</b> <small>{n.type === 'passive' ? t('skill.passive') : t('book.key', { k: keyOf(`skill.${jobActives(me.job).indexOf(base) + 1}` as Action) })} · {t('common.lv', { n: n.level })} · {extra ? <b className="better">{t('book.rankSig', { r: rank, m: n.maxRank, x: extra, e: rank + extra })}</b> : t('book.rank', { r: rank, m: n.maxRank })}</small>
+                      <div>{n.desc}</div>
+                      {def && <SkillFacts def={def} hud={hud} cost={def.cost} rage={d.resource === 'rage'} sigil={sig} />}
                     </div>
                     <button disabled={!!why} title={why ? tm(why) : t('book.spend')} aria-label={t('book.learnName', { name: n.name })} onClick={() => game.learn(n.id)}>{rank ? t('book.addRank') : t('book.learn')}</button>
                   </div>
@@ -678,6 +681,7 @@ function SkillBook({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () =
                         <img className="nodeicon" src={skillIcon(sp.id)} alt="" />
                         <b>{sp.name}</b> <small>{t('book.key', { k: runeKey(sl, i) })} · {t('rune.lv', { n: sp.unlock! })} · {t('skill.costMana', { n: costOf(sp, s) })} · {sp.cdMs / 1000}s{sp.castMs ? ` · ${t('skill.cast', { s: sp.castMs / 1000 })}` : ''}</small>
                         <div>{sp.desc}</div>
+                        <SkillFacts def={sp} hud={hud} cost={costOf(sp, s)} />
                       </div>
                     ))}
                   </>
@@ -685,8 +689,35 @@ function SkillBook({ hud, game, onClose }: { hud: Hud; game: Game; onClose: () =
               })()}
             </div>
           ))}
+          <FusionList hud={hud} />
         </>
       )}
+    </div>
+  );
+}
+
+/** The rune fusions: locked with what they need before level 90; then every pair of attuned runes, ready or waiting on rune levels. */
+function FusionList({ hud }: { hud: Hud }) {
+  const me = hud.self!, b = hud.build!, s = hud.stats!, open = me.level >= FUSION_LEVEL, slots = b.runes.slots;
+  const keys = (['fusion.1', 'fusion.2', 'fusion.3'] as Action[]).map((a) => keyOf(a)).join(' ');
+  const lvOf = (el: Element) => (b.runes.lv[el] ?? 1) + (s.runeLevel ?? 0);
+  return (
+    <div className={'tier fusions' + (open ? '' : ' locked')}>
+      <h3>{t('fu.title')} {!open && <small className="sub"><Icon name="lock" size={11} className="inl" /> {t('common.lv', { n: FUSION_LEVEL })}</small>}</h3>
+      <p className="sub">{open ? t('fu.help', { m: FUSION_RUNE_LEVEL }) : t('fu.lockedLevel', { n: FUSION_LEVEL, m: FUSION_RUNE_LEVEL, k: keys })}</p>
+      <div className="fusiongrid">
+        {FUSIONS.map((f) => {
+          const attuned = f.els.every((el) => slots.includes(el)), low = Math.min(lvOf(f.els[0]), lvOf(f.els[1])), ready = open && attuned && low >= FUSION_RUNE_LEVEL;
+          return (
+            <div key={f.id} className={'node spell fusion' + (ready ? ' on' : '') + (open && attuned ? '' : ' dim')}>
+              <img className="nodeicon" src={skillIcon(f.id)} alt="" />
+              <b>{f.name}</b> <small>{t('fu.pair', { a: tv(ELEMENT_NAMES[f.els[0]] ?? f.els[0]), b: tv(ELEMENT_NAMES[f.els[1]] ?? f.els[1]) })} · {ready ? t('fu.ready') : !open ? t('common.lv', { n: FUSION_LEVEL }) : !attuned ? t('fu.notAttuned') : t('fu.lowRune', { m: FUSION_RUNE_LEVEL, n: low })}</small>
+              <div>{f.desc}</div>
+              <SkillFacts def={f} hud={hud} cost={Math.round(f.cost * s.runeCost)} />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

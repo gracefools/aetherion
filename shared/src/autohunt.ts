@@ -9,6 +9,7 @@ import { ABILITIES, jobActives, runeSpells, type AbilityDef, type Build } from '
 import { ITEMS } from './items';
 import { MONSTERS } from './monsters';
 import { TILE, type Job } from './protocol';
+import { FUSION_LEVEL, fusionsFor } from './awakening';
 
 /** How a skill is used automatically. */
 export type AutoKind = 'enemy' | 'area' | 'heal' | 'buff';
@@ -39,6 +40,8 @@ export interface AutoConfig {
   elites: boolean;
   /** Also fight bosses (dungeon bosses and world bosses). Off by default. */
   bosses: boolean;
+  /** Unleash the ultimate as soon as it is charged (level 70, with a path). On by default. */
+  ult: boolean;
   /** Use an HP potion below this percentage of maximum HP. */
   hpPct: number;
   mpPct: number;
@@ -74,9 +77,11 @@ export function autoKind(def: AbilityDef): AutoKind | null {
 /** How far around the caster (or the target) the skill reaches, for counting enemies. */
 export const autoRadius = (def: AbilityDef) => def.hit?.aoeSelf ?? def.field?.r ?? def.hit?.aoe ?? def.hit?.splash ?? 0;
 /** Every ability of this character that auto hunting may use, in hotbar order. */
-export function autoAbilities(job: Job, build: Build): AbilityDef[] {
+export function autoAbilities(job: Job, build: Build, level = 0): AbilityDef[] {
   const out = jobActives(job).filter((d) => (build.skills[d.id] ?? 0) > 0);
   for (const el of build.runes.slots) if (el) out.push(...runeSpells(el));
+  // from level 90, the fusions of the attuned runes join the list
+  if (level >= FUSION_LEVEL) out.push(...fusionsFor(build.runes.slots));
   return out.filter((d) => autoKind(d));
 }
 export function defaultAutoSkill(def: AbilityDef, pri: number): AutoSkill {
@@ -84,7 +89,7 @@ export function defaultAutoSkill(def: AbilityDef, pri: number): AutoSkill {
   return { id: def.id, on: (kind === 'enemy' || kind === 'area') && !def.move, pri, minMp: kind === 'heal' ? 0 : 20, minEnemies: kind === 'area' ? (def.field?.kind === 'trap' ? 1 : 3) : 1, hpBelow: kind === 'heal' ? 60 : kind === 'buff' ? 100 : 100 };
 }
 export const DEFAULT_AUTO: AutoConfig = {
-  attack: true, skills: true, potions: true, loot: true, target: true, elites: false, bosses: false, hpPct: 60, mpPct: 30, radius: AUTO_RADIUS.def,
+  attack: true, skills: true, potions: true, loot: true, target: true, elites: false, bosses: false, ult: true, hpPct: 60, mpPct: 30, radius: AUTO_RADIUS.def,
   skillList: [], lootMode: 'all', ignore: [], onFull: 'continue', returnTo: 'none', finishWithSkills: false,
 };
 
@@ -104,15 +109,15 @@ export function cleanAutoConfig(raw: unknown): AutoConfig {
     }
   return {
     attack: flag(r.attack, d.attack), skills: flag(r.skills, d.skills), potions: flag(r.potions, d.potions), loot: flag(r.loot, d.loot), target: flag(r.target, d.target),
-    elites: flag(r.elites, d.elites), bosses: flag(r.bosses, d.bosses), hpPct: pct(r.hpPct, d.hpPct, 5, 95), mpPct: pct(r.mpPct, d.mpPct, 5, 95), radius: pct(r.radius, d.radius, AUTO_RADIUS.min, AUTO_RADIUS.max),
+    elites: flag(r.elites, d.elites), bosses: flag(r.bosses, d.bosses), ult: flag(r.ult, d.ult), hpPct: pct(r.hpPct, d.hpPct, 5, 95), mpPct: pct(r.mpPct, d.mpPct, 5, 95), radius: pct(r.radius, d.radius, AUTO_RADIUS.min, AUTO_RADIUS.max),
     skillList, lootMode: LOOT_MODES_AUTO.includes(r.lootMode) ? r.lootMode : d.lootMode,
     ignore: Array.isArray(r.ignore) ? [...new Set(r.ignore.filter((k: unknown) => (LOOT_KINDS as readonly string[]).includes(k as string)))] as string[] : [],
     onFull: r.onFull === 'stop' ? 'stop' : 'continue', returnTo: r.returnTo === 'start' || r.returnTo === 'town' ? r.returnTo : 'none', finishWithSkills: flag(r.finishWithSkills, d.finishWithSkills),
   };
 }
 /** The configuration with an entry for every skill the character can currently use (new skills get defaults). */
-export function withSkills(cfg: AutoConfig, job: Job, build: Build): AutoConfig {
-  const usable = autoAbilities(job, build), list = usable.map((def, i) => cfg.skillList.find((s) => s.id === def.id) ?? defaultAutoSkill(def, i));
+export function withSkills(cfg: AutoConfig, job: Job, build: Build, level = 0): AutoConfig {
+  const usable = autoAbilities(job, build, level), list = usable.map((def, i) => cfg.skillList.find((s) => s.id === def.id) ?? defaultAutoSkill(def, i));
   return { ...cfg, skillList: list };
 }
 

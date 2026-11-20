@@ -2688,6 +2688,19 @@ test('new rules: monsters have doubled health; regions refuse players below thei
   }
 });
 
+test('sigils lift passives past their maximum rank; fusions join auto hunting at level 90', () => {
+  // evasion (assassin passive): +3 dodge a rank, max 5; a sigil's +2 makes it work at rank 7
+  const max = JOB_DEFS.assassin.skills.find((s) => s.id === 'evasion')!.maxRank;
+  const at = (r: number) => computeStats('assassin', 60, 0, { evasion: r }).dodge;
+  assert.equal(at(max + 2) - at(max), 6, 'two ranks above the maximum still count');
+  // auto hunting: the fusions of the attuned runes appear only from level 90
+  const build = { skills: {}, runes: { slots: ['fire', 'water', null], lv: { fire: 10, water: 10 }, xp: {} } } as any;
+  assert.ok(!autoAbilities('mage', build, 89).some((d) => d.kind === 'fusion'));
+  assert.deepEqual(autoAbilities('mage', build, 90).filter((d) => d.kind === 'fusion').map((d) => d.id), ['fu_steam']);
+  assert.equal(cleanAutoConfig({}).ult, true, 'the ultimate is used automatically by default');
+  assert.equal(cleanAutoConfig({ ult: false }).ult, false, 'and can be switched off');
+});
+
 test('M8 gathering: range and cooldown per node, shared by the channel, respawning; no energy or daily limit', () => {
   const node = objAt('eldoria', 'node'), [dx, dy] = offset('eldoria', node);
   const { world, join, step } = harness({ capacity: 10 });

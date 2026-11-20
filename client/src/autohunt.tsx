@@ -138,6 +138,7 @@ export function AutoPanel({ hud, game, onClose }: { hud: Hud; game: Game; onClos
               </div>
             );
           })}
+          <label className="switch" title={t('auto.ultTip')}><input type="checkbox" checked={cfg.ult !== false} onChange={(e: any) => set({ ult: e.target.checked })} />{t('auto.ult')}</label>
           <label className="switch" title={t('auto.finishTip')}><input type="checkbox" checked={cfg.finishWithSkills} onChange={(e: any) => set({ finishWithSkills: e.target.checked })} />{t('auto.finish')}</label>
           <h3>{t('auto.loot')}</h3>
           <div className="autorow"><span>{t('auto.collect')}</span>

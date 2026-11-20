@@ -9,6 +9,7 @@ import { AudioSection } from './audio/ui';
 import { settings, toggleFullscreen } from './settings';
 import { t, useT, type Key } from './i18n';
 import { COLORBLIND } from '../../shared/src/settings';
+import { TOUCH_MODES } from '../../shared/src/settings';
 
 const useSettings = (): GameSettings => useSyncExternalStore(settings.subscribe, settings.get);
 const actionName = (a: Action) => t(`act.${a}` as Key);
@@ -177,6 +178,12 @@ function Interface() {
         <span id="uiscale">{t('ui.scale')}</span>
         <select aria-labelledby="uiscale" value={s.uiScale} onChange={(e: any) => settings.set({ uiScale: Number(e.target.value) })}>
           {UI_SCALES.map((v) => <option key={v} value={v}>{Math.round(v * 100)}%</option>)}
+        </select>
+      </div>
+      <div className="srow">
+        <span id="touchmode">{t('ui.touch')}</span>
+        <select aria-labelledby="touchmode" value={s.touch} onChange={(e: any) => settings.set({ touch: e.target.value })}>
+          {TOUCH_MODES.map((m) => <option key={m} value={m}>{t(`ui.touch.${m}` as Key)}</option>)}
         </select>
       </div>
       <div className="srow">

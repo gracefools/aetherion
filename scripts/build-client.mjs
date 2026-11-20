@@ -6,6 +6,9 @@ import { spawnSync } from 'node:child_process';
 fs.mkdirSync('client/dist', { recursive: true });
 fs.copyFileSync('client/public/index.html', 'client/dist/index.html');
 fs.copyFileSync('client/public/clock.js', 'client/dist/clock.js');
+// U3: the installable app (manifest, icons, service worker, offline page)
+for (const f of ['manifest.webmanifest', 'sw.js', 'offline.html', 'icon-192.png', 'icon-512.png', 'icon-maskable.png'])
+  if (fs.existsSync('client/public/' + f)) fs.copyFileSync('client/public/' + f, 'client/dist/' + f);
 const r = await build({
   entryPoints: ['client/src/main.tsx'],
   bundle: true,

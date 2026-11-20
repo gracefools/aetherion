@@ -71,6 +71,7 @@ import { toDockTop } from './rail';
 import { TitleBackdrop } from './titleArt';
 import { abilityFacts, SkillFacts } from './skillInfo';
 import { CtxMenu } from './ctxmenu';
+import { TouchControls } from './touch';
 
 interface Character {
   id: number;
@@ -826,6 +827,7 @@ function HudView({ game, onExit, input, sheet, setSheet, book, setBook, bag, set
       <Guard><MatchBar hud={hud} game={game} /></Guard>
       <Guard><MatchReady hud={hud} game={game} /></Guard>
       <TipLayer />
+      <Guard><TouchControls hud={hud} game={game} /></Guard>
       <Guard><CtxMenu hud={hud} game={game} whisper={(name) => { const el = input.current; if (el) { el.value = `/w ${name} `; el.dispatchEvent(new Event('input', { bubbles: true })); setTimeout(() => el.focus(), 0); } }} /></Guard>
       <Guard><PvpZoneBadge hud={hud} game={game} /></Guard>
       <Guard><TraitBadge hud={hud} /></Guard>
@@ -969,3 +971,7 @@ function tierText(b: TierBonus): string {
   }
   return out.join(', ');
 }
+
+// U3: installable app. The service worker only serves an offline page; the game always loads fresh.
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && window.isSecureContext)
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));

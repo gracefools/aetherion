@@ -42,7 +42,7 @@ export const MAX_MESSAGE_BYTES = 4096;
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.png': 'image/png', '.json': 'application/json', '.map': 'application/json', '.svg': 'image/svg+xml', '.ogg': 'audio/ogg',
+  '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.map': 'application/json', '.svg': 'image/svg+xml', '.ogg': 'audio/ogg',
 };
 
 /** Sent with every response. The page loads only its own script and talks only to its own server. */
@@ -240,7 +240,18 @@ export async function createApp(cfg: Config) {
   };
   const wss = new WebSocketServer({
     // 4 KB: the largest real message is an auto hunting configuration (about 1.8 KB with every skill a character can have)
-    server, path: '/ws', maxPayload: MAX_MESSAGE_BYTES, perMessageDeflate: false,
+    server, path: '/ws', maxPayload: MAX_MESSAGE_BYTES,
+    // T3: snapshots are compressed (permessage-deflate). Each socket keeps a small window (2 KB, about
+    // 20 KB of zlib state), so thousands of players stay cheap; tiny messages (inputs, pings) are sent as is.
+    // The payload limit applies after decompression, so a compressed flood cannot grow past it.
+    perMessageDeflate: cfg.wsDeflate ? {
+      zlibDeflateOptions: { level: 3, memLevel: 4 },
+      serverMaxWindowBits: 11,
+      clientNoContextTakeover: true,
+      clientMaxWindowBits: 11,
+      threshold: 96,
+      concurrencyLimit: 16,
+    } : false,
     verifyClient: (info: { req: http.IncomingMessage }, done: (ok: boolean, code?: number, msg?: string) => void) => {
       if (!originOk(info.req)) return done(false, 403, 'Origin not allowed');
       if (wss.clients.size >= cfg.maxConnections) return done(false, 503, 'Server full');

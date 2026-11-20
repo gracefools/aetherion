@@ -1578,3 +1578,30 @@ test('T4 moderation: mute refuses chat, ban kicks and refuses login and joining,
   m.close();
   await sleep(GRACE + 1200);
 });
+
+test('T3: the game socket is compressed (permessage-deflate) and snapshots shrink on the wire', async () => {
+  const a = await Bot.create(base, 'acc_t3a', 'Zipa', 'knight');
+  const b = await Bot.create(base, 'acc_t3b', 'Zipb', 'mage');
+  await a.connect();
+  await b.connect();
+  assert.match(a.ws!.extensions, /permessage-deflate/);
+  const w0 = a.wireIn, r0 = a.bytesIn;
+  for (let i = 0; i < 40; i++) { b.raw({ t: 'in', s: i + 1, x: i % 2 ? 1 : -1, y: 0, r: 1 }); await sleep(25); }
+  await sleep(300);
+  assert.ok(a.bytesIn - r0 > 500, 'snapshots arrived');
+  assert.ok(a.wireIn - w0 < (a.bytesIn - r0) * 0.8, `compressed: ${a.wireIn - w0} bytes on the wire for ${a.bytesIn - r0} of messages`);
+  a.close();
+  b.close();
+  await sleep(GRACE + 1200);
+});
+
+test('U3: the installable app files are served (manifest, icons, service worker, offline page)', async () => {
+  const m = await fetch(base + '/manifest.webmanifest');
+  assert.equal(m.status, 200);
+  assert.match(m.headers.get('content-type') ?? '', /manifest\+json/);
+  const man = await m.json();
+  assert.equal(man.start_url, '/');
+  for (const ic of man.icons) assert.equal((await fetch(base + ic.src)).headers.get('content-type'), 'image/png', ic.src);
+  assert.match(await (await fetch(base + '/sw.js')).text(), /offline\.html/);
+  assert.equal((await fetch(base + '/offline.html')).status, 200);
+});

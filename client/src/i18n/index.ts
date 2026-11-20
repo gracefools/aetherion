@@ -9,14 +9,15 @@
 // catalog in ./messages.ts. A unit test scans the server source and fails for any message the
 // catalog does not cover.
 //
-// Game content (item, skill, monster, place and quest names and descriptions, lore) is not yet
-// translated and is shown in English in every language.
+// Game content (item, skill, monster, place and quest names and descriptions, lore) is translated
+// by ./content.ts (U7): the content tables are switched to the chosen language in place.
 import { useSyncExternalStore } from 'react';
 import type { Lang } from '../../../shared/src/settings';
 import { settings } from '../settings';
 import { en } from './en';
 import { id } from './id';
 import { MESSAGES } from './messages';
+import { applyContentLang, tc } from './content';
 
 export type Key = keyof typeof en;
 export type Params = Record<string, string | number>;
@@ -25,6 +26,11 @@ export const DICTS: Record<Lang, Record<Key, string>> = { en, id };
 const fill = (s: string, p?: Params) => (p ? s.replace(/\{(\w+)\}/g, (m, k) => (k in p ? fmtVal(p[k]) : m)) : s);
 const fmtVal = (v: string | number) => (typeof v === 'number' ? v.toLocaleString(lang() === 'id' ? 'id-ID' : 'en-US') : v);
 export const lang = (): Lang => settings.get().lang;
+// U7: the content tables follow the language (in the browser only: tests and the server keep English)
+if (typeof document !== 'undefined') {
+  applyContentLang(lang());
+  settings.subscribe(() => applyContentLang(lang()));
+}
 
 /** Interface text for a key in the current language (English if a language somehow lacks it). */
 export function t(key: Key, p?: Params): string {
@@ -84,14 +90,14 @@ export function matchMessage(text: string): { key: string; params: Record<string
 export function tm(text: string, l: Lang = lang()): string {
   if (!text || l === 'en') return text;
   const depth = 0, hit = matchMessage(text);
-  if (!hit) return text;
+  if (!hit) return tc(text); // not a message: perhaps content (a boss shout, a name)
   const tpl = MESSAGES[hit.key][l];
   // values inside a message may themselves be messages (a refusal quoted in a sentence)
   return tpl.replace(/\{(\w+)\}/g, (m, k) => (k in hit.params ? (depth < 2 ? tmDepth(hit.params[k], l, depth + 1) : hit.params[k]) : m));
 }
 function tmDepth(text: string, l: Lang, depth: number): string {
   const hit = matchMessage(text);
-  if (!hit) return text;
+  if (!hit) return l === 'id' ? tc(text) : text; // a value: a name, an item
   return MESSAGES[hit.key][l].replace(/\{(\w+)\}/g, (m, k) => (k in hit.params ? (depth < 2 ? tmDepth(hit.params[k], l, depth + 1) : hit.params[k]) : m));
 }
 /** Same as useT, for components that show run-time messages. */

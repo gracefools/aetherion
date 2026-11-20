@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#161a26">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>Aetherion Online</title>
 <style>
   :root { --ink:#ecdfc4; --dim:#a89b82; --gold:#c9a24a; --bg:#161a26; --panel:rgba(22,26,40,.92); --line:#4a4030; --err:#ff8f7a; }
@@ -656,6 +663,35 @@
   .ctxmenu .ctxhead { font-weight: 700; padding: 4px 8px; color: #ffe08a; border-bottom: 1px solid rgba(255,255,255,0.12); margin-bottom: 2px; }
   .ctxmenu button { text-align: left; padding: 5px 8px; background: transparent; border: 0; } .ctxmenu button:hover, .ctxmenu button:focus { background: rgba(255,224,138,0.16); }
   .dropok { outline: 2px dashed #ffe08a; outline-offset: 2px; }
+  /* U3: touch controls and the phone layout (html.touch; the interface is scaled by --ui) */
+  html.touch canvas { touch-action: none; }
+  html.touch body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  html.touch input, html.touch textarea { -webkit-user-select: text; user-select: text; }
+  .touchpad { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+  .tstick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: max(18px, env(safe-area-inset-bottom)); width: 124px; height: 124px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,.08), rgba(255,255,255,.03) 60%, rgba(0,0,0,.25)); border: 2px solid rgba(236,223,196,.35); pointer-events: auto; touch-action: none; }
+  .tstick i { position: absolute; left: 37px; top: 37px; width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f3e3b8, #c9a24a 60%, #7a5f24); box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  .tbtns { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 176px; height: 150px; pointer-events: none; }
+  .touchpad .tbtn { position: absolute; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; padding: 0; pointer-events: auto; touch-action: none;
+    background: rgba(22,26,40,.72); border: 2px solid rgba(236,223,196,.4); color: var(--ink); }
+  .touchpad .tbtn:active { background: rgba(201,162,74,.45); } .touchpad .tbtn:disabled { opacity: .35; }
+  .touchpad .tbtn.big { width: 82px; height: 82px; right: 0; bottom: 0; border-color: var(--gold); background: radial-gradient(circle, rgba(201,162,74,.35), rgba(22,26,40,.8)); }
+  .tbtns .tbtn:nth-child(2) { right: 92px; bottom: 0; } .tbtns .tbtn:nth-child(3) { right: 88px; bottom: 62px; }
+  .tbtns .tbtn:nth-child(4) { right: 30px; bottom: 92px; } .tbtns .tbtn:nth-child(5) { right: 146px; bottom: 46px; width: 44px; height: 44px; }
+  .rotatehint { display: none; }
+  html.touch.portrait .rotatehint { display: block; position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 100px); translate: -50% 0; pointer-events: auto; font-size: 13px; padding: 6px 12px; border-radius: 16px; background: rgba(22,26,40,.85); }
+  .play .chatfab { position: absolute; left: 14px; bottom: calc(150px / var(--ui, 1)); border-radius: 50%; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; padding: 0; background: var(--panel); border: 1px solid var(--line); pointer-events: auto; }
+  .chatfab b { position: absolute; top: -4px; right: -4px; min-width: 20px; padding: 0 5px; border-radius: 10px; background: #c0392b; color: #fff; font-size: 12px; }
+  html.touch .chat.touchchat { z-index: 35; } .chatfold { float: right; }
+  html.touch .keys, html.touch .hint .key { display: none; }
+  html.touch .hotbar { bottom: calc(14px / var(--ui, 1)); }
+  html.touch .dock { bottom: calc(176px / var(--ui, 1)); }
+  html.touch .autopanel, html.touch .lootfeed, html.touch .pointsbtn { bottom: calc(200px / var(--ui, 1)) !important; }
+  html.touch.portrait .hotbar { bottom: calc(160px / var(--ui, 1)); }
+  html.touch.portrait .dock { bottom: calc(260px / var(--ui, 1)); }
+  html.touch .ctxmenu button { padding: 10px 12px; }
+  html.touch .coach { top: calc(100px / var(--ui, 1)); bottom: auto; left: 10px; max-width: calc(330px / var(--ui, 1)); }
+  html.touch.portrait .coach { top: auto; bottom: calc(340px / var(--ui, 1)); }
 </style>
 </head>
 <body>

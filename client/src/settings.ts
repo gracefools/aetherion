@@ -71,9 +71,20 @@ class SettingsStore {
     } catch { /* offline: local settings stay in force */ }
   }
   /** Things the page itself reflects: the interface scale and the document language. */
+  private watching = false;
   private apply() {
     if (typeof document === 'undefined') return;
-    document.documentElement.style.setProperty('--ui', String(this.s.uiScale));
+    // U3: touch mode (on touch screens unless switched off) shrinks the interface on small screens
+    const touch = touchActive(this.s), short = Math.min(window.innerWidth, window.innerHeight);
+    const tz = touch ? (short < 500 ? 0.6 : short < 800 ? 0.8 : 1) : 1;
+    document.documentElement.classList.toggle('touch', touch);
+    document.documentElement.classList.toggle('portrait', window.innerHeight > window.innerWidth);
+    document.documentElement.style.setProperty('--ui', String(Math.round(this.s.uiScale * tz * 100) / 100));
+    if (!this.watching) {
+      this.watching = true;
+      window.addEventListener('resize', () => this.apply());
+      try { matchMedia('(pointer: coarse)').addEventListener('change', () => { this.apply(); for (const f of this.subs) f(); }); } catch { /* old browsers */ }
+    }
     document.documentElement.lang = this.s.lang;
     // U6: colour correction (an SVG filter on the game and its interface), contrast and motion
     const a = this.s.access, root = document.documentElement;
@@ -121,6 +132,11 @@ function installColorFilters() {
     svg.appendChild(f);
   }
   document.body.appendChild(svg);
+}
+/** U3: whether the on-screen touch controls and the phone layout are in use. */
+export function touchActive(s: GameSettings): boolean {
+  if (s.touch !== 'auto') return s.touch === 'on';
+  try { return matchMedia('(pointer: coarse)').matches; } catch { return false; }
 }
 function guessLang(): GameSettings['lang'] {
   return typeof navigator !== 'undefined' && /^id\b/i.test(navigator.language ?? '') ? 'id' : 'en';

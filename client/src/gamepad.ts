@@ -18,7 +18,8 @@ const BUTTONS: (Action | null)[] = [
 ];
 const DEAD = 0.45;
 
-function send(type: 'keydown' | 'keyup', action: Action | 'escape') {
+/** Presses or lets go of an action as the keyboard would (its first bound key). */
+export function send(type: 'keydown' | 'keyup', action: Action | 'escape') {
   const code = action === 'escape' ? 'Escape' : settings.get().keys[action]?.[0];
   if (!code) return;
   window.dispatchEvent(new KeyboardEvent(type, { code, key: code, bubbles: true, cancelable: true }));

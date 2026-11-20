@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MAX_CHAT_LEN } from '../../shared/src/protocol';
 import { keyOf, type Game, type Hud } from './game/Game';
 import { t, tm, type Key } from './i18n';
+import { useTouch } from './touch';
+import { Icon } from './ui/icons';
 
 type Line = Hud['chat'][number];
 const TABS = ['all', 'zone', 'world', 'lfg', 'party', 'guild', 'whisper', 'sys'] as const;
@@ -12,6 +14,8 @@ const inTab = (c: Line, tab: Tab) =>
   tab === 'all' ? true : tab === 'sys' ? !c.from : !!c.from && (tab === 'zone' ? !c.ch || c.ch === 'zone' : c.ch === tab);
 
 export function ChatBox({ hud, game, input }: { hud: Hud; game: Game; input: { current: HTMLInputElement | null } }) {
+  const touch = useTouch();
+  const [shut, setShut] = useState(true); // U3: in touch mode the chat is a button until opened
   const [text, setText] = useState('');
   const [ch, setCh] = useState('zone');
   const [tab, setTab] = useState('all' as Tab);
@@ -39,8 +43,13 @@ export function ChatBox({ hud, game, input }: { hud: Hud; game: Game; input: { c
     input.current?.blur();
   };
   const shown = hud.chat.filter((c) => inTab(c, tab));
+  if (touch && shut) {
+    const unread = hud.chat.filter((c) => c.id > seen.all && !!c.from).length;
+    return <button className="hud chatfab" aria-label={t('touch.chat')} onClick={() => setShut(false)}><Icon name="chat" size={22} />{unread > 0 && <b>{unread > 99 ? '99+' : unread}</b>}</button>;
+  }
   return (
-    <div className="hud bl panel chat">
+    <div className={'hud bl panel chat' + (touch ? ' touchchat' : '')}>
+      {touch && <button className="link chatfold" onClick={() => { setShut(true); setSeen(Object.fromEntries(TABS.map((k) => [k, lastId])) as Record<Tab, number>); }}>{t('touch.chatClose')}</button>}
       <div className="chattabs" role="tablist" aria-label={t('chat.tabs')}>
         {TABS.map((k) => {
           if ((k === 'party' && !hud.party) || (k === 'guild' && !hud.guild)) return null;

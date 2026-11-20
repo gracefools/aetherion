@@ -27,6 +27,10 @@ export class Bot {
   seq = 0;
   snaps = 0;
   bytesIn = 0;
+  /** T3: bytes read off the wire (after permessage-deflate compression), including frame headers. */
+  get wireIn(): number {
+    return (this.ws as any)?._socket?.bytesRead ?? 0;
+  }
   remotes = new Map<number, EntityMeta & { m?: number }>();
   events: number[][] = [];
   dmg: [number, number, number, number][] = [];

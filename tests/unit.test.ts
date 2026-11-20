@@ -7132,3 +7132,40 @@ test('T4: a muted player cannot chat; moderation commands are refused for player
   assert.equal(a.p.admin, false);
   assert.ok(a.p.mutedUntil > Date.now());
 });
+
+test('U7: every shown piece of game content has Indonesian, keeps its numbers, and the switch is exact both ways', async () => {
+  const { CONTENT_ID, CONTENT_KEPT } = await import('../client/src/i18n/contentId');
+  const { contentRootsSync } = await import('../client/src/i18n/contentWalk');
+  const { applyContentLang, tc } = await import('../client/src/i18n/content');
+  const kept = new Set(CONTENT_KEPT), strings = new Set<string>(), seen = new Set<object>();
+  const isEnum = (o: object) => Object.entries(o).length > 0 && Object.entries(o).every(([k, v]) => typeof v === 'number' || (/^\d+$/.test(k) && typeof v === 'string'));
+  const walk = (v: any) => {
+    if (typeof v === 'string') { if (/[A-Za-z]/.test(v) && (/\s/.test(v) || /^[A-Z]/.test(v))) strings.add(v); return; }
+    if (!v || typeof v !== 'object' || seen.has(v) || isEnum(v)) return;
+    seen.add(v);
+    for (const [k, x] of Object.entries(v)) if (!/^t_/.test(k) && !(typeof (x as any)?.id === 'string' && /^t_/.test((x as any).id))) walk(x); // fixtures other tests add
+  };
+  for (const r of contentRootsSync()) walk(r);
+  const missing = [...strings].filter((s) => CONTENT_ID[s] === undefined && !kept.has(s));
+  assert.deepEqual(missing.slice(0, 20), [], `content without Indonesian (${missing.length}): add it to client/src/i18n/contentId.ts`);
+  for (const [en, id] of Object.entries(CONTENT_ID)) assert.deepEqual(id.match(/\d+/g), en.match(/\d+/g), `numbers kept: ${en}`);
+  const before = JSON.stringify(contentRootsSync());
+  applyContentLang('id');
+  assert.equal(ITEMS.hp_potion.name, CONTENT_ID['Health Potion']);
+  assert.equal(tc('Health Potion'), CONTENT_ID['Health Potion']);
+  assert.notEqual(JSON.stringify(contentRootsSync()), before, 'Indonesian is in the tables');
+  applyContentLang('en');
+  assert.equal(JSON.stringify(contentRootsSync()), before, 'and English is back exactly');
+});
+
+test('U3: the joystick gives eight directions with a dead zone; touch mode is a cleaned setting', async () => {
+  const { stickKeys } = await import('../client/src/stick');
+  assert.deepEqual(stickKeys(0.1, 0.1), [], 'a resting thumb does not move');
+  assert.deepEqual(stickKeys(1, 0), ['move.right']);
+  assert.deepEqual(stickKeys(0, -1), ['move.up']);
+  assert.deepEqual(stickKeys(-0.7, 0.7), ['move.down', 'move.left'], 'diagonals hold two keys');
+  assert.deepEqual(stickKeys(0.95, 0.2), ['move.right'], 'nearly straight stays straight');
+  assert.equal(cleanGameSettings({}).touch, 'auto');
+  assert.equal(cleanGameSettings({ touch: 'on' }).touch, 'on');
+  assert.equal(cleanGameSettings({ touch: 'sideways' }).touch, 'auto');
+});

@@ -6,6 +6,7 @@ declare module 'ws' {
     constructor(url: string);
     readyState: number;
     bufferedAmount: number;
+    extensions: string;
     send(data: string): void;
     close(): void;
     terminate(): void;
@@ -14,7 +15,7 @@ declare module 'ws' {
     on(ev: 'error', cb: (e: Error) => void): this;
   }
   export class WebSocketServer {
-    constructor(opts: { server: Server; path?: string; maxPayload?: number; perMessageDeflate?: boolean; verifyClient?: (info: { req: import('node:http').IncomingMessage }, done: (ok: boolean, code?: number, msg?: string) => void) => void });
+    constructor(opts: { server: Server; path?: string; maxPayload?: number; perMessageDeflate?: boolean | Record<string, unknown>; verifyClient?: (info: { req: import('node:http').IncomingMessage }, done: (ok: boolean, code?: number, msg?: string) => void) => void });
     clients: Set<WebSocket>;
     on(ev: 'connection', cb: (ws: WebSocket, req: import('node:http').IncomingMessage) => void): this;
   }

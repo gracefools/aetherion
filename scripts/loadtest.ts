@@ -56,12 +56,14 @@ await sleep(5000); // warm-up
 const m0 = (await http(base, '/api/metrics', undefined, process.env.METRICS_TOKEN)).body;
 const snaps0 = bots.reduce((a, b) => a + b.snaps, 0);
 const bytes0 = bots.reduce((a, b) => a + b.bytesIn, 0);
+const wire0 = bots.reduce((a, b) => a + b.wireIn, 0);
 const cpu0 = process.cpuUsage();
 await sleep(SECS * 1000);
 const m1 = (await http(base, '/api/metrics', undefined, process.env.METRICS_TOKEN)).body;
 clearInterval(timer);
 const snaps = bots.reduce((a, b) => a + b.snaps, 0) - snaps0;
 const bytes = bots.reduce((a, b) => a + b.bytesIn, 0) - bytes0;
+const wire = bots.reduce((a, b) => a + b.wireIn, 0) - wire0;
 const avgRemotes = bots.reduce((a, b) => a + b.remotes.size, 0) / N;
 const dropped = bots.filter((b) => b.closed).length;
 const ticks = m1.tick - m0.tick;
@@ -74,6 +76,8 @@ console.log(JSON.stringify({
   avgVisiblePlayersPerClient: +avgRemotes.toFixed(1),
   snapshotsPerClientPerSec: +(snaps / N / SECS).toFixed(1),
   kBpsDownPerClient: +((bytes * 8) / 1000 / N / SECS).toFixed(1),
+  // T3: what actually crosses the network (compressed frames)
+  wireKbpsDownPerClient: +((wire * 8) / 1000 / N / SECS).toFixed(1),
   monsters: m1.monsters, parties: m1.parties, damageEventsSeen: bots.reduce((a, b) => a + b.dmg.length, 0), botsThatGainedExp: bots.filter((b) => b.xp > 0).length,
   abilityCasts: bots.reduce((a, b) => a + b.events.filter((e) => e[0] === b.characterId && e[1] === 4).length, 0),
   inputsSentPerSec: Math.round(sent / (SECS + 5)),

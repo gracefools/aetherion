@@ -11,6 +11,7 @@ import { t, useT, type Key } from './i18n';
 import { settings } from './settings';
 import { GUILD_CREATE_LEVEL } from '../../shared/src/economy';
 import { Icon, type IconName } from './ui/icons';
+import { touchActive } from './settings';
 
 export interface DockActions {
   character: () => void;
@@ -107,7 +108,8 @@ export function Dock({ hud, act, open }: { hud: Hud; act: DockActions; open: Par
   useSyncExternalStore(settings.subscribe, settings.get); // shortcut labels follow the bindings
   const [mini, setMini] = useState(() => {
     try {
-      return localStorage.getItem('aetherion.dock') === 'mini';
+      const v = localStorage.getItem('aetherion.dock');
+      return v ? v === 'mini' : touchActive(settings.get()); // U3: compact on touch screens until chosen
     } catch {
       return false;
     }

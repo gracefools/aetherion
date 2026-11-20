@@ -8,6 +8,7 @@ import type { Game } from './game/Game';
 import { settings } from './settings';
 import { currentStep } from './tutorial';
 import { t, useT, type Key } from './i18n';
+import { touchActive } from './settings';
 
 /** The keys a step's text mentions, from the player's own bindings. */
 function keysFor(): Record<string, string> {
@@ -19,7 +20,7 @@ function keysFor(): Record<string, string> {
   };
 }
 export const stepTitle = (s: TutorialStep) => t(`tut.${s}.title` as Key);
-export const stepText = (s: TutorialStep) => t(`tut.${s}.text` as Key, keysFor());
+export const stepText = (s: TutorialStep) => (s === 'move' && touchActive(settings.get()) ? t('tut.move.touch') : t(`tut.${s}.text` as Key, keysFor()));
 
 export function TutorialCoach({ game, onOpen }: { game: Game; onOpen: () => void }) {
   useT();

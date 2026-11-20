@@ -154,6 +154,8 @@ export interface GameSettings {
     skipped: boolean;
   };
   markers: MapMarker[];
+  /** U3: on-screen touch controls and the phone layout (auto: on touch screens). */
+  touch: TouchMode;
   /** U6: accessibility. */
   access: {
     /** Colour correction for colour-blind players: shifts the colours they confuse into ones they tell apart. */
@@ -165,6 +167,8 @@ export interface GameSettings {
   };
 }
 export const COLORBLIND = ['none', 'protan', 'deutan', 'tritan'] as const;
+export const TOUCH_MODES = ['auto', 'on', 'off'] as const;
+export type TouchMode = (typeof TOUCH_MODES)[number];
 export type Colorblind = (typeof COLORBLIND)[number];
 export const defaultGameSettings = (): GameSettings => ({
   keys: defaultBindings(),
@@ -176,6 +180,7 @@ export const defaultGameSettings = (): GameSettings => ({
   movement: { walkToggle: false, aimAtCursor: true, clickMove: true },
   tutorial: { done: [], skipped: false },
   markers: [],
+  touch: 'auto',
   access: { colorblind: 'none', contrast: false, reduceMotion: false },
 });
 
@@ -215,6 +220,7 @@ export function cleanGameSettings(raw: unknown): GameSettings {
   };
   const zr = obj(r.camera).zoom;
   out.camera = { zoom: zr === 1 || zr === 2 ? zr : 0 };
+  out.touch = TOUCH_MODES.includes(r.touch as TouchMode) ? (r.touch as TouchMode) : 'auto';
   const ac = obj(r.access);
   out.access = { colorblind: COLORBLIND.includes(ac.colorblind as Colorblind) ? (ac.colorblind as Colorblind) : 'none', contrast: bool(ac.contrast, false), reduceMotion: bool(ac.reduceMotion, false) };
   out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false), aimAtCursor: bool(obj(r.movement).aimAtCursor, true) , clickMove: bool(obj(r.movement).clickMove, true) };

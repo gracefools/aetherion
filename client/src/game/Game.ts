@@ -66,6 +66,7 @@ import { BG, BG_BASES, BG_SHRINE, MATCH_ZONE, type MatchView } from '../../../sh
 import { ambient, glowSprite, windOf } from './ambient';
 import { AUTO_MOUNT_MS, MOUNT_FORBIDDEN_KINDS } from '../../../shared/src/companions';
 import { clearLine, findPath, tileOf, tileXY } from '../../../shared/src/nav';
+import { tc } from '../i18n/content';
 
 export interface ChatLine {
   id: number;
@@ -490,6 +491,9 @@ export class Game {
     window.addEventListener('resize', this.resize);
     this.canvas.addEventListener('mousedown', this.onClick);
     this.canvas.addEventListener('contextmenu', this.onContext);
+    this.canvas.addEventListener('pointerdown', this.onPress);
+    this.canvas.addEventListener('pointerup', this.onRelease);
+    this.canvas.addEventListener('pointercancel', this.onRelease);
     this.canvas.addEventListener('wheel', this.onWheel, { passive: false });
     this.canvas.addEventListener('mousemove', this.onMouse);
     this.canvas.addEventListener('mouseleave', this.onMouse);
@@ -530,6 +534,9 @@ export class Game {
     window.removeEventListener('resize', this.resize);
     this.canvas.removeEventListener('mousedown', this.onClick);
     this.canvas.removeEventListener('contextmenu', this.onContext);
+    this.canvas.removeEventListener('pointerdown', this.onPress);
+    this.canvas.removeEventListener('pointerup', this.onRelease);
+    this.canvas.removeEventListener('pointercancel', this.onRelease);
     this.canvas.removeEventListener('wheel', this.onWheel);
     this.unsubSettings();
     this.ws?.close();
@@ -609,6 +616,7 @@ export class Game {
   /** G1: where the mouse points in the world (for aimed skills), or null when it is off the game. */
   private mouseAt: { cx: number; cy: number } | null = null;
   private onMouse = (e: MouseEvent) => {
+    if (this.pressTimer && e.type === 'mousemove' && (e.buttons & 1)) clearTimeout(this.pressTimer);
     this.mouseAt = e.type === 'mouseleave' ? null : { cx: e.clientX, cy: e.clientY };
   };
   private aimPoint(): { x: number; y: number } | null {
@@ -698,9 +706,21 @@ export class Game {
     const z = settings.get().camera.zoom, n = Math.max(0, Math.min(2, z + (e.deltaY < 0 ? 1 : -1))) as 0 | 1 | 2;
     if (n !== z) settings.set({ camera: { zoom: n } });
   };
+  /** U3: a finger held still on the world for half a second opens the action menu (phones have no right button). */
+  private pressTimer = 0;
+  private ctxAt = 0;
+  private onPress = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch') return;
+    clearTimeout(this.pressTimer);
+    const x = e.clientX, y = e.clientY;
+    this.pressTimer = window.setTimeout(() => this.onContext(new MouseEvent('contextmenu', { clientX: x, clientY: y })), 520);
+  };
+  private onRelease = () => clearTimeout(this.pressTimer);
   private onContext = (e: MouseEvent) => {
     e.preventDefault();
-    if (this.hud.status !== 'playing') return;
+    clearTimeout(this.pressTimer);
+    if (this.hud.status !== 'playing' || performance.now() - this.ctxAt < 700) return; // a long press can also fire the browser's own
+    this.ctxAt = performance.now();
     const { wx, wy } = this.worldAt(e), { r, o } = this.pickAt(wx, wy);
     const base = { sx: e.clientX, sy: e.clientY, wx, wy, id: 0, obj: '', name: '' };
     let ctx: CtxMenu;
@@ -1505,6 +1525,7 @@ export class Game {
     if (m.add)
       for (const e of m.add) {
         const mt = e.mt ?? '';
+        if (mt) e.name = tc(e.name); // U7: monster names in the player's language
         this.remotes.set(e.id, {
           meta: e, mt, sheet: mt ? getMonsterSheet(mt) : getCharSheet(e.ap!, e.job!), buf: [t, e.x, e.y], d: e.d, m: 0, rx: e.x, ry: e.y,
           act: null, actAt: 0, hp: e.hp, mhp: e.mhp, st: e.st, hitAt: 0, deadAt: e.hp <= 0 ? now - 2000 : 0, castUntil: 0, stepAt: 0,

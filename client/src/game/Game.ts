@@ -65,6 +65,7 @@ import { DODGE } from '../../../shared/src/combat';
 import { BG, BG_BASES, BG_SHRINE, MATCH_ZONE, type MatchView } from '../../../shared/src/matches';
 import { ambient, glowSprite, windOf } from './ambient';
 import { AUTO_MOUNT_MS, MOUNT_FORBIDDEN_KINDS } from '../../../shared/src/companions';
+import { clearLine, findPath, tileOf, tileXY } from '../../../shared/src/nav';
 
 export interface ChatLine {
   id: number;
@@ -85,6 +86,17 @@ export interface TargetInfo {
   player?: boolean;
   /** A monster of an open-PvP area. */
   fierce?: boolean;
+}
+/** U4: what a right click opened a menu for. */
+export interface CtxMenu {
+  sx: number;
+  sy: number;
+  kind: 'monster' | 'player' | 'enemy' | 'npc' | 'node' | 'ground';
+  id: number;
+  obj: string;
+  name: string;
+  wx: number;
+  wy: number;
 }
 export interface Hud {
   status: 'connecting' | 'playing' | 'reconnecting' | 'kicked';
@@ -137,6 +149,8 @@ export interface Hud {
   level: [number, number];
   /** The object in reach, for the interaction hint. */
   near: { id: string; kind: string; name: string; hint: string } | null;
+  /** U4: the right-click menu, at screen coordinates, for what was under the cursor. */
+  ctx: CtxMenu | null;
   /** Id of the NPC the player is talking to. */
   talk: string | null;
   /** Waystones attuned and caches opened. */
@@ -326,7 +340,7 @@ export class Game {
     status: 'connecting', reason: '', zone: '', channel: 1, ping: 0, fps: 0, nearby: 0, chat: [], self: null, stats: null,
     hp: 0, res: 0, exp: 0, next: 1, statuses: [], statusUntil: [], target: null, attacking: false, dead: 0, canRespawn: false, toast: '',
     build: null, points: 0, cds: {}, cast: null, ally: null, notice: '', party: null, invite: null,
-    inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, talk: null, disc: [], zoneId: '',
+    inv: [], eq: {}, gold: 0, potionAt: 0, shop: false, loot: [], banner: null, boss: null, dungeon: null, gate: null, level: [1, 1], near: null, ctx: null, talk: null, disc: [], zoneId: '',
     auto: { on: false, status: 'Stopped', target: '', cfg: DEFAULT_AUTO, stats: emptyAutoStats() }, trade: null, tradeInvite: null,
     quests: emptyQuests(), journal: emptyJournal(), friends: [], wevent: null, rift: null, riftTop: null, asc: emptyAscension(), life: null, home: null, territory: { held: [], factions: {} }, siege: null, raidLobbies: null, raid: null, ult: 0, combo: { i: 0, at: 0 }, mail: null, mailUnread: 0, qprog: {}, rep: {}, factions: DEFAULT_FACTIONS,
     guild: null, grank: 3, ginv: null, bank: emptyBank(), ah: null, ahhist: [], banklog: [],
@@ -475,6 +489,8 @@ export class Game {
     window.addEventListener('blur', this.onBlur);
     window.addEventListener('resize', this.resize);
     this.canvas.addEventListener('mousedown', this.onClick);
+    this.canvas.addEventListener('contextmenu', this.onContext);
+    this.canvas.addEventListener('wheel', this.onWheel, { passive: false });
     this.canvas.addEventListener('mousemove', this.onMouse);
     this.canvas.addEventListener('mouseleave', this.onMouse);
     this.unsubSettings = settings.subscribe(this.resize); // camera zoom
@@ -513,6 +529,8 @@ export class Game {
     window.removeEventListener('blur', this.onBlur);
     window.removeEventListener('resize', this.resize);
     this.canvas.removeEventListener('mousedown', this.onClick);
+    this.canvas.removeEventListener('contextmenu', this.onContext);
+    this.canvas.removeEventListener('wheel', this.onWheel);
     this.unsubSettings();
     this.ws?.close();
     this.subs.clear();
@@ -598,9 +616,117 @@ export class Game {
     const r = this.canvas.getBoundingClientRect();
     return { x: this.camX + (this.mouseAt.cx - r.left) / this.zoom, y: this.camY + (this.mouseAt.cy - r.top) / this.zoom };
   }
-  private onClick = (e: MouseEvent) => {
+  private worldAt(e: MouseEvent) {
     const r = this.canvas.getBoundingClientRect();
-    const wx = this.camX + (e.clientX - r.left) / this.zoom, wy = this.camY + (e.clientY - r.top) / this.zoom;
+    return { wx: this.camX + (e.clientX - r.left) / this.zoom, wy: this.camY + (e.clientY - r.top) / this.zoom };
+  }
+  /** U4: what is under the cursor: a monster, then a player, then a character or gathering spot. */
+  private pickAt(wx: number, wy: number): { r?: Remote; o?: WorldObj } {
+    let best: Remote | undefined, bd = 1e9;
+    for (const m of this.remotes.values()) {
+      if (!m.mt || m.hp <= 0) continue;
+      const d = Math.hypot(m.rx - wx, m.ry - 6 - wy);
+      if (d < MONSTERS[m.mt].radius * monsterScale(m.mt) + 12 && d < bd) { bd = d; best = m; }
+    }
+    if (best) return { r: best };
+    for (const r of this.remotes.values()) {
+      if (r.mt || r.meta.id === this.me?.id) continue;
+      const d = Math.hypot(r.rx - wx, r.ry - 10 - wy);
+      if (d < 18 && d < bd) { bd = d; best = r; }
+    }
+    if (best) return { r: best };
+    let ob: WorldObj | undefined;
+    for (const o of this.objs) {
+      if (!isNpc(o) && o.kind !== 'node') continue;
+      const d = Math.hypot(o.x - wx, o.y - 10 - wy);
+      if (d < 20 && d < bd) { bd = d; ob = o; }
+    }
+    return { o: ob };
+  }
+  // ---------- U4: click-to-move ----------
+  /** Where a click sent the character, and what to do on arrival. Movement keys and auto hunting cancel it. */
+  private goal: { x: number; y: number; then?: () => void } | null = null;
+  private goalPath: number[] = [];
+  private goalAt = 0;
+  /** Walks to a spot; with `then`, does it on arrival (talk to someone, gather). */
+  walkTo(x: number, y: number, then?: () => void) {
+    if (!this.map || this.isDead || this.hud.status !== 'playing') return;
+    this.goal = { x, y, then };
+    this.goalPath = [];
+    this.goalAt = 0;
+  }
+  /** The goal walker's next step (the same straight-line-or-route walking as the hunter's). */
+  private stepGoal(): { ix: number; iy: number } | null {
+    const g = this.goal, map = this.map;
+    if (!g || !map) return null;
+    const me = this.cur, near = g.then ? INTERACT_RANGE * 0.7 : 4;
+    if (Math.hypot(g.x - me.x, g.y - me.y) <= near) {
+      this.goal = null;
+      g.then?.();
+      return null;
+    }
+    const toward = (tx: number, ty: number) => {
+      const dx = tx - me.x, dy = ty - me.y, ix = Math.abs(dx) > 3 ? Math.sign(dx) : 0, iy = Math.abs(dy) > 3 ? Math.sign(dy) : 0;
+      return ix || iy ? { ix, iy } : null;
+    };
+    if (clearLine(map, me.x, me.y, g.x, g.y)) return toward(g.x, g.y) ?? (this.goal = null);
+    const now = performance.now();
+    if (!this.goalPath.length && now >= this.goalAt) {
+      this.goalAt = now + 500;
+      const nav = navOf(map.def.id);
+      this.goalPath = findPath(nav, tileOf(me.x), tileOf(me.y), tileOf(g.x), tileOf(g.y)) ?? [];
+      if (!this.goalPath.length) return (this.goal = null); // nowhere to walk to: give up quietly
+    }
+    const nav = navOf(map.def.id);
+    while (this.goalPath.length) {
+      const p = tileXY(nav, this.goalPath[0]);
+      if (Math.abs(p.x - me.x) <= 5 && Math.abs(p.y - me.y) <= 5) this.goalPath.shift();
+      else return toward(p.x, p.y);
+    }
+    return toward(g.x, g.y) ?? (this.goal = null);
+  }
+  /** Walks up to a character and talks, or to a gathering spot and gathers. */
+  approach(o: WorldObj) {
+    this.walkTo(o.x, o.y, () => {
+      this.refreshNear();
+      if (this.hud.near?.id === o.id) this.interact();
+    });
+  }
+  /** The mouse wheel zooms the camera in whole steps (crisp pixels), within what the server sends. */
+  private onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const z = settings.get().camera.zoom, n = Math.max(0, Math.min(2, z + (e.deltaY < 0 ? 1 : -1))) as 0 | 1 | 2;
+    if (n !== z) settings.set({ camera: { zoom: n } });
+  };
+  private onContext = (e: MouseEvent) => {
+    e.preventDefault();
+    if (this.hud.status !== 'playing') return;
+    const { wx, wy } = this.worldAt(e), { r, o } = this.pickAt(wx, wy);
+    const base = { sx: e.clientX, sy: e.clientY, wx, wy, id: 0, obj: '', name: '' };
+    let ctx: CtxMenu;
+    if (r?.mt) ctx = { ...base, kind: 'monster', id: r.meta.id, name: MONSTERS[r.mt].name };
+    else if (r) ctx = { ...base, kind: r.hp > 0 && this.canAttack(r) ? 'enemy' : 'player', id: r.meta.id, name: r.meta.name };
+    else if (o) ctx = { ...base, kind: isNpc(o) ? 'npc' : 'node', obj: o.id, name: o.name };
+    else ctx = { ...base, kind: 'ground' };
+    this.setHud({ ctx });
+  };
+  closeCtx() {
+    if (this.hud.ctx) this.setHud({ ctx: null });
+  }
+  /** Runs a right-click menu entry. */
+  ctxAct(a: 'target' | 'attack' | 'ally' | 'talk' | 'walk' | 'gather') {
+    const c = this.hud.ctx;
+    this.closeCtx();
+    if (!c) return;
+    if (a === 'target' || a === 'attack') { if (this.targetId === c.id && a === 'attack') this.doAction(); else { this.setTarget(c.id); if (a === 'attack') this.doAction(); } }
+    else if (a === 'ally') { this.friendId = c.id; this.refreshAlly(); }
+    else if (a === 'talk' || a === 'gather') { const o = this.objs.find((x) => x.id === c.obj); if (o) this.approach(o); }
+    else this.walkTo(c.wx, c.wy);
+  }
+  private onClick = (e: MouseEvent) => {
+    if (e.button !== 0) return; // the right button opens the menu (contextmenu)
+    this.closeCtx();
+    const { wx, wy } = this.worldAt(e);
     let best = 0, bd = 1e9;
     for (const m of this.remotes.values()) {
       if (!m.mt || m.hp <= 0) continue;
@@ -634,7 +760,13 @@ export class Game {
       }
       this.friendId = best;
       this.refreshAlly();
+      return;
     }
+    // U4: a character to talk to or a gathering spot: walk up and use it; otherwise walk to the spot
+    if (!settings.get().movement.clickMove || this.hunter.busy) return;
+    const { o } = this.pickAt(wx, wy);
+    if (o) return this.approach(o);
+    this.walkTo(wx, wy);
   };
   private resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
@@ -1023,6 +1155,8 @@ export class Game {
       case 'invite': return rest ? this.partyOp('invite', undefined, rest) : this.pushChat({ text: 'Usage: /invite Name' });
       case 'leave': return this.partyOp('leave');
       case 'trade': return rest ? this.tradeOp('invite', { name: rest }) : this.pushChat({ text: 'Usage: /trade Name' });
+      // T4: moderation (the server answers for accounts without the right)
+      case 'ban': case 'unban': case 'mute': case 'unmute': case 'kick': case 'audit': return this.sendMsg({ t: 'mod', op: cmd.toLowerCase(), arg: rest });
       default: return this.pushChat({ text: `Unknown command /${cmd}. Try /p, /g, /w Name, /invite Name, /trade Name, /duel Name, /ginvite Name, /leave.` });
     }
   }
@@ -1472,7 +1606,7 @@ export class Game {
         });
         if (amount > 0 && !(flags & (Dmg.Heal | Dmg.Dot | Dmg.Miss)) && this.hits.length < 5 * 40)
           this.hits.push(pos.x + (Math.random() * 10 - 5), pos.y - (r?.mt ? monsterHeight(r.mt) * 0.5 : 14), now + (mine ? 0 : INTERP_DELAY), flags & Dmg.Crit ? 1 : 0, mine ? 1 : 0);
-          if (settings.get().graphics.quality !== 'low') ambient.burst(pos.x, pos.y - (r?.mt ? monsterHeight(r.mt) * 0.5 : 14), flags & Dmg.Crit ? '#ffd24a' : mine ? '#ff9a8a' : '#fff3c4', flags & Dmg.Crit ? 14 : 6, flags & Dmg.Crit ? 110 : 70, now + (mine ? 0 : INTERP_DELAY));
+          if (settings.get().graphics.quality !== 'low' && !settings.get().access.reduceMotion) ambient.burst(pos.x, pos.y - (r?.mt ? monsterHeight(r.mt) * 0.5 : 14), flags & Dmg.Crit ? '#ffd24a' : mine ? '#ff9a8a' : '#fff3c4', flags & Dmg.Crit ? 14 : 6, flags & Dmg.Crit ? 110 : 70, now + (mine ? 0 : INTERP_DELAY));
         if (amount > 0 && !(flags & Dmg.Heal)) {
           if (mine) this.selfHitAt = now;
           else if (r) r.hitAt = now + INTERP_DELAY;
@@ -1546,6 +1680,11 @@ export class Game {
     ix = Math.sign(ix);
     iy = Math.sign(iy);
     let run = this.walkHeld ? 0 : 1;
+    // U4: a click-to-move walk; the movement keys or auto hunting take over from it
+    if (this.goal) {
+      if (ix || iy || this.hunter.busy) this.goal = null;
+      else { const s = this.stepGoal(); if (s) { ix = s.ix; iy = s.iy; } }
+    }
     if (this.hunter.busy) {
       // a hand on the movement keys always wins, but only while held: a hunt carries on from where you let go
       if (ix || iy) {
@@ -1749,7 +1888,7 @@ export class Game {
     // heavy effects shake the camera for a moment (never the stored camera used for mouse picking)
     screenFx.cx = px;
     screenFx.cy = py;
-    const shake = screenFx.shake > 0.3 ? screenFx.shake : 0;
+    const shake = screenFx.shake > 0.3 && !settings.get().access.reduceMotion ? screenFx.shake : 0; // U6: reduced motion: still
     screenFx.shake *= 0.86;
     this.camX = Math.round(vw >= mw ? (mw - vw) / 2 : Math.max(0, Math.min(mw - vw, px - vw / 2)));
     this.camY = Math.round(vh >= mh ? (mh - vh) / 2 : Math.max(0, Math.min(mh - vh, py - vh / 2)));
@@ -2322,6 +2461,15 @@ export class Game {
       screenFx.flash *= 0.8;
     }
     if (this.dbgOn) this.drawDebug(g, map, camX, camY, z, W, H);
+    if (this.goal) {
+      // U4: where a click is taking the character: a small pulsing ring on the ground
+      const gx = (this.goal.x - camX) * z, gy = (this.goal.y - camY) * z, k = 0.75 + 0.25 * Math.sin(now / 160);
+      g.strokeStyle = 'rgba(255,224,138,0.85)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.ellipse(gx, gy, 7 * z * k, 3.5 * z * k, 0, 0, 7);
+      g.stroke();
+    }
     if (this.isDead) {
       g.fillStyle = 'rgba(40,10,14,0.35)';
       g.fillRect(0, 0, W, H);

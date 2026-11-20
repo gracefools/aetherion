@@ -37,14 +37,23 @@ const BAG_FILTERS: [BagFilter, Key, (i: Item) => boolean][] = [
 ];
 /** One click on the sort icon sorts the way that suits what is shown: gear by rarity, the rest by type. */
 const sortFor = (f: BagFilter): SortKey => (f === 'equip' ? 'rarity' : f === 'mat' || f === 'scroll' ? 'name' : 'kind');
-function Cell({ item, sel, onClick, onUse, mark = false, hud }: { item?: Item; sel: boolean; onClick: () => void; onUse: () => void; mark?: boolean; hud?: Hud }) {
+/** U4: what is being dragged: a bag item (its uid) or a worn one (its slot). */
+const DRAG = 'application/x-aetherion-item';
+const dragData = (e: any): { uid?: string; slot?: string } | null => { try { return JSON.parse(e.dataTransfer.getData(DRAG)); } catch { return null; } };
+const dropZone = (accept: (d: { uid?: string; slot?: string }) => void) => ({
+  onDragOver: (e: any) => { if (e.dataTransfer.types.includes(DRAG)) { e.preventDefault(); e.currentTarget.classList.add('dropok'); } },
+  onDragLeave: (e: any) => e.currentTarget.classList.remove('dropok'),
+  onDrop: (e: any) => { e.preventDefault(); e.currentTarget.classList.remove('dropok'); const d = dragData(e); if (d) accept(d); },
+});
+function Cell({ item, sel, onClick, onUse, mark = false, hud, slot }: { item?: Item; sel: boolean; onClick: () => void; onUse: () => void; mark?: boolean; hud?: Hud; slot?: string }) {
   if (!item) return <span className="cell empty" />;
   const b = ITEMS[item.base];
   const tipProps = hud ? tip(() => <ItemTip item={item} hud={hud} />) : {};
   return (
     <button
       className={'cell' + (sel ? ' sel' : '') + (mark ? ' marked' : '')} style={{ borderColor: b.kind === 'equip' ? RARITY_COLOR[item.rar] : undefined }}
-      {...tipProps} onClick={onClick} onDoubleClick={(e: any) => { hideTip(); onUse(); void e; }} aria-label={`${b.kind === 'equip' ? rarName(item.rar) + ' ' : ''}${itemName(item)}${item.qty > 1 ? ` ×${item.qty}` : ''}${item.bd ? ` (${t('item.bound')})` : ''}`} aria-pressed={sel}
+      {...tipProps} draggable onDragStart={(e: any) => { hideTip(); e.dataTransfer.setData(DRAG, JSON.stringify(slot ? { slot } : { uid: item.uid })); e.dataTransfer.effectAllowed = 'move'; }}
+      onClick={onClick} onDoubleClick={(e: any) => { hideTip(); onUse(); void e; }} aria-label={`${b.kind === 'equip' ? rarName(item.rar) + ' ' : ''}${itemName(item)}${item.qty > 1 ? ` ×${item.qty}` : ''}${item.bd ? ` (${t('item.bound')})` : ''}`} aria-pressed={sel}
     >
       <Icon item={item} />
       {item.qty > 1 && <span className="qty">{item.qty}</span>}
@@ -237,8 +246,8 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
           <h3>{t('bag.equipped')}</h3>
           <div className="eqrow">
             {SLOTS.map((s) => (
-              <div key={s} className="eqslot">
-                {hud.eq[s] ? <Cell hud={hud} item={hud.eq[s]} sel={sel === hud.eq[s]!.uid} onClick={() => setSel(hud.eq[s]!.uid)} onUse={() => game.invOp('unequip', { slot: s })} /> : <span className="cell empty" />}
+              <div key={s} className="eqslot" {...dropZone((d) => { const it = d.uid && hud.inv.find((x) => x.uid === d.uid); if (it && ITEMS[it.base].slot === s) game.invOp('equip', { uid: d.uid }); })}>
+                {hud.eq[s] ? <Cell hud={hud} slot={s} item={hud.eq[s]} sel={sel === hud.eq[s]!.uid} onClick={() => setSel(hud.eq[s]!.uid)} onUse={() => game.invOp('unequip', { slot: s })} /> : <span className="cell empty" />}
                 <small>{slotName(s)}</small>
               </div>
             ))}
@@ -264,7 +273,7 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
               </select>
             </span>
           </div>
-          <div className="grid baggrid" role="list">
+          <div className="grid baggrid" role="list" {...dropZone((d) => d.slot && game.invOp('unequip', { slot: d.slot }))}>
             {shownItems.map((it) => <Cell hud={hud} key={it.uid} item={it} sel={sel === it.uid} mark={!!marks?.has(it.uid)} onClick={() => (marks ? toggle(it.uid) : (setSel(it.uid), setAskRead('')))} onUse={() => !marks && quick(it)} />)}
             {filtering ? !shownItems.length && <p className="sub">{t('bag.none')}</p>
               : Array.from({ length: Math.min(INVENTORY_SIZE - hud.inv.length, Math.max(0, 48 - hud.inv.length) + ((8 - (hud.inv.length % 8)) % 8)) }, (_, i) => <span key={`e${i}`} className="cell empty" />)}
@@ -275,7 +284,7 @@ export function InventoryPanel({ hud, game, onClose }: { hud: Hud; game: Game; o
         <div>
           {item ? <Details item={item} worn={worn} hud={hud} game={game} askRead={askRead === item.uid} /> : <p className="sub">{t('bag.select')}</p>}
           {hud.shop ? (
-            <div className="shop merchant">
+            <div className="shop merchant" {...dropZone((d) => d.uid && game.invOp('sell', { uid: d.uid, qty: hud.inv.find((x) => x.uid === d.uid)?.qty ?? 1 }))}>
               <div className="merchhead">
                 <h3>{t('shop.title')}</h3>
                 <b className="gold purse">{t('common.gold', { n: hud.gold })}</b>

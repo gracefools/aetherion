@@ -66,7 +66,6 @@ function Btn({ action, icon, label, big = false, off = false }: { action: Action
 export function TouchControls({ hud }: { hud: Hud; game: Game }) {
   useT();
   const on = useTouch();
-  const [hint, setHint] = useState(true);
   if (!on || hud.status !== 'playing') return null;
   return (
     <div className="touchpad">
@@ -78,7 +77,6 @@ export function TouchControls({ hud }: { hud: Hud; game: Game }) {
         <Btn action="potion.hp" icon="pot" label={t('touch.potion')} />
         <Btn action="dodge" icon="burst" label={t('touch.dodge')} />
       </div>
-      {hint && <button className="rotatehint" onClick={() => setHint(false)}>{t('touch.rotate')}</button>}
     </div>
   );
 }

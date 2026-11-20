@@ -7169,3 +7169,10 @@ test('U3: the joystick gives eight directions with a dead zone; touch mode is a 
   assert.equal(cleanGameSettings({ touch: 'on' }).touch, 'on');
   assert.equal(cleanGameSettings({ touch: 'sideways' }).touch, 'auto');
 });
+
+test('fullscreen on phones: asked once by default, then kept as chosen', () => {
+  assert.equal(cleanGameSettings({}).fullscreen, 'ask');
+  assert.equal(cleanGameSettings({ fullscreen: 'on' }).fullscreen, 'on');
+  assert.equal(cleanGameSettings({ fullscreen: 'off' }).fullscreen, 'off');
+  assert.equal(cleanGameSettings({ fullscreen: 'always' }).fullscreen, 'ask');
+});

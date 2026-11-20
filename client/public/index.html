@@ -708,13 +708,22 @@
   html.touch body:has(.win) .touchpad { display: none; }
   /* upright screens: event and boss boxes sit under the character frame instead of over it */
   html.portrait .topstack { top: calc(190px * var(--ui, 1)); width: calc(100% - 24px); min-width: 0; }
-  html.portrait .rotatehint { font-size: 12px; }
-  html.touch.portrait:not(.phone) .rotatehint { display: none; } /* tablets are fine upright */
-  html.touch.portrait.phone .rotatehint { top: auto; bottom: 214px; }
   /* short screens: the sound prompt goes to the bottom, clear of the title and the sign-in form */
   @media (max-height: 520px) { .audioprompt { top: auto; bottom: 8px; } }
   /* never a sideways scroll on the page itself */
   html, body { max-width: 100%; overflow-x: hidden; }
+  /* fullscreen prompt (phones and tablets, asked once) */
+  .play .fsask { position: fixed; z-index: 45; left: 50%; top: 50%; translate: -50% -50%; zoom: var(--uiw, 1); width: min(420px, calc(100vw / var(--uiw, 1) - 24px)); display: flex; gap: 12px; align-items: flex-start; padding: 16px; }
+  .fsask p { margin: 4px 0 10px; } .fsask .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  /* a phone held upright: the game waits under a request to turn it */
+  .portraitcover { display: none; }
+  html.touch.phone.portrait .play .portraitcover { display: flex; position: fixed; inset: 0; z-index: 90; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center;
+    background: radial-gradient(ellipse at 50% 35%, #2a3350, #0d1018 75%); color: var(--ink); font-size: 18px; }
+  .portraitcover .sub { max-width: 300px; font-size: 14px; margin: 0; }
+  .rotphone { width: 54px; height: 92px; border: 3px solid var(--gold); border-radius: 10px; position: relative; margin-bottom: 14px; animation: rotphone 2.4s ease-in-out infinite; }
+  .rotphone i { position: absolute; left: 50%; bottom: 6px; width: 10px; height: 3px; margin-left: -5px; border-radius: 2px; background: var(--gold); }
+  @keyframes rotphone { 0%, 25% { transform: rotate(0); } 55%, 85% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+  html.rm .rotphone { animation: none; transform: rotate(-90deg); }
 </style>
 </head>
 <body>

@@ -156,6 +156,8 @@ export interface GameSettings {
   markers: MapMarker[];
   /** U3: on-screen touch controls and the phone layout (auto: on touch screens). */
   touch: TouchMode;
+  /** Fullscreen and landscape on phones and tablets: ask once, then on (the first tap of a visit) or off. */
+  fullscreen: FullscreenMode;
   /** U6: accessibility. */
   access: {
     /** Colour correction for colour-blind players: shifts the colours they confuse into ones they tell apart. */
@@ -168,6 +170,8 @@ export interface GameSettings {
 }
 export const COLORBLIND = ['none', 'protan', 'deutan', 'tritan'] as const;
 export const TOUCH_MODES = ['auto', 'on', 'off'] as const;
+export const FULLSCREEN_MODES = ['ask', 'on', 'off'] as const;
+export type FullscreenMode = (typeof FULLSCREEN_MODES)[number];
 export type TouchMode = (typeof TOUCH_MODES)[number];
 export type Colorblind = (typeof COLORBLIND)[number];
 export const defaultGameSettings = (): GameSettings => ({
@@ -181,6 +185,7 @@ export const defaultGameSettings = (): GameSettings => ({
   tutorial: { done: [], skipped: false },
   markers: [],
   touch: 'auto',
+  fullscreen: 'ask',
   access: { colorblind: 'none', contrast: false, reduceMotion: false },
 });
 
@@ -221,6 +226,7 @@ export function cleanGameSettings(raw: unknown): GameSettings {
   const zr = obj(r.camera).zoom;
   out.camera = { zoom: zr === 1 || zr === 2 ? zr : 0 };
   out.touch = TOUCH_MODES.includes(r.touch as TouchMode) ? (r.touch as TouchMode) : 'auto';
+  out.fullscreen = FULLSCREEN_MODES.includes(r.fullscreen as FullscreenMode) ? (r.fullscreen as FullscreenMode) : 'ask';
   const ac = obj(r.access);
   out.access = { colorblind: COLORBLIND.includes(ac.colorblind as Colorblind) ? (ac.colorblind as Colorblind) : 'none', contrast: bool(ac.contrast, false), reduceMotion: bool(ac.reduceMotion, false) };
   out.movement = { walkToggle: bool(obj(r.movement).walkToggle, false), aimAtCursor: bool(obj(r.movement).aimAtCursor, true) , clickMove: bool(obj(r.movement).clickMove, true) };

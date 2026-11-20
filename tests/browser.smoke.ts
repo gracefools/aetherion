@@ -1342,18 +1342,21 @@ try {
     // the world map
     await p1.keyboard.press('KeyM');
     const map = p1.getByRole('dialog', { name: 'World map' });
-    await map.getByRole('button', { name: /^Eldoria, Lv\.1-5, explored, you are here/ }).waitFor();
+    await map.getByRole('tab', { name: 'Current map' }).waitFor(); // the map of where you are comes first
     await map.getByRole('img', { name: 'You' }).waitFor();
     await map.getByRole('img', { name: 'Waystone of Eldoria' }).waitFor();
     await map.getByRole('img', { name: new RegExp(`^Mossling, level \\d+ \\(${SPAWNS.eldoria.find((g) => g.type === 'mossling')!.count}\\)$`) }).first().waitFor();
     await map.getByRole('img', { name: /^Elite: Old Tusk/ }).waitFor();
     await map.getByRole('img', { name: 'Road to Verdant Reach' }).waitFor();
-    // a region never attuned stays hidden; its recommended level is still shown
+    // the world map tab: a region never attuned stays hidden; its recommended level is still shown
+    await map.getByRole('tab', { name: 'World map' }).click();
+    await map.getByRole('button', { name: /^Eldoria, Lv\.1-5, explored, you are here/ }).waitFor();
     await map.getByRole('button', { name: /^Astral Ruins, Lv\.34-45, Unexplored/ }).click();
     await map.getByText(/Unexplored\. Travel here and attune the waystone in Starfall Camp/).waitFor();
     assert.equal(await map.getByRole('img').count(), 0, 'no details of an unexplored region');
     // Verdant Reach (attuned earlier in this test): its dungeon is on the map
     await map.getByRole('button', { name: /^Verdant Reach, Lv\.4-10, explored/ }).click();
+    await map.getByRole('button', { name: 'Open the map of Verdant Reach' }).click();
     await map.getByRole('img', { name: /^Dungeon: Ancient Ruins, level 8\+/ }).waitFor();
     // a marker of one's own, kept with the account
     await map.getByRole('button', { name: 'Add a marker' }).click();

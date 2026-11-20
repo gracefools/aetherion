@@ -105,6 +105,8 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
   const hud: Hud = useSyncExternalStore(game.subscribe, game.getHud), s: GameSettings = useSyncExternalStore(settings.subscribe, settings.get);
   const here = regionOf(hud.zoneId);
   const [sel, setSel] = useState(here);
+  // two views: the map of the region (where you are, by default) and the world around Eldoria
+  const [tab, setTab] = useState('region' as 'region' | 'world');
   const [hide, setHide] = useState(new Set<Kind>());
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState(null as { x: number; y: number } | null);
@@ -112,9 +114,6 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
   const [label, setLabel] = useState('');
   const [, tick] = useState(0);
   const strip = useRef(null as HTMLOListElement | null);
-  useEffect(() => { // open on where the player is: the region strip scrolls to put it in the middle
-    strip.current?.querySelector('.region.here')?.scrollIntoView({ inline: 'center', block: 'nearest' });
-  }, []);
   useEffect(() => { // the player and party markers move: redraw twice a second
     const id = setInterval(() => tick((n: number) => n + 1), 500);
     return () => clearInterval(id);
@@ -141,6 +140,11 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
         <h2>{t('map.title')}</h2>
         <button className="link panelx" onClick={onClose} aria-label={t('map.close')}>{t('common.close')}</button>
       </div>
+      <div className="tabs maptabs" role="tablist" aria-label={t('map.views')}>
+        <button role="tab" aria-selected={tab === 'region'} className={tab === 'region' ? 'on' : ''} onClick={() => setTab('region')}><Icon name="map" size={14} className="inl" /> {sel === here ? t('map.tab.here') : t('map.tab.region', { name: z.name })}</button>
+        <button role="tab" aria-selected={tab === 'world'} className={tab === 'world' ? 'on' : ''} onClick={() => setTab('world')}><Icon name="castle" size={14} className="inl" /> {t('map.tab.world')}</button>
+      </div>
+      {tab === 'world' && (<>
       <ol className="regions worldchart" ref={strip} aria-label={t('map.regions')}>
         <li className="chartroads" aria-hidden="true">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -154,7 +158,7 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
           void i;
           return (
             <li key={r} className="chartnode" style={{ left: `${at[0]}%`, top: `${at[1]}%` }}>
-              <button className={'region ' + (d.depth ? 'depth ' : '') + (ok ? 'open' : 'locked') + (sel === r ? ' on' : '') + (here === r ? ' here' : '') + (rec ? ' rec' : '') + (low ? ' low' : '')} onClick={() => { setSel(r); setDraft(null); }} aria-pressed={sel === r}
+              <button className={'region ' + (d.depth ? 'depth ' : '') + (ok ? 'open' : 'locked') + (sel === r ? ' on' : '') + (here === r ? ' here' : '') + (rec ? ' rec' : '') + (low ? ' low' : '')} onClick={() => { setSel(r); setDraft(null); }} onDoubleClick={() => setTab('region')} aria-pressed={sel === r}
                 aria-label={`${d.name}, ${t('common.lvRange', { a: d.level[0], b: d.level[1] })}, ${ok ? t('map.explored') : t('map.unexplored')}${here === r ? `, ${t('map.youAreHere')}` : ''}${rec ? `, ${t('map.recommended')}` : ''}`}>
                 <b>{d.name}</b>
                 <small>{t('common.lvRange', { a: d.level[0], b: d.level[1] })}{rec && <em className="recmark" title={t('map.recommended')}> ★</em>}</small>
@@ -176,6 +180,20 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
           );
         })}
       </ol>
+      <div className="worldcard">
+        <div>
+          <h3>{z.name} <small className="sub">{t('map.recLevel', { a: z.level[0], b: z.level[1] })}</small>{sel === here && <small className="herechip">{t('map.youAreHere')}</small>}</h3>
+          <p className="sub">{z.blurb}</p>
+          {z.depth && <p className="locknote">{t('map.depthNote', { n: Math.round((DEPTH_MONSTER.exp - 1) * 100), lv: ZONES[z.depth.host].level[0] })}</p>}
+          {!open && <p className="locknote">{t('map.lockedHelp', { town: (z.depth ? ZONES[z.depth.host] : z).town?.name ?? z.name })}</p>}
+        </div>
+        <div className="actions">
+          {open && <GoHere game={game} hud={hud} sel={sel} dest={dest} onClose={onClose} />}
+          <button className={open ? '' : 'primary'} onClick={() => setTab('region')}><Icon name="map" size={14} className="inl" /> {t('map.viewRegion', { name: z.name })}</button>
+        </div>
+      </div>
+      </>)}
+      {tab === 'region' && (
       <div className="mapbody">
         <div className="mapinfo">
           <h3>{z.name} <small className="sub">{t('map.recLevel', { a: z.level[0], b: z.level[1] })}</small></h3>
@@ -215,6 +233,8 @@ export function WorldMap({ game, onClose }: { game: Game; onClose: () => void })
         </div>
         <RegionView region={sel} open={open} pins={pins} adding={adding} onPick={(x, y) => { setDraft({ x, y }); setAdding(false); }} onGo={(x, y) => setDest({ zone: sel, x, y })} dest={dest?.zone === sel ? dest : null} draft={draft} />
       </div>
+      )}
+      {tab === 'region' && sel !== here && <div className="actions"><button className="link" onClick={() => { setSel(here); setDraft(null); }}>{t('map.backHere', { name: ZONES[here].name })}</button></div>}
     </div>
   );
 }

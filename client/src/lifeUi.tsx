@@ -7,6 +7,7 @@ import {
   GROW_MS, haulChances, PROF_MAX, PROFESSIONS, profExpToNext, SEASON_LEVELS, SEASON_XP, seasonEnds, seasonLevel, seasonReward, SEEDS, TIER_MATS, type FoodKind,
 } from '../../shared/src/life';
 import type { Game, Hud } from './game/Game';
+import { ProfessionsTab } from './professionsUi';
 import { t, useT } from './i18n';
 import { AURA_SHOP } from '../../shared/src/life';
 
@@ -17,14 +18,8 @@ export function LifePanel({ game, onClose }: { game: Game; onClose: () => void }
   useT();
   const hud = useSyncExternalStore(game.subscribe, game.getHud) as Hud;
   const [tab, setTab] = useState('prof' as Tab) as [Tab, (t: Tab) => void];
-  const [base, setBase] = useState('');
-  const [stats, setStats] = useState([] as GearStat[]) as [GearStat[], (s: GearStat[]) => void];
-  const [flvl, setFlvl] = useState(30);
-  const [dish, setDish] = useState('steak' as FoodKind) as [FoodKind, (k: FoodKind) => void];
   const me = hud.self, l = hud.life;
   if (!me || !l) return null;
-  const smith = l.prof.smithing.lv, rates = forgeRates(smith), cost = forgeCost(flvl), energy = energyNow(l, Date.now());
-  const have = (b: string) => hud.inv.reduce((n, i) => n + (i.base === b ? i.qty : 0), 0);
   const sl = seasonLevel(l.season.xp), days = Math.max(0, Math.ceil((seasonEnds(Date.now()) - Date.now()) / 86_400_000));
   return (
     <div className="hud lifepanel panel" role="dialog" aria-label={t('life.title')}>
@@ -35,69 +30,7 @@ export function LifePanel({ game, onClose }: { game: Game; onClose: () => void }
       <div className="tabs" role="tablist">
         {TABS.map((x) => <button key={x} role="tab" aria-selected={tab === x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{t(`life.tab.${x}` as any)}</button>)}
       </div>
-      {tab === 'prof' && (
-        <div className="jrbody">
-          <div className="energyrow" title={t('life.energyTip')}>
-            <span>{t('life.energy')}</span>
-            <div className="bar energy"><i style={{ width: `${(energy / ENERGY_MAX) * 100}%` }} /></div>
-            <b>{energy} / {ENERGY_MAX}</b>
-          </div>
-          <p className="sub">{t('life.energyHelp', { a: ENERGY_COST[1], b: ENERGY_COST[2], c: ENERGY_COST[3], d: ENERGY_COST[4] })}</p>
-          {PROFESSIONS.map((p) => {
-            const s = l.prof[p], c = haulChances(s.lv);
-            const note = p === 'herbalism' || p === 'fishing' ? t('life.haul', { a: Math.round(c.x2 * 100), b: Math.round(c.x3 * 1000) / 10, c: Math.round(c.x4 * 1000) / 10 })
-              : p === 'mining' ? t('life.mineExtra', { n: extraYield(s.lv) }) : t('life.smithOdds', { m: rates[4], l: rates[3] });
-            return (
-              <div key={p} className="mission">
-                <span>{t(`life.prof.${p}` as any)} <b>{s.lv}</b></span>
-                <div className="bar"><i style={{ width: `${s.lv >= PROF_MAX ? 100 : (s.xp / profExpToNext(s.lv)) * 100}%` }} /></div>
-                <small>{note}</small>
-                {p === 'fishing' ? <button className="small" onClick={() => game.lifeOp('fish')}>{t('life.fish')}</button> : <span />}
-              </div>
-            );
-          })}
-          <h3>{t('life.forge')} <small className="sub">{t('life.forgeHelp2')}</small></h3>
-          <div className="actions">
-            <select value={flvl} onChange={(e: any) => setFlvl(Number(e.target.value))} aria-label={t('life.forgeLevel')}>
-              {FORGE_LEVELS.map((f) => <option key={f.ilvl} value={f.ilvl}>{t('life.forgeLv', { n: f.ilvl, ore: ITEMS[TIER_MATS.mining[f.tier - 1]].name, q: f.ore })}</option>)}
-            </select>
-            <select value={base} onChange={(e: any) => setBase(e.target.value)} aria-label={t('life.forgeItem')}>
-              <option value="">{t('life.forgeItem')}</option>
-              {FORGEABLE(me.job).map((id) => <option key={id} value={id}>{ITEMS[id].name}</option>)}
-            </select>
-          </div>
-          <div className="forgeodds" aria-label={t('life.forgeOdds')}>
-            {FORGE_RARITIES.map((r, i) => <span key={r} style={{ color: RARITY_COLOR[r] }}>{RARITIES[r]} <b>{rates[i]}%</b></span>)}
-          </div>
-          <div className="mailitems" role="group" aria-label={t('life.forgeStats2')}>
-            {GEAR_STATS.map((k) => (
-              <button key={k} type="button" className={stats.includes(k) ? 'on' : ''} aria-pressed={stats.includes(k)} onClick={() => setStats(stats.includes(k) ? stats.filter((x) => x !== k) : stats.length < 5 ? [...stats, k] : stats)}>
-                {stats.includes(k) && <b>{stats.indexOf(k) + 1}. </b>}{STAT_LABEL[k]}
-              </button>
-            ))}
-          </div>
-          <p className="sub">{t('life.forgeStatsHelp')}</p>
-          <div className="actions">
-            <span className="sub">{t('life.cost', { g: cost.gold.toLocaleString(), mats: cost.mats.map(([b, n]) => `${ITEMS[b].name} ×${n} (${have(b)})`).join(', ') })}</span>
-            <button className="primary" disabled={!base || !stats.length || hud.gold < cost.gold || cost.mats.some(([b, n]) => have(b) < n)} onClick={() => game.lifeOp('forge', { base, ilvl: flvl, stats })}>{t('life.forgeIt')}</button>
-          </div>
-          <h3>{t('life.cook')} <small className="sub">{t('life.cookHelp')}</small></h3>
-          <div className="actions">
-            <select value={dish} onChange={(e: any) => setDish(e.target.value)} aria-label={t('life.cookDish')}>
-              {FOODS.map((k) => <option key={k} value={k}>{t(`life.food.${k}` as any)}</option>)}
-            </select>
-          </div>
-          {[1, 2, 3, 4].map((tier) => {
-            const need = cookCost(tier), ok = need.every(([b, n]) => have(b) >= n), d = FOOD_STAT[dish];
-            return (
-              <div key={tier} className="shoprow">
-                <span>{ITEMS[foodId(dish, tier)].name} <small className="sub">{d.stat === 'moveMul' ? `+${d.v[tier - 1]}%` : `+${d.v[tier - 1]}`} · {need.map(([b, n]) => `${ITEMS[b].name} ${have(b)}/${n}`).join(' + ')}</small></span>
-                <button className="small" disabled={!ok} onClick={() => game.lifeOp('cook', { food: dish, tier })}>{t('life.cookIt')}</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {tab === 'prof' && <ProfessionsTab hud={hud} game={game} />}
       {tab === 'home' && <HomeTab hud={hud} game={game} />}
       {tab === 'season' && (
         <div className="jrbody">

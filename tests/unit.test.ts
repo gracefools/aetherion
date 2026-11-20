@@ -3083,7 +3083,7 @@ test('there is no energy, stamina, fatigue or entry-limit mechanic anywhere but 
   assert.ok(files.length > 30);
   for (const f of files) {
     const code = fs.readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.replace(/\/\/.*$/, '').replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""')).join('\n');
-    const gathering = /(^|[\\/])(life\.ts|Life\.ts|Places\.ts|lifeUi\.tsx)$/.test(f);
+    const gathering = /(^|[\\/])(life\.ts|Life\.ts|Places\.ts|lifeUi\.tsx|professionsUi\.tsx)$/.test(f);
     const hit = (gathering ? /\b\w*(stamina|fatigue)\w*\b/i : /\b\w*(stamina|energy|fatigue)\w*\b/i).exec(code);
     assert.equal(hit, null, `${f}: identifier "${hit?.[0]}"`);
   }
